@@ -79,7 +79,8 @@ export class TagVisualService {
 
         // 支持通过 data-tag 属性与 data-content 属性匹配正文标签，同时适配侧栏列表项
         const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
-        const selector = `span[data-type~="tag"][data-tag="${escapedLabel}"], `
+        const selector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
+          + `span[data-type~="tag"][data-tag="${escapedLabel}"], `
           + `span[data-type~="tag"][data-content="${escapedLabel}"], `
           + `.b3-list-item[data-label="${escapedLabel}"] .b3-list-item__text`;
 
@@ -104,7 +105,9 @@ export class TagVisualService {
           if (darkBg) darkDeclarations.push(`background-color: ${darkBg} !important;`);
           if (darkText) darkDeclarations.push(`color: ${darkText} !important;`);
           if (darkDeclarations.length > 0) {
-            const darkSelector = `[data-theme-mode="dark"] span[data-type~="tag"][data-tag="${escapedLabel}"], `
+            const darkSelector = `[data-theme-mode="dark"] .protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
+              + `[data-theme-mode="dark"] span[data-type~="tag"][data-tag="${escapedLabel}"], `
+              + `body.theme--dark .protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
               + `body.theme--dark span[data-type~="tag"][data-tag="${escapedLabel}"], `
               + `[data-theme-mode="dark"] span[data-type~="tag"][data-content="${escapedLabel}"], `
               + `body.theme--dark span[data-type~="tag"][data-content="${escapedLabel}"], `
@@ -118,7 +121,8 @@ export class TagVisualService {
       // 如果配置了自定义 Emoji/图标
       if (meta.icon) {
         const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
-        const iconSelector = `span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
+        const iconSelector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
+          + `span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
           + `span[data-type~="tag"][data-content="${escapedLabel}"]::before`;
         rules.push(`${iconSelector} { content: "${meta.icon} "; font-size: 0.9em; margin-right: 2px; }`);
       }

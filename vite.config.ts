@@ -1,5 +1,6 @@
 /* eslint-disable node/prefer-global/process */
 import { resolve } from "node:path"
+import { cpSync } from "node:fs"
 import vue from "@vitejs/plugin-vue"
 import fg from "fast-glob"
 import minimist from "minimist"
@@ -53,6 +54,19 @@ export default defineConfig(({
 
     plugins: [
       vue(),
+      {
+        name: 'copy-to-siyuan-workspace',
+        closeBundle() {
+          if (devDistDir && devDistDir !== './dist' && !isWatch) {
+            try {
+              cpSync('./dist', devDistDir, { recursive: true });
+              console.log(`\n[Build Sync] Successfully synced build output to ${devDistDir}`);
+            } catch (err) {
+              console.warn('[Build Sync] Sync to siyuan workspace failed:', err);
+            }
+          }
+        },
+      },
       viteStaticCopy({
         targets: [
           {

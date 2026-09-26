@@ -16,8 +16,8 @@ export class TagDomDecorator {
    */
   public static extractTagLabel(rawText: string | null | undefined): string {
     if (!rawText) return '';
-    // 过滤零宽空格（\u200B-\u200D）、BOM（\uFEFF）等隐藏字符
-    const cleaned = rawText.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+    // 过滤零宽字符（\u200B-\u200F）、格式控制字符（\u202A-\u202E）、单词连接符（\u2060-\u206F，思源Protyle行内标签默认前缀U+2060）及BOM字符（\uFEFF）
+    const cleaned = rawText.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '').trim();
     // 剥离首尾所有的 '#' 字符并修剪
     return cleaned.replace(/^#+|#+$/g, '').trim();
   }

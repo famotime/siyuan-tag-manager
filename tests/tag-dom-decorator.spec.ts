@@ -15,9 +15,12 @@ describe('TagDomDecorator 正文标签 DOM 属性装饰器测试', () => {
       expect(TagDomDecorator.extractTagLabel('#life/finance/stock#')).toBe('life/finance/stock');
     });
 
-    it('正确过滤零宽空格及隐藏格式字符', () => {
+    it('正确过滤零宽空格及隐藏格式字符（包括思源Protyle行内标签默认前缀 U+2060）', () => {
       expect(TagDomDecorator.extractTagLabel('\u200B#Prompt#\u200C')).toBe('Prompt');
       expect(TagDomDecorator.extractTagLabel('\uFEFF#Rust#\u200D')).toBe('Rust');
+      expect(TagDomDecorator.extractTagLabel('\u2060Python')).toBe('Python');
+      expect(TagDomDecorator.extractTagLabel('\u2060#Python#\u2060')).toBe('Python');
+      expect(TagDomDecorator.extractTagLabel('\u2060tech/python')).toBe('tech/python');
     });
 
     it('面对空串、纯 # 号或无效输入时返回空字符串', () => {

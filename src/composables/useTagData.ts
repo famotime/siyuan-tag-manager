@@ -3,6 +3,7 @@ import { showMessage } from 'siyuan';
 import type { ITagGroup, ITagItem, ITagMetadata } from '../types/tag';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagVisualService } from '../services/TagVisualService';
+import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
 import { usePlugin } from '../main';
 
@@ -81,6 +82,9 @@ export function useTagData() {
 
     const css = TagVisualService.generateCssRules(metaList);
     TagVisualService.applyStyles(css);
+    if (typeof document !== 'undefined') {
+      TagDomDecorator.decorateElement(document);
+    }
   }
 
   async function saveTagGroups(groups: ITagGroup[], savedViews: any[] = []) {
