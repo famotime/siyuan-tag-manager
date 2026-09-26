@@ -127,5 +127,15 @@ export class TagFilterEngine {
       excludeTags: nextExcludes,
     };
   }
+
+  /**
+   * 清空所有筛选标签条件，重置为空筛选状态
+   */
+  public static clearFilterSelection(): { includeTags: string[]; excludeTags: string[] } {
+    return {
+      includeTags: [],
+      excludeTags: [],
+    };
+  }
 }
 

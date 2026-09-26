@@ -175,21 +175,40 @@
               class="b3-button b3-button--outline tm-btn-sm"
               :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
               v-tooltip="'将当前组合保存为智能视图'"
+              aria-label="保存为智能视图"
               @click="openSaveViewDialog"
             >
-              <SyLineIcon name="save" :size="12" />
-              <span>保存</span>
+              <SyLineIcon name="save" :size="13" />
             </button>
           </div>
         </div>
 
-        <!-- 激活的筛选条件池 (紧凑胶囊) -->
-        <div class="tm-filter-box">
-          <div class="tm-section-hint">
-            <span>点击切换：</span>
-            <b class="text-primary">AND (必含)</b>
-            <span> | </span>
-            <b class="text-danger">NOT (排除)</b>
+        <!-- 激活的筛选条件池 (紧凑胶囊) 与候选标签区域 -->
+        <div
+          ref="filterBoxRef"
+          class="tm-filter-box"
+          :class="{
+            'is-custom-height': filterBoxHeight !== null,
+            'is-resizing': isResizingFilterBox
+          }"
+          :style="filterBoxStyle"
+        >
+          <div class="tm-filter-header">
+            <div class="tm-section-hint">
+              <span>点击切换：</span>
+              <b class="text-primary">AND (必含)</b>
+              <span> | </span>
+              <b class="text-danger">NOT (排除)</b>
+            </div>
+            <button
+              class="b3-button b3-button--text tm-clear-filter-btn"
+              :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
+              v-tooltip="'清空当前所有已选择的标签'"
+              @click="clearFilterTags"
+            >
+              <SyLineIcon name="trash" :size="11" />
+              <span>清空</span>
+            </button>
           </div>
           <div class="tm-active-chips">
             <div
@@ -226,9 +245,13 @@
             </div>
           </div>
 
-          <!-- 快速候选标签流 (可折叠) -->
+          <!-- 快速候选标签流 (可折叠 / 可拖拽拉伸高度消除滚动条) -->
           <div class="tm-quick-tags-wrapper">
-            <div class="tm-quick-tags" :class="{ 'is-expanded': expandQuickTags }">
+            <div
+              ref="quickTagsRef"
+              class="tm-quick-tags"
+              :class="{ 'is-expanded': expandQuickTags || filterBoxHeight !== null }"
+            >
               <span
                 v-for="tag in topQuickTags"
                 :key="tag.label"
@@ -247,9 +270,20 @@
               class="tm-quick-expand-btn"
               @click="expandQuickTags = !expandQuickTags"
             >
-              {{ expandQuickTags ? '收起候选' : `展开更多 (${topQuickTags.length})` }}
+              {{ expandQuickTags ? '收起候选' : `展开全部 (${allTags.length})` }}
               <SyLineIcon :name="expandQuickTags ? 'chevron-down' : 'chevron-right'" :size="10" />
             </button>
+          </div>
+
+          <!-- 标签区域底边拖拽手柄：向下拖动扩大可见区域，消除滚动条 -->
+          <div
+            class="tm-filter-resizer"
+            :class="{ 'is-active': isResizingFilterBox }"
+            v-tooltip="'向下拖动扩大可见区域，消除滚动条；双击自适应内容'"
+            @mousedown="startFilterBoxResize"
+            @dblclick="resetFilterBoxHeight"
+          >
+            <div class="tm-resizer-line"></div>
           </div>
         </div>
 
@@ -714,6 +748,32 @@ const allCollapsed = ref(false);
 // 快速候选标签折叠控制
 const expandQuickTags = ref(false);
 
+// 标签筛选容器尺寸与拖拽控制
+const filterBoxRef = ref<HTMLElement | null>(null);
+const quickTagsRef = ref<HTMLElement | null>(null);
+const isResizingFilterBox = ref(false);
+const filterBoxHeight = ref<number | null>(() => {
+  try {
+    const saved = localStorage.getItem('siyuan_tm_filter_box_height');
+    if (saved) {
+      const val = parseInt(saved, 10);
+      if (!isNaN(val) && val >= 80 && val <= 1600) return val;
+    }
+  } catch {}
+  return null;
+});
+
+const filterBoxStyle = computed(() => {
+  if (filterBoxHeight.value !== null) {
+    return {
+      height: `${filterBoxHeight.value}px`,
+      maxHeight: 'none',
+      flexShrink: '0',
+    };
+  }
+  return {};
+});
+
 // 智能视图列表
 const savedViews = ref<ISmartTagView[]>([]);
 const selectedSmartViewId = ref('');
@@ -803,8 +863,10 @@ const displayTreeNodes = computed(() => {
 });
 
 const topQuickTags = computed(() => {
-  const limit = expandQuickTags.value ? 50 : 12;
-  return allTags.value.slice(0, limit);
+  if (expandQuickTags.value || filterBoxHeight.value !== null) {
+    return allTags.value;
+  }
+  return allTags.value.slice(0, 12);
 });
 
 const topLinks = computed(() => {
@@ -1179,6 +1241,68 @@ function removeFilterTag(label: string) {
   activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== label);
   activeFilter.value.excludeTags = activeFilter.value.excludeTags.filter(t => t !== label);
   runQuery();
+}
+
+function clearFilterTags() {
+  const cleared = TagFilterEngine.clearFilterSelection();
+  activeFilter.value.includeTags = cleared.includeTags;
+  activeFilter.value.excludeTags = cleared.excludeTags;
+  selectedSmartViewId.value = '';
+  runQuery();
+}
+
+function startFilterBoxResize(e: MouseEvent) {
+  e.preventDefault();
+  isResizingFilterBox.value = true;
+  const startY = e.clientY;
+  const startH = filterBoxRef.value ? filterBoxRef.value.offsetHeight : 120;
+  expandQuickTags.value = true;
+
+  const onMouseMove = (moveEvt: MouseEvent) => {
+    const deltaY = moveEvt.clientY - startY;
+    const maxAllowed = Math.max(200, Math.round(window.innerHeight * 0.8));
+    const newH = Math.max(90, Math.min(maxAllowed, startH + deltaY));
+    filterBoxHeight.value = Math.round(newH);
+  };
+
+  const onMouseUp = () => {
+    isResizingFilterBox.value = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+    if (filterBoxHeight.value) {
+      try {
+        localStorage.setItem('siyuan_tm_filter_box_height', String(filterBoxHeight.value));
+      } catch {}
+    }
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+}
+
+function resetFilterBoxHeight() {
+  if (filterBoxHeight.value !== null) {
+    filterBoxHeight.value = null;
+    expandQuickTags.value = false;
+    try {
+      localStorage.removeItem('siyuan_tm_filter_box_height');
+    } catch {}
+  } else {
+    expandQuickTags.value = true;
+    nextTick(() => {
+      if (filterBoxRef.value && quickTagsRef.value) {
+        const extra = Math.max(0, quickTagsRef.value.scrollHeight - quickTagsRef.value.clientHeight);
+        const targetH = Math.min(
+          Math.round(window.innerHeight * 0.75),
+          filterBoxRef.value.offsetHeight + extra + 8
+        );
+        filterBoxHeight.value = targetH;
+        try {
+          localStorage.setItem('siyuan_tm_filter_box_height', String(targetH));
+        } catch {}
+      }
+    });
+  }
 }
 
 async function runQuery() {
@@ -1704,6 +1828,12 @@ onUnmounted(() => {
   gap: 6px;
 }
 
+.tm-views-select-row .tm-btn-sm {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
 .tm-views-icon {
   color: var(--b3-theme-primary);
 }
@@ -1714,13 +1844,84 @@ onUnmounted(() => {
   height: 28px;
 }
 
-/* 筛选条件池 */
+/* 筛选条件池与候选标签容器 */
 .tm-filter-box {
   background: var(--b3-theme-surface);
   border-radius: 6px;
-  padding: 8px;
+  padding: 8px 8px 3px 8px;
   margin-bottom: 8px;
   border: 1px solid var(--b3-border-color);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tm-filter-box.is-resizing {
+  user-select: none;
+  cursor: ns-resize;
+  border-color: var(--b3-theme-primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.tm-filter-box.is-custom-height {
+  overflow: hidden;
+}
+
+.tm-filter-box.is-custom-height .tm-quick-tags-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tm-filter-box.is-custom-height .tm-quick-tags {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  align-content: flex-start;
+  align-items: flex-start;
+}
+
+/* 标签筛选区域头部栏（提示与清空按钮） */
+.tm-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.tm-filter-header .tm-section-hint {
+  margin-bottom: 0;
+}
+
+.tm-clear-filter-btn {
+  font-size: 11px;
+  padding: 1px 6px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--b3-theme-on-surface-light);
+  border-radius: 3px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tm-clear-filter-btn:hover:not(:disabled) {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.tm-clear-filter-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .tm-section-hint {
@@ -1732,16 +1933,24 @@ onUnmounted(() => {
 .tm-active-chips {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
   gap: 6px;
   min-height: 28px;
+  flex-shrink: 0;
 }
 
 .tm-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  height: 22px;
+  line-height: 1;
+  padding: 0 8px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  flex-grow: 0;
+  border-radius: 11px;
   font-size: 11px;
   cursor: pointer;
   user-select: none;
@@ -1804,11 +2013,17 @@ onUnmounted(() => {
   margin-top: 8px;
   border-top: 1px dashed var(--b3-border-color);
   padding-top: 6px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tm-quick-tags {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
   gap: 4px;
   max-height: 52px;
   overflow: hidden;
@@ -1821,9 +2036,16 @@ onUnmounted(() => {
 }
 
 .tm-quick-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  line-height: 20px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  flex-grow: 0;
   font-size: 11px;
   background: var(--b3-theme-background);
-  padding: 1px 6px;
+  padding: 0 6px;
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid var(--b3-border-color);
@@ -1859,6 +2081,40 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+/* 标签筛选区域底边拖拽手柄 */
+.tm-filter-resizer {
+  height: 12px;
+  margin: 4px -8px -3px -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  user-select: none;
+  border-radius: 0 0 6px 6px;
+  transition: background-color 0.15s ease;
+}
+
+.tm-filter-resizer:hover,
+.tm-filter-resizer.is-active {
+  background: var(--b3-theme-background-light);
+}
+
+.tm-filter-resizer:hover .tm-resizer-line,
+.tm-filter-resizer.is-active .tm-resizer-line {
+  background: var(--b3-theme-primary);
+  width: 44px;
+}
+
+.tm-resizer-line {
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--b3-border-color);
+  transition: all 0.15s ease;
 }
 
 .tm-results-header {

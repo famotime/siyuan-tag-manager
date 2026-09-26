@@ -112,5 +112,13 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       expect(result.excludeTags).toEqual(['Legacy']);
     });
   });
+
+  describe('clearFilterSelection 清空筛选状态测试', () => {
+    it('返回空的包含与排除标签集合', () => {
+      const result = TagFilterEngine.clearFilterSelection();
+      expect(result.includeTags).toEqual([]);
+      expect(result.excludeTags).toEqual([]);
+    });
+  });
 });
 
