@@ -73,11 +73,31 @@
               :style="{ paddingLeft: `${node.depth * 16 + 8}px` }"
             >
               <div class="tm-node-content" @click="handleQuickFilter(node.label)">
-                <span class="tm-node-icon">{{ node.metadata?.icon || '🔖' }}</span>
-                <span class="tm-node-name" :title="node.label">{{ node.name }}</span>
+                <span class="tm-node-icon">{{ getTagIcon(node.label) }}</span>
+                <span
+                  class="tm-node-name"
+                  :style="getTagStyle(node.label)"
+                  :title="node.label"
+                >
+                  {{ node.name }}
+                </span>
                 <span class="tm-node-count">{{ node.count }}</span>
               </div>
               <div class="tm-node-actions">
+                <button
+                  class="tm-mini-btn"
+                  title="🎨 设置色彩样式与别名"
+                  @click.stop="openStyleDialog(node.label)"
+                >
+                  🎨
+                </button>
+                <button
+                  class="tm-mini-btn"
+                  title="📄 一键升格为实体主题文档"
+                  @click.stop="handleConvertToDoc(node.label)"
+                >
+                  📄
+                </button>
                 <button
                   class="tm-mini-btn"
                   title="加入即时交叉筛选"
@@ -87,7 +107,7 @@
                 </button>
                 <button
                   class="tm-mini-btn"
-                  title="查看知识共现关联"
+                  title="查看知识共现与生命周期"
                   @click.stop="viewTagNetwork(node.label)"
                 >
                   🕸️
@@ -107,6 +127,27 @@
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
       <section v-if="currentTab === 'filter'" class="tm-tab-content">
+        <!-- 智能保存视图管理 -->
+        <div class="tm-views-toolbar">
+          <div class="tm-views-select-row">
+            <span class="tm-views-lbl">智能视图：</span>
+            <select v-model="selectedSmartViewId" class="b3-select tm-views-select" @change="applySmartView">
+              <option value="">-- 选择或切换常用智能视图 --</option>
+              <option v-for="v in savedViews" :key="v.id" :value="v.id">
+                ⭐ {{ v.title }}
+              </option>
+            </select>
+            <button
+              class="b3-button b3-button--outline tm-btn-sm"
+              :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
+              title="将当前组合保存为智能视图"
+              @click="openSaveViewDialog"
+            >
+              💾 保存当前
+            </button>
+          </div>
+        </div>
+
         <!-- 激活的筛选条件池 -->
         <div class="tm-filter-box">
           <div class="tm-section-hint">点击切换：➕必含 (AND) | ➖排除 (NOT) | ✕移除</div>
@@ -178,29 +219,55 @@
         </div>
       </section>
 
-      <!-- TAB 3: 认知图谱与共现网络 -->
+      <!-- TAB 3: 认知图谱与生命周期分析 -->
       <section v-if="currentTab === 'graph'" class="tm-tab-content">
         <div class="tm-graph-summary">
           <div class="tm-graph-stat">
             <span>活跃节点: <b>{{ graphData.nodes.length }}</b></span>
             <span>共现连接: <b>{{ graphData.links.length }}</b></span>
           </div>
-          <div class="tm-graph-hint">探索经常在同一块或文档中同时出现的知识关联</div>
+          <div class="tm-graph-hint">探索知识共现网络与关注演变</div>
         </div>
 
-        <!-- 伴随标签分析面板 -->
+        <!-- 聚焦标签选择 -->
         <div class="tm-network-box">
           <div class="tm-network-header">
-            <span>当前聚焦标签：</span>
-            <select v-model="selectedGraphTag" class="b3-select tm-select-tag" @change="updateAssociatedTags">
+            <span>聚焦标签：</span>
+            <select v-model="selectedGraphTag" class="b3-select tm-select-tag" @change="onFocusTagChange">
               <option v-for="tag in allTags" :key="tag.label" :value="tag.label">
                 #{{ tag.label }} ({{ tag.count }})
               </option>
             </select>
           </div>
 
+          <!-- 时序生命周期分析看板 (特性 15) -->
+          <div v-if="timelineStats" class="tm-timeline-stats-card">
+            <div class="tm-timeline-top">
+              <span class="tm-timeline-trend-badge" :class="`trend-${timelineStats.activityTrend}`">
+                {{ timelineStats.activityTrend === 'rising' ? '🚀 近期活跃' : timelineStats.activityTrend === 'cooling' ? '❄️ 冷却沉寂' : '🟢 平稳常驻' }}
+              </span>
+              <span class="tm-timeline-last-updated">最后打标：{{ timelineStats.lastUpdated || '未知' }}</span>
+            </div>
+            <div class="tm-timeline-grid">
+              <div class="tm-timeline-metric">
+                <div class="tm-metric-val">{{ timelineStats.recent7DaysCount }}</div>
+                <div class="tm-metric-lbl">近 7 天</div>
+              </div>
+              <div class="tm-timeline-metric">
+                <div class="tm-metric-val">{{ timelineStats.recent30DaysCount }}</div>
+                <div class="tm-metric-lbl">近 30 天</div>
+              </div>
+              <div class="tm-timeline-metric">
+                <div class="tm-metric-val">{{ timelineStats.totalCount }}</div>
+                <div class="tm-metric-lbl">历史累计</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 伴随标签列表 -->
+          <div class="tm-section-hint" style="margin-top: 10px;">最密切关联的伴随标签 (TOP Associated)：</div>
           <div class="tm-associated-list">
-            <div v-if="associatedTags.length === 0" class="tm-empty" style="padding: 16px;">
+            <div v-if="associatedTags.length === 0" class="tm-empty" style="padding: 12px;">
               该标签与其他标签暂无高频共现记录
             </div>
             <div
@@ -304,6 +371,73 @@
       </section>
     </main>
 
+    <!-- 样式与别名设置弹窗 (Color Picker & Alias Modal) -->
+    <div v-if="styleModal.visible" class="tm-modal-mask" @click.self="styleModal.visible = false">
+      <div class="tm-modal-card">
+        <div class="tm-modal-title">🎨 设置标签样式与别名</div>
+        <div class="tm-modal-body">
+          <p>正在定制标签：<b>#{{ styleModal.label }}#</b></p>
+          <div class="tm-form-group">
+            <label>预设背景色彩：</label>
+            <div class="tm-color-palette">
+              <span
+                v-for="preset in colorPresets"
+                :key="preset.bg"
+                class="tm-color-swatch"
+                :style="{ backgroundColor: preset.bg, color: preset.text }"
+                @click="applyColorPreset(preset)"
+              >
+                Aa
+              </span>
+            </div>
+          </div>
+          <div class="tm-form-row">
+            <div class="tm-form-group fn__flex-1">
+              <label>背景颜色 (Hex):</label>
+              <input v-model="styleModal.backgroundColor" class="b3-text-field fn__block" placeholder="#E8F0FE" />
+            </div>
+            <div class="tm-form-group fn__flex-1" style="margin-left: 8px;">
+              <label>文字颜色 (Hex):</label>
+              <input v-model="styleModal.textColor" class="b3-text-field fn__block" placeholder="#1A73E8" />
+            </div>
+          </div>
+          <div class="tm-form-group">
+            <label>自定义 Emoji / 图标：</label>
+            <input v-model="styleModal.icon" class="b3-text-field fn__block" placeholder="例如：🎬, 💡, 🚀, 💻" />
+          </div>
+          <div class="tm-form-group">
+            <label>别名列表（逗号分隔，支持拼音首字母模糊联想）：</label>
+            <input v-model="styleModal.aliasesText" class="b3-text-field fn__block" placeholder="例如：油管, 视频平台" />
+          </div>
+        </div>
+        <div class="tm-modal-footer">
+          <button class="b3-button b3-button--cancel" @click="styleModal.visible = false">取消</button>
+          <button class="b3-button b3-button--primary" @click="saveTagStyle">保存并即时生效</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存智能视图弹窗 -->
+    <div v-if="saveViewModal.visible" class="tm-modal-mask" @click.self="saveViewModal.visible = false">
+      <div class="tm-modal-card">
+        <div class="tm-modal-title">💾 保存为智能视图</div>
+        <div class="tm-modal-body">
+          <div class="tm-form-group">
+            <label>视图名称：</label>
+            <input v-model="saveViewModal.title" class="b3-text-field fn__block" placeholder="例如：AI视频开发重点" />
+          </div>
+          <div class="tm-section-hint">
+            包含: {{ activeFilter.includeTags.map(t => `#${t}`).join(', ') || '无' }}<br>
+            排除: {{ activeFilter.excludeTags.map(t => `#${t}`).join(', ') || '无' }}
+          </div>
+        </div>
+        <div class="tm-modal-footer">
+          <button class="b3-button b3-button--cancel" @click="saveViewModal.visible = false">取消</button>
+          <button class="b3-button b3-button--primary" @click="confirmSaveSmartView">保存视图</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 批量打标弹窗 -->
     <div v-if="batchModal.visible" class="tm-modal-mask" @click.self="batchModal.visible = false">
       <div class="tm-modal-card">
@@ -371,13 +505,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagHealthIssue, ITagItem, ITagMatchedBlock } from './types/tag';
+import type { ITagHealthIssue, ITagItem, ITagMatchedBlock, ITagMetadata, ISmartTagView } from './types/tag';
 import { TagApiClient } from './services/TagApiClient';
 import { TagTreeService, type TagSortMode } from './services/TagTreeService';
 import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagPinyinAliasService } from './services/TagPinyinAliasService';
 import { TagBatchService } from './services/TagBatchService';
 import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
+import { TagVisualService } from './services/TagVisualService';
+import { TagDocConverterService } from './services/TagDocConverterService';
+import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
+import { usePlugin } from './main';
 
 // 状态管理
 const currentTab = ref<'tree' | 'filter' | 'graph' | 'hygiene'>('tree');
@@ -385,6 +523,13 @@ const loading = ref(false);
 const allTags = ref<ITagItem[]>([]);
 const searchKeyword = ref('');
 const sortMode = ref<TagSortMode>('count_desc');
+
+// 标签元数据映射表 Map<label, ITagMetadata>
+const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
+
+// 智能视图列表
+const savedViews = ref<ISmartTagView[]>([]);
+const selectedSmartViewId = ref('');
 
 // 筛选状态
 const activeFilter = ref<{
@@ -397,13 +542,40 @@ const activeFilter = ref<{
 const matchedBlocks = ref<ITagMatchedBlock[]>([]);
 const queryLoading = ref(false);
 
-// 图谱与共现
+// 图谱与生命周期
 const graphData = ref<ITagGraphData>({ nodes: [], links: [] });
 const selectedGraphTag = ref('');
 const associatedTags = ref<Array<{ label: string; weight: number; jaccard: number }>>([]);
+const timelineStats = ref<ITagTimelineStats | null>(null);
 
 // 健康体检结果
 const healthResult = ref(TagGovernanceService.runHealthInspection([]));
+
+// 预设柔和色彩组合
+const colorPresets = [
+  { bg: '#E8F0FE', text: '#1A73E8' }, // 经典蓝
+  { bg: '#E6F4EA', text: '#137333' }, // 护眼绿
+  { bg: '#FEF7E0', text: '#B06000' }, // 柔和橙
+  { bg: '#FCE8E6', text: '#C5221F' }, // 警示红
+  { bg: '#F3E8FD', text: '#8430CE' }, // 优雅紫
+  { bg: '#E0F2F1', text: '#00695C' }, // 青蓝
+];
+
+// 样式弹窗
+const styleModal = ref({
+  visible: false,
+  label: '',
+  backgroundColor: '',
+  textColor: '',
+  icon: '',
+  aliasesText: '',
+});
+
+// 保存视图弹窗
+const saveViewModal = ref({
+  visible: false,
+  title: '',
+});
 
 // 批量打标弹窗
 const batchModal = ref({
@@ -422,7 +594,6 @@ const mergeModal = ref({
   executing: false,
 });
 
-// 计算选项卡配置
 const tabs = computed(() => [
   { id: 'tree' as const, name: '标签全景', icon: '🗂️' },
   { id: 'filter' as const, name: '多维筛选', icon: '⚡', badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length },
@@ -430,46 +601,81 @@ const tabs = computed(() => [
   { id: 'hygiene' as const, name: '健康治理', icon: '🩺', badge: healthResult.value.issues.length },
 ]);
 
-// 计算树形展示数据（集成拼音首字母模糊联想与别名匹配）
 const displayTreeNodes = computed(() => {
   if (!searchKeyword.value.trim()) {
     return TagTreeService.buildTree(allTags.value, sortMode.value);
   }
-  // 使用拼音首字母引擎模糊匹配
   const matches = TagPinyinAliasService.matchTags(allTags.value, searchKeyword.value, 50);
-  const matchedTags = matches.map(m => m.tag);
-  return TagTreeService.buildTree(matchedTags, sortMode.value);
+  return TagTreeService.buildTree(matches.map(m => m.tag), sortMode.value);
 });
 
-// 高频候选标签（用于多维筛选快速点选）
 const topQuickTags = computed(() => allTags.value.slice(0, 30));
 
-// 图谱核心强连接
 const topLinks = computed(() => {
   return [...graphData.value.links]
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 15);
 });
 
+function getTagIcon(label: string): string {
+  return metadataMap.value.get(label)?.icon || '🔖';
+}
+
+function getTagStyle(label: string): Record<string, string> {
+  const meta = metadataMap.value.get(label);
+  if (!meta) return {};
+  const s: Record<string, string> = {};
+  if (meta.backgroundColor) s.backgroundColor = meta.backgroundColor;
+  if (meta.textColor) s.color = meta.textColor;
+  if (meta.backgroundColor || meta.textColor) {
+    s.borderRadius = '4px';
+    s.padding = '1px 6px';
+  }
+  return s;
+}
+
 function switchTab(tabId: 'tree' | 'filter' | 'graph' | 'hygiene') {
   currentTab.value = tabId;
-  if (tabId === 'graph' && graphData.value.nodes.length === 0) {
-    loadGraphData();
+  if (tabId === 'graph') {
+    if (graphData.value.nodes.length === 0) {
+      loadGraphData();
+    }
+    if (selectedGraphTag.value) {
+      loadTimelineStats(selectedGraphTag.value);
+    }
   }
 }
 
-// 刷新全库标签数据
+// 刷新全库标签数据与本地元数据配置
 async function refreshTags() {
   loading.value = true;
   try {
+    const plugin = usePlugin();
+    const localData = await plugin.loadData('tag-manager-config.json').catch(() => null);
+    if (localData?.metadataList && Array.isArray(localData.metadataList)) {
+      const map = new Map<string, ITagMetadata>();
+      localData.metadataList.forEach((m: ITagMetadata) => map.set(m.label, m));
+      metadataMap.value = map;
+      // 动态注入样式到编辑器正文
+      const css = TagVisualService.generateCssRules(localData.metadataList);
+      TagVisualService.applyStyles(css);
+    }
+    if (localData?.savedViews && Array.isArray(localData.savedViews)) {
+      savedViews.value = localData.savedViews;
+    }
+
     const tags = await TagApiClient.fetchAllTags();
+    // 注入 metadata 属性
+    tags.forEach(t => {
+      t.metadata = metadataMap.value.get(t.label);
+    });
+
     allTags.value = tags;
     if (tags.length > 0 && !selectedGraphTag.value) {
       selectedGraphTag.value = tags[0].label;
     }
-    // 运行健康检查
     healthResult.value = TagGovernanceService.runHealthInspection(tags);
-    // 触发筛选更新
+
     if (activeFilter.value.includeTags.length > 0 || activeFilter.value.excludeTags.length > 0) {
       await runQuery();
     }
@@ -480,7 +686,125 @@ async function refreshTags() {
   }
 }
 
-// 加载共现图谱数据
+// 样式与别名设置
+function openStyleDialog(label: string) {
+  const meta = metadataMap.value.get(label);
+  styleModal.value = {
+    visible: true,
+    label,
+    backgroundColor: meta?.backgroundColor || '',
+    textColor: meta?.textColor || '',
+    icon: meta?.icon || '',
+    aliasesText: (meta?.aliases || []).join(', '),
+  };
+}
+
+function applyColorPreset(preset: { bg: string; text: string }) {
+  styleModal.value.backgroundColor = preset.bg;
+  styleModal.value.textColor = preset.text;
+}
+
+async function saveTagStyle() {
+  const { label, backgroundColor, textColor, icon, aliasesText } = styleModal.value;
+  const aliases = aliasesText.split(',').map(s => s.trim()).filter(Boolean);
+
+  const meta: ITagMetadata = {
+    label,
+    backgroundColor,
+    textColor,
+    icon,
+    aliases,
+    updatedAt: Date.now(),
+  };
+
+  metadataMap.value.set(label, meta);
+  styleModal.value.visible = false;
+
+  // 持久化并刷新 CSS
+  const plugin = usePlugin();
+  const metaList = Array.from(metadataMap.value.values());
+  await plugin.saveData('tag-manager-config.json', {
+    metadataList: metaList,
+    savedViews: savedViews.value,
+  });
+
+  const css = TagVisualService.generateCssRules(metaList);
+  TagVisualService.applyStyles(css);
+  showMessage(`已成功更新标签 "#${label}#" 的样式与别名！`, 3000, 'info');
+}
+
+// 一键升格为实体文档 (Tag to Doc)
+async function handleConvertToDoc(label: string) {
+  loading.value = true;
+  try {
+    // 提取当前标签命中的块
+    const blocks = await TagApiClient.queryMatchedBlocks({ includeTags: [label], limit: 30 });
+    const res = await TagDocConverterService.createDocFromTag(label, blocks);
+    if (res.success && res.docId) {
+      showMessage(`🎉 已成功创建主题聚合文档《${label}》！`, 4000, 'info');
+      // 打开新创建的文档
+      if ((window as any).siyuan?.openTab) {
+        (window as any).siyuan.openTab({
+          app: (window as any).siyuan.appId,
+          doc: { id: res.docId },
+        });
+      }
+    } else {
+      showMessage(`创建聚合文档失败: ${res.error}`, 4000, 'error');
+    }
+  } catch (err: any) {
+    showMessage(`升格文档异常: ${err.message || err}`, 4000, 'error');
+  } finally {
+    loading.value = false;
+  }
+}
+
+// 智能视图保存与应用
+function openSaveViewDialog() {
+  saveViewModal.value = {
+    visible: true,
+    title: `${activeFilter.value.includeTags.join('+')} 视图`,
+  };
+}
+
+async function confirmSaveSmartView() {
+  if (!saveViewModal.value.title.trim()) {
+    showMessage('视图标题不能为空', 3000, 'error');
+    return;
+  }
+
+  const newView: ISmartTagView = {
+    id: `view_${Date.now()}`,
+    title: saveViewModal.value.title.trim(),
+    includeTags: [...activeFilter.value.includeTags],
+    excludeTags: [...activeFilter.value.excludeTags],
+    optionalTags: [],
+    displayMode: 'card',
+    createdAt: Date.now(),
+  };
+
+  savedViews.value.push(newView);
+  selectedSmartViewId.value = newView.id;
+  saveViewModal.value.visible = false;
+
+  const plugin = usePlugin();
+  await plugin.saveData('tag-manager-config.json', {
+    metadataList: Array.from(metadataMap.value.values()),
+    savedViews: savedViews.value,
+  });
+
+  showMessage(`已保存智能视图 "${newView.title}"`, 3000, 'info');
+}
+
+function applySmartView() {
+  const v = savedViews.value.find(view => view.id === selectedSmartViewId.value);
+  if (!v) return;
+  activeFilter.value.includeTags = [...v.includeTags];
+  activeFilter.value.excludeTags = [...v.excludeTags];
+  runQuery();
+}
+
+// 加载共现图谱与时序分析
 async function loadGraphData() {
   loading.value = true;
   try {
@@ -492,6 +816,20 @@ async function loadGraphData() {
   } finally {
     loading.value = false;
   }
+}
+
+async function loadTimelineStats(label: string) {
+  try {
+    const timestamps = await TagApiClient.fetchTagTimestamps(label);
+    timelineStats.value = TagTimelineService.calculateTimelineStats(label, timestamps);
+  } catch (err: any) {
+    console.warn('获取时序统计失败', err);
+  }
+}
+
+function onFocusTagChange() {
+  updateAssociatedTags();
+  loadTimelineStats(selectedGraphTag.value);
 }
 
 function updateAssociatedTags() {
@@ -507,16 +845,15 @@ function viewTagNetwork(label: string) {
   } else {
     updateAssociatedTags();
   }
+  loadTimelineStats(label);
 }
 
-// 组合关联标签进行交叉筛选
 function combineFilterWithAssociated(tagA: string, tagB: string) {
   currentTab.value = 'filter';
   activeFilter.value.includeTags = Array.from(new Set([...activeFilter.value.includeTags, tagA, tagB]));
   runQuery();
 }
 
-// 快速加入多维筛选
 function handleQuickFilter(label: string) {
   currentTab.value = 'filter';
   if (!activeFilter.value.includeTags.includes(label)) {
@@ -525,7 +862,6 @@ function handleQuickFilter(label: string) {
   runQuery();
 }
 
-// 切换标签的包含/排除状态
 function toggleTagFilter(label: string) {
   const incIndex = activeFilter.value.includeTags.indexOf(label);
   const excIndex = activeFilter.value.excludeTags.indexOf(label);
@@ -557,7 +893,6 @@ function removeFilterTag(label: string) {
   runQuery();
 }
 
-// 执行多维交叉查询
 async function runQuery() {
   if (activeFilter.value.includeTags.length === 0 && activeFilter.value.excludeTags.length === 0) {
     matchedBlocks.value = [];
@@ -578,13 +913,11 @@ async function runQuery() {
   }
 }
 
-// 高亮正文标签
 function highlightTags(text: string): string {
   if (!text) return '';
   return text.replace(/#([^#]+)#/g, '<span class="tm-matched-tag">#$1#</span>');
 }
 
-// 定位跳转到块
 function jumpToBlock(rootId: string, blockId: string) {
   if ((window as any).siyuan && (window as any).siyuan.openTab) {
     (window as any).siyuan.openTab({
@@ -596,17 +929,9 @@ function jumpToBlock(rootId: string, blockId: string) {
   }
 }
 
-// 执行批量打标
 async function executeBatchTag() {
-  const docIds = batchModal.value.docIdsText
-    .split('\n')
-    .map(s => s.trim())
-    .filter(Boolean);
-
-  const tags = batchModal.value.tagsText
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  const docIds = batchModal.value.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
+  const tags = batchModal.value.tagsText.split(',').map(s => s.trim()).filter(Boolean);
 
   if (docIds.length === 0 || tags.length === 0) {
     showMessage('文档 ID 与待添加标签均不能为空', 3000, 'error');
@@ -632,7 +957,6 @@ async function executeBatchTag() {
   }
 }
 
-// 打开合并对话框
 function openMergeDialog(sourceLabel: string) {
   mergeModal.value = {
     visible: true,
@@ -643,7 +967,6 @@ function openMergeDialog(sourceLabel: string) {
   };
 }
 
-// 确认合并
 async function confirmMerge() {
   const { sourceLabel, targetLabel, setAsAlias } = mergeModal.value;
   const { plan, error } = TagGovernanceService.generateMergePlan(targetLabel, [sourceLabel], allTags.value, setAsAlias);
@@ -670,7 +993,6 @@ async function confirmMerge() {
   }
 }
 
-// 一键自动修复冲突
 async function autoResolveIssue(issue: ITagHealthIssue) {
   if (!issue.relatedLabels || issue.relatedLabels.length === 0) return;
   const planRes = TagGovernanceService.generateMergePlan(issue.primaryLabel, issue.relatedLabels, allTags.value, true);
@@ -694,7 +1016,6 @@ async function autoResolveIssue(issue: ITagHealthIssue) {
   }
 }
 
-// 删除标签
 async function handleRemoveTag(label: string) {
   if (!confirm(`确定要彻底删除标签 "${label}" 吗？此操作将移除全库关联引用的标签标记。`)) {
     return;
@@ -912,6 +1233,27 @@ onMounted(() => {
   background: var(--b3-theme-surface);
 }
 
+/* 智能视图 */
+.tm-views-toolbar {
+  margin-bottom: 8px;
+}
+
+.tm-views-select-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-views-lbl {
+  font-size: 12px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.tm-views-select {
+  flex: 1;
+  font-size: 12px;
+}
+
 /* 筛选样式 */
 .tm-filter-box {
   background: var(--b3-theme-surface);
@@ -1054,7 +1396,7 @@ onMounted(() => {
   color: var(--b3-theme-on-surface-light);
 }
 
-/* 认知图谱样式 */
+/* 认知图谱与生命周期 */
 .tm-graph-summary {
   display: flex;
   justify-content: space-between;
@@ -1094,6 +1436,57 @@ onMounted(() => {
 
 .tm-select-tag {
   flex: 1;
+}
+
+.tm-timeline-stats-card {
+  background: var(--b3-theme-background);
+  border-radius: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--b3-border-color);
+  margin-bottom: 8px;
+}
+
+.tm-timeline-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tm-timeline-trend-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.trend-rising { background: rgba(40, 167, 69, 0.15); color: #28a745; }
+.trend-cooling { background: rgba(108, 117, 125, 0.15); color: #6c757d; }
+.trend-stable { background: rgba(0, 123, 255, 0.15); color: #007bff; }
+
+.tm-timeline-last-updated {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.tm-timeline-grid {
+  display: flex;
+  justify-content: space-around;
+  text-align: center;
+}
+
+.tm-timeline-metric {
+  flex: 1;
+}
+
+.tm-metric-val {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.tm-metric-lbl {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
 }
 
 .tm-associated-list {
@@ -1176,6 +1569,30 @@ onMounted(() => {
 .tm-link-btn {
   font-size: 10px;
   color: var(--b3-theme-primary);
+}
+
+/* 色彩调色板 */
+.tm-color-palette {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tm-color-swatch {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  border: 1px solid var(--b3-border-color);
+}
+
+.tm-form-row {
+  display: flex;
 }
 
 /* 健康体检 */

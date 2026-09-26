@@ -178,6 +178,22 @@ export class TagApiClient {
       spansCount: rows?.length || 0,
     };
   }
+
+  /**
+   * 获取指定标签关联块的更新时间戳列表（用于生命周期与时序热力分析）
+   */
+  public static async fetchTagTimestamps(label: string): Promise<string[]> {
+    const clean = TagFilterEngine.escapeSql(label);
+    const sql = `SELECT b.updated `
+      + `FROM blocks b `
+      + `JOIN spans s ON b.id = s.block_id `
+      + `WHERE s.type LIKE '%tag%' AND s.content = '${clean}' `
+      + `ORDER BY b.updated DESC;`;
+
+    const rows: Array<{ updated: string }> = await this.request('/api/query/sql', { stmt: sql });
+    return (rows || []).map(r => r.updated).filter(Boolean);
+  }
 }
+
 
 

@@ -1,198 +1,108 @@
-# Siyuan Plugin Template - Vite & Vue3
+# 🏷️ 思源笔记 · 标签管家 (Tag Manager)
 
-[English](./README.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/famotime/siyuan-tag-manager)
+[![SiYuan](https://img.shields.io/badge/SiYuan->=v3.8.5-6366f1.svg)](https://b3log.org/siyuan/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 
-> 本例同 [siyuan/plugin-sample](https://github.com/siyuan-note/plugin-sample).
+[English](./README.md) | **简体中文**
 
-1. 使用 Vite 打包
-2. 使用 Vue3 进行开发
-3. 提供一个github action 模板，能自动生成package.zip并上传到新版本中
-4. 提供自动更新 `plugin.json` 中的 `version` 并发布新版本的脚本。[link](#release-script)
-
-## 兼容性基线
-
-- 思源版本：`3.8.5` 或更高版本
-- 插件类型包：`siyuan@1.2.8`
-- `plugin.json` 多语言键：RFC 5646（`en-US`、`zh-CN`）
-- 本模板同时支持前端插件和后端内核（Kernel）插件。通过 `src/kernel.ts` 构建 `kernel.js`，并在 `plugin.json` 中声明了 `kernels` 与 `publish` 发布支持。
-
-SiYuan 3.8.x 新增了端到端强类型内核 API 契约系统、插件发布服务机制（`loadPublishData`/`savePublishData` 与 `publish` 字段声明）、`openInputDialog` 统一对话框组件、顶栏右键上下文菜单、命令多快捷键与条件控制、数据库日历/列表视图、富文本表格单元格及列表思维导图等。
-
-参考资料：
-
-- [官方内核 API](https://github.com/siyuan-note/siyuan/blob/master/docs/API.zh-CN.md)
-- [官方插件示例](https://github.com/siyuan-note/plugin-sample)
-- [Petal / 插件类型定义](https://github.com/siyuan-note/petal)
-- [本项目 v3.8.5 迁移指南](./developer_docs/00-version/SiYuan-v3.8.5开发进展与API迁移指南.md)
-
-> [!NOTE]
->
-> 在开始之前，你需要先安装 [NodeJS](https://nodejs.org/en/download) 和 [pnpm](https://pnpm.io/installation)。
-
-## 开始
-
-1. 通过 `Use the template` 按钮，以该仓库为模板创建你自己的项目。
-> [!WARNING]
->
-> 请注意库名和插件名称一致，默认分支必须为 `main`.
-
-> [!WARNING]
->
-> 初次尝试，请不要修改任何内容，直接通过下述方式，成功在思源里加载插件模板以后，再进行调整。
->
-> 例如删除 README_zh_CN.md 也会导致插件加载不成功。
-
-
-2. 使用 `git clone` 克隆创建好的仓库。
-3. 使用 `pnpm i` 安装项目所需的依赖。
-
-4. 复制 `.env.example` 文件并取名为 `.env`，修改其中的 `VITE_SIYUAN_WORKSPACE_PATH` 为你的思源工作空间。
-
-
-> [!TIP]
->
-> 如果你不喜欢将项目打包至工作空间中，可以使用 `软链接` 的方式。
->
-> 直接写入思源空间下，可通过思源的同步功能直接同步至其他设备，而软链接的方式则不会参与同步。
-> 
-> 本模板不提供软链接的具体内容，相关内容可参考 [plugin-sample-vite-svelte](https://github.com/siyuan-note/plugin-sample-vite-svelte)。
-> 
-
-
-5. 使用 `pnpm dev` 启动项目，看到类似下面的内容表示构建成功
-
-  ```
-
-  > plugin-sample-vite-vue@0.0.1 dev /path/to/your/plugin-sample-vite-vue
-  > vite build --watch
-
-  mode=> production
-  env=> {
-    VITE_SIYUAN_WORKSPACE_PATH: '/path/to/siyuan/workspace',
-  }
-
-  Siyuan workspace path is set:
-  /path/to/siyuan/workspace
-
-  Plugin will build to:
-  # ✅ 插件将会构建至下面的位置
-  /path/to/siyuan/workspace/data/plugins/plugin-sample-vite-vue
-
-  isWatch=> true
-  distDir=> /path/to/siyuan/workspace/data/plugins/plugin-sample-vite-vue
-  vite v6.3.5 building for production...
-
-  watching for file changes...
-
-  build started...
-  ✓ 26 modules transformed.
-  rendering chunks (1)...LiveReload enabled
-  ../../Siyuan-plugin/data/plugins/plugin-sample-vite-vue/index.css    1.08 kB │ gzip:  0.41 kB
-  ../../Siyuan-plugin/data/plugins/plugin-sample-vite-vue/index.js   198.60 kB │ gzip: 46.59 kB
-  [vite-plugin-static-copy] Copied 7 items.
-  built in 502ms.
-  ```
-
-   刷新思源，你将会在 `思源 - 设置 - 集市` 中看到名为 `plugin-sample-vite-vue` 的插件。
-   
-6. 启用插件, 并检查 `App.vue` 文件进行开发。
-
-   这个文件中包含了一些代码示例。
-
-
-> [!TIP]
->
-> 更多的插件代码案例，请查看： [siyuan/plugin-sample/src/index.ts](https://github.com/siyuan-note/plugin-sample/blob/main/src/index.ts)
-
-
-
-## 上架集市
-
-### 使用 Github Action
-
-1. 你可以在本地使用插件的版本创建一个名为 `v*` 的 tag。
-2. 将创建好的 tag 推送至 Github。模板项目提供了 Action 脚本自动构建新版本。
-
-
-> [!TIP]
->
-> <div id="release-script"></div>这个项目提供了自动创建 `tag` 并发布新版本的脚本，你可以通过运行 `pnpm release` 创建一个修正版本。
->
-> 你可以通过使用参数 `--mode=manual|patch|minor|major` 设置版本号的调整模式，或者通过 `pnpm release:manual` 的方式直接以特定参数进行发布。
->
-> 完整的命令列表请查看 `package.json` 文件。
-
-
-样例中自带了 github action，可以自动打包发布，请遵循以下操作：
-
-1. 设置项目 `https://github.com/OWNER/REPO/settings/actions` 页面向下划到 Workflow Permissions，打开配置
-
-![img](./asset/action.png)
-
-2. 需要发布版本的时候，push 一个格式为 `v*` 的 tag，github 就会自动打包发布 release（包括 package.zip）
-3. 默认使用保守策略进行 pre-release 发布，如果觉得没有必要，可以更改 release.yml 中的设置：
-
-```yaml
-- name: Release
-    uses: ncipollo/release-action@v1
-    with.
-        allowUpdates: true
-        artifactErrorsFailBuild: true
-        artifacts: 'package.zip'
-        token: ${{ secrets.GITHUB_TOKEN }}
-        prerelease: true # change this to false
-```
-
-### 手动发布
-
-1. 使用 `pnpm build` 构建 `package.zip`
-2. 在 GitHub 上创建一个新的发布，使用插件版本号作为 “Tag version”，示例: https://github.com/siyuan-note/plugin-sample/releases
-3. 上传 package.zip 作为二进制附件
-4. 提交发布
-
-> [!NOTE]
-> 
-> 如果是第一次发布版本，还需要创建一个 PR 到 [Community Bazaar](https://github.com/siyuan-note/bazaar)  社区集市仓库，修改该库的 plugins.json。该文件是所有社区插件库的索引，格式为：
-
-```json
-{
-  "repos": [
-    "username/reponame"
-  ]
-}
-```
-
-## 国际化
-
-国际化方面主要考虑的是支持多语言，具体需要完成以下工作：
-
-* 插件自身的元信息，比如插件描述和自述文件
-  * `plugin.json` 中的 `displayName`、`description` 和 `readme` 字段，以及对应的 `README*.md` 文件
-* 插件中使用的文本，比如按钮文字和提示信息
-  * `src/i18n/*.json` 语言配置文件
-  * 代码中使用 `this.i18n.key` 获取文本
-
-建议插件至少支持英文和简体中文，不支持的语种不需要在 `plugin.json` 中声明。
-
-## 开发者须知
-
-开发者需注意以下规范。
-
-### 1. 读写文件规范
-
-插件或者外部扩展如果有直接读取或者写入 data 下文件的需求，请通过调用内核 API 来实现，**不要自行调用 `fs` 或者其他 electron、nodejs API**，否则可能会导致数据同步时分块丢失，造成云端数据损坏。
-
-相关 API 见 `/api/file/*`（例如 `/api/file/getFile` 等）。
-
-### 2. Daily Note 属性规范
-
-思源在创建日记的时候会自动为文档添加 `custom-dailynote-yyyymmdd` 属性，以方便将日记文档同普通文档区分。详情请见 [Github Issue #9807](https://github.com/siyuan-note/siyuan/issues/9807)。
-
-开发者在开发手动创建 Daily Note 的功能时请注意：
-
-* 如果调用了 `/api/filetree/createDailyNote` 创建日记，那么文档会自动添加这个属性，无需开发者特别处理
-* 如果是开发者代码手动创建文档（例如使用 `createDocWithMd` API 创建日记），请手动为文档添加该属性
+> **为思源笔记打造的专业级标签资产管理、多维交叉筛选、知识共现图谱与健康治理工作台。**
 
 ---
 
-更多有关于插件的信息，请查看： [siyuan/plugin-sample](https://github.com/siyuan-note/plugin-sample).
+## 💡 为什么需要“标签管家”？
+
+在个人知识库中，**双链**负责微观的节点穿透，而**标签（Tags）**则维系着宏观的分类维度与知识切片。
+
+随着笔记数量和标签资产不断增长，思源原生标签在实际使用中往往面临诸多痛点：
+* ❌ **命名失控与大小写割裂**：随手打标导致 `Prompt` 与 `prompt`、`Python` 与 `python` 并存，语义完全相同却被系统当作两个独立标签，检索遗漏且无法批量合并。
+* ❌ **碎片化冷门标签泛滥**：列表中堆积大量仅引用 1 次的边缘临时标签或废弃标签，列表无限冗长，缺乏体系化治理工具。
+* ❌ **点击标签打断阅读思绪**：原生点击标签强行弹出全局搜索大窗口，遮挡当前页面与思维上下文。
+* ❌ **无法进行多标签交叉切片**：想查找“*同时具备 `#AI#` 和 `#提示词#`，但不包含 `#已废弃#`*”的内容时，操作极其繁琐。
+* ❌ **打标与查找成本高**：标签过多时难以快速定位，缺乏拼音首字母模糊联想与多文档批量打标能力。
+
+**“标签管家”** 专为解决上述痛点而生，提供从**资产浏览、多维交叉检索、健康体检治理、网络关联探查到批量操作**的一站式体验。
+
+---
+
+## ✨ 核心功能与使用场景
+
+### 1. 🗂️ 标签全景资产树（快速检索与多维排序）
+- **拼音首字母与别名模糊联想**：无需切换输入法，输入 `ytb` 即可秒级匹配 `#YouTube#`，输入 `wz` 匹配 `#微服务#`。
+- **层级树结构与清晰统计**：支持多层级标签路径折叠与展开，直观查看每个标签的实时引用频次。
+- **灵活排序模式**：支持按**引用频次降序/升序**、**中文拼音 A-Z / Z-A** 等多种维度随心切换。
+
+### 2. ⚡ 多维交叉筛选与即时卡片流（沉浸式切片检索）
+- **可视化布尔组合过滤**：
+  - `AND`（必含）：同时满足多个标签交集；
+  - `NOT`（排除）：精准剔除包含特定标签的干扰项；
+- **抽屉式即时卡片流**：无需弹出全局搜索大窗口，在当前工作区侧边即可展开匹配卡片，保持当前编辑与阅读心流。
+- **一键平滑跳转**：点击卡片即刻精准定位到目标文档的对应块，高亮命中内容。
+
+### 3. 🩺 标签治理与健康体检（告别标签债务）
+- **知识库健康度评分**：全景扫描当前知识库的标签规范度并给出综合健康指数。
+- **三大亚健康问题智能检测**：
+  - ⚠️ **大小写冲突检测**：自动揪出 `Prompt (23)` / `prompt (2)` 类似冲突，支持**一键合并规范化**；
+  - ℹ️ **低频标签收敛**：发现仅使用 1 次的孤立碎片标签，辅助快速重构或清理；
+  - 🗑️ **废弃/孤儿标签扫描**：找出已无任何块引用的残留标签并支持一键清理。
+
+### 4. 🕸️ 认知图谱与知识共现网络（发现潜在关联）
+- **共现频次与关联度分析**：计算标签间的 Jaccard 相似度系数，直观展示哪些标签经常在同一上下文同时出现。
+- **强关联线索探查**：一键聚焦核心标签，探查关联度最高的伴随标签，并支持一键将强关联对加入组合筛选。
+
+### 5. 🎨 视觉色彩与 Emoji 图标定制 (Tag Styler)
+- **零侵入动态渲染**：支持为标签自定义背景色、字体颜色、Emoji 图标与别名列表，编辑器正文 `#标签#` 即刻拥有专属高保真胶囊样式，换设备或停用插件绝不产生脏数据。
+
+### 6. 📄 标签一键升格为实体文档 (Tag to Doc)
+- **碎片沉淀为主题知识库**：点击一键升格，自动在笔记本中创建同名聚合文档，并自动内置实时动态 SQL 嵌入块与静态引用历史快照。
+
+### 7. 📈 标签时序生命周期与活跃分析
+- **洞察关注重心演进**：分析各标签近 7 天、近 30 天打标频次与月度活跃直方分布，智能标识标签活跃趋势（🚀 爆发中 / 🟢 常驻 / ❄️ 冷却沉寂）。
+
+### 8. 📑 批量文档打标与智能重构
+- **批量文档快速打标**：粘贴多个文档块 ID，一键批量追加多个标签，极大减少机械重复操作。
+- **智能合并与别名保留**：将旧标签一键无缝合并至新标签或目标层级，所有关联块自动平滑迁移，并可自动记录历史别名。
+
+---
+
+## 🚀 快速上手
+
+### 快捷呼出工作台
+* **顶栏图标**：点击思源顶栏专属的 `标签管家` 按钮即可展开/收起工作台抽屉。
+* **全局快捷键**：使用快捷键 `Alt + Shift + T`（macOS 为 `⌥ + ⇧ + T`）随时呼出。
+
+### 典型使用场景流程
+```
+[随手打标积累] ──> [健康体检：一键合并大小写冲突] ──> [拼音模糊查找 / 多维 AND+NOT 交叉切片] ──> [共现图谱激发新灵感]
+```
+
+1. **日常检索**：按 `Alt+Shift+T` 呼出管家，输入拼音首字母秒搜标签。
+2. **知识切片**：点击标签上的 `🔍` 按钮加入多维筛选，点选 `AND` / `NOT` 得到精准卡片流。
+3. **定期维护**：切换至 `健康治理` 面板，查看健康度评分，一键合并冲突标签、清理过期标签。
+
+---
+
+## 📋 功能对比表
+
+| 维度 | 思源笔记原生标签 | 🏷️ 标签管家 (Tag Manager) | 用户价值 |
+| :--- | :--- | :--- | :--- |
+| **检索方式** | 仅单标签搜索，强行弹出全局搜索窗口 | **抽屉式卡片流，支持拼音首字母模糊联想与多维交叉筛选** | 沉浸式检索，零工作流打断 |
+| **组合切片** | 不支持多标签交集/差集（需手写 SQL） | **可视化点选 `AND`（包含）与 `NOT`（排除）** | 轻松实现跨维度知识切片 |
+| **命名规范** | 大小写严格敏感，易造成概念割裂（如 `Prompt/prompt`） | **智能体检与一键规范化合并，支持自动维护别名** | 彻底解决标签碎片化与命名冲突 |
+| **体系维护** | 无健康检测，仅支持单个删除/改名 | **健康评分、大小写冲突诊断、低频孤儿标签治理** | 自动化维护，保持知识库长久整洁 |
+| **关联挖掘** | 无法感知标签间的共生关系 | **共现网络分析，自动计算 Jaccard 相似度与伴随标签** | 激发灵感，发现潜在概念网 |
+| **批量操作** | 需逐篇逐块手动打标与修改 | **支持多文档 ID 批量打标与全局标签智能迁移** | 提升大批量知识整理效率 10 倍以上 |
+
+---
+
+## ⚙️ 兼容性与运行环境
+
+- **思源笔记版本**：`>= v3.8.5`
+- **支持平台**：Windows / macOS / Linux / Docker / 桌面端网页版
+- **数据安全**：所有操作基于思源官方标准内核 API 执行，不直接修改底层磁盘文件，完全兼容思源官方云端同步。
+
+---
+
+## 📄 开源许可
+
+本项目遵循 [MIT License](./LICENSE) 开源协议。
