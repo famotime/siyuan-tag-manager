@@ -68,6 +68,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: none !important;
+  outline: none;
 }
 
 /* 选项卡导航 */
@@ -187,6 +189,75 @@
   flex-direction: column;
 }
 
+/* 树多选控制横条 */
+.tm-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  background: var(--tm-badge-primary-bg);
+  border: 1px solid var(--tm-badge-primary-border);
+  font-size: 11px;
+  color: var(--tm-badge-primary-text);
+  flex-shrink: 0;
+}
+
+.tm-selection-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.tm-selection-icon {
+  color: var(--tm-badge-primary-text);
+  flex-shrink: 0;
+}
+
+.tm-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-view-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--b3-theme-primary);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.tm-view-filter-btn:hover {
+  opacity: 0.9;
+}
+
+.tm-clear-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--tm-badge-primary-text);
+  border: 1px solid var(--tm-badge-primary-border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.tm-clear-filter-btn:hover {
+  background: var(--tm-badge-primary-border);
+}
+
 .tm-tree-node {
   display: flex;
   align-items: center;
@@ -194,12 +265,49 @@
   padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color 0.15s, box-shadow 0.15s;
   min-height: 26px;
+  user-select: none;
 }
 
 .tm-tree-node:hover {
   background: var(--b3-theme-background-light);
+}
+
+/* 标签全景选中高亮态 */
+.tm-tree-node.is-selected {
+  background: var(--tm-badge-primary-bg);
+  box-shadow: inset 0 0 0 1px var(--tm-badge-primary-border);
+}
+
+.tm-tree-node.is-selected:hover {
+  background: var(--tm-badge-primary-bg);
+  filter: brightness(0.96);
+}
+
+[data-theme-mode="dark"] .tm-tree-node.is-selected:hover,
+body.theme--dark .tm-tree-node.is-selected:hover {
+  filter: brightness(1.1);
+}
+
+.tm-tree-node.is-selected .tm-node-name {
+  color: var(--tm-badge-primary-text);
+  font-weight: 600;
+}
+
+.tm-tree-node.is-selected .tm-node-count {
+  border-color: var(--tm-badge-primary-border);
+  color: var(--tm-badge-primary-text);
+  background: var(--tm-badge-primary-bg);
+}
+
+.tm-selected-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tm-badge-primary-text);
+  margin-right: 2px;
+  flex-shrink: 0;
 }
 
 .tm-node-expander {
@@ -271,6 +379,8 @@
   width: 20px;
   height: 20px;
   padding: 0;
+  border: none !important;
+  outline: none;
 }
 
 /* 浮动右键/更多菜单 */
@@ -1018,7 +1128,7 @@
   color: #17a2b8;
 }
 .text-danger {
-  color: #e74c3c;
+  color: var(--b3-theme-error, #e74c3c);
 }
 
 .tm-issues-list {
@@ -1072,7 +1182,52 @@
 .tm-issue-op {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex-shrink: 0;
+
+  .tm-icon-btn,
+  .b3-button.tm-btn-sm {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    flex-shrink: 0;
+    border: none !important;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+
+    &:hover {
+      background: var(--b3-theme-background-light);
+      border: none !important;
+      outline: none;
+    }
+
+    &:active {
+      transform: scale(0.96);
+    }
+  }
+
+  .tm-btn-danger {
+    color: var(--b3-theme-error, #e74c3c);
+    border: none !important;
+
+    .sy-line-icon,
+    svg {
+      color: var(--b3-theme-error, #e74c3c);
+      stroke: var(--b3-theme-error, #e74c3c);
+    }
+
+    &:hover {
+      color: var(--b3-theme-error, #e74c3c);
+      border: none !important;
+      outline: none;
+      background-color: var(--tm-badge-danger-bg, rgba(220, 53, 69, 0.12));
+    }
+  }
 }
 
 .tm-empty-state {

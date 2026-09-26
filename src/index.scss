@@ -184,24 +184,26 @@ body.theme--dark .tm-tag-style--slate-grey {
   }
 }
 
-/* 4. 微型图标按钮规范 (tm-icon-btn) */
+/* 4. 微型图标按钮规范 (tm-icon-btn) - 仅图标按钮统一无边框，极简清爽 */
 .tm-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid transparent;
+  border: none !important;
+  outline: none;
   background: transparent;
   color: var(--b3-theme-on-surface);
   border-radius: 4px;
   cursor: pointer;
   padding: 4px;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
   user-select: none;
 
   &:hover {
     background: var(--b3-theme-background-light);
     color: var(--b3-theme-primary);
-    border-color: var(--b3-border-color);
+    border: none !important;
+    outline: none;
   }
 
   &:active {
@@ -211,7 +213,7 @@ body.theme--dark .tm-tag-style--slate-grey {
   &.is-active {
     background: var(--tm-badge-primary-bg, #ebf3fe);
     color: var(--tm-badge-primary-text, #1a56db);
-    border-color: var(--tm-badge-primary-border, rgba(26, 86, 219, 0.28));
+    border: none !important;
   }
 
   &[disabled] {

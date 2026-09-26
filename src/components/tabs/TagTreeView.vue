@@ -36,6 +36,34 @@
       </div>
     </div>
 
+    <!-- 多选状态控制横条 -->
+    <div v-if="selectedTags && selectedTags.length > 0" class="tm-selection-bar">
+      <div class="tm-selection-info">
+        <SyLineIcon name="check-circle" :size="13" class="tm-selection-icon" />
+        <span class="tm-selection-text">
+          已多选 <strong>{{ selectedTags.length }}</strong> 个标签
+        </span>
+      </div>
+      <div class="tm-selection-actions">
+        <button
+          class="tm-view-filter-btn"
+          v-tooltip="'跳转至多维筛选查看匹配块记录'"
+          @click="emit('switch-to-filter')"
+        >
+          <SyLineIcon name="filter-funnel" :size="12" />
+          <span>查看结果</span>
+        </button>
+        <button
+          class="tm-clear-filter-btn"
+          v-tooltip="'清空已选筛选标签'"
+          @click="emit('clear-selected')"
+        >
+          <SyLineIcon name="close" :size="12" />
+          <span>清空</span>
+        </button>
+      </div>
+    </div>
+
     <!-- 标签树列表 -->
     <div class="tm-tree-scroller">
       <div v-if="displayTreeNodes.length === 0" class="tm-empty-state">
@@ -50,6 +78,7 @@
           v-show="isNodeVisible(node)"
           :key="node.label"
           class="tm-tree-node"
+          :class="{ 'is-selected': isTagSelected(node.label) }"
           :style="{ paddingLeft: `${node.depth * 14 + 6}px` }"
         >
           <!-- 展开/折叠箭头指示 -->
@@ -70,9 +99,13 @@
             <span
               class="tm-node-name"
               :style="getTagStyle(node.label)"
-              :title="`${node.label}（点击仅筛选此标签，按住 Ctrl/Shift 可追加组合）`"
+              :title="formatNodeTitle(node.label)"
             >
-              <span v-if="getTagIcon(node.label)" class="tm-custom-icon">{{ getTagIcon(node.label) }}</span>
+              <!-- 选中指示勾选标记 -->
+              <span v-if="isTagSelected(node.label)" class="tm-selected-check" v-tooltip="'已加入筛选条件'">
+                <SyLineIcon name="check" :size="12" />
+              </span>
+              <span v-else-if="getTagIcon(node.label)" class="tm-custom-icon">{{ getTagIcon(node.label) }}</span>
               <SyLineIcon v-else name="hash" :size="12" class="tm-default-hash" />
               {{ node.name }}
             </span>
@@ -109,23 +142,44 @@ import { TagTreeService, type TagSortMode } from '../../services/TagTreeService'
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
-const props = defineProps<{
-  allTags: ITagItem[];
-  loading: boolean;
-  getTagStyle: (label: string) => Record<string, string>;
-  getTagIcon: (label: string) => string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    allTags: ITagItem[];
+    loading: boolean;
+    getTagStyle: (label: string) => Record<string, string>;
+    getTagIcon: (label: string) => string;
+    selectedTags?: string[];
+  }>(),
+  {
+    selectedTags: () => [],
+  }
+);
 
 const emit = defineEmits<{
   (e: 'tag-click', label: string, event: MouseEvent): void;
   (e: 'quick-filter', label: string, append: boolean): void;
   (e: 'open-menu', label: string, event: MouseEvent): void;
+  (e: 'clear-selected'): void;
+  (e: 'switch-to-filter'): void;
 }>();
 
 const searchKeyword = ref('');
 const sortMode = ref<TagSortMode>('count_desc');
 const collapsedSet = ref<Set<string>>(new Set());
 const allCollapsed = ref(false);
+
+const selectedTagSet = computed(() => new Set(props.selectedTags || []));
+
+function isTagSelected(label: string): boolean {
+  return selectedTagSet.value.has(label);
+}
+
+function formatNodeTitle(label: string): string {
+  if (isTagSelected(label)) {
+    return `${label}（已加入筛选；点击仅单选此项，按住 Ctrl/Shift 可取消选择）`;
+  }
+  return `${label}（点击仅单选并跳转，按住 Ctrl/Shift 可多选加入筛选）`;
+}
 
 const displayTreeNodes = computed(() => {
   if (!searchKeyword.value.trim()) {

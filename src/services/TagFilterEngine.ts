@@ -129,6 +129,36 @@ export class TagFilterEngine {
   }
 
   /**
+   * 切换标签的组合筛选状态（用于多选场景：未包含则以 AND 追加，已包含则反选移除）
+   * @param currentFilter 当前筛选状态
+   * @param label 选中的标签
+   */
+  public static toggleFilterSelection(
+    currentFilter: { includeTags: string[]; excludeTags: string[] },
+    label: string
+  ): { includeTags: string[]; excludeTags: string[] } {
+    const trimmed = label ? label.trim() : '';
+    if (!trimmed) {
+      return {
+        includeTags: [...currentFilter.includeTags],
+        excludeTags: [...currentFilter.excludeTags],
+      };
+    }
+
+    if (currentFilter.includeTags.includes(trimmed)) {
+      return {
+        includeTags: currentFilter.includeTags.filter(t => t !== trimmed),
+        excludeTags: currentFilter.excludeTags.filter(t => t !== trimmed),
+      };
+    }
+
+    return {
+      includeTags: [...currentFilter.includeTags, trimmed],
+      excludeTags: currentFilter.excludeTags.filter(t => t !== trimmed),
+    };
+  }
+
+  /**
    * 清空所有筛选标签条件，重置为空筛选状态
    */
   public static clearFilterSelection(): { includeTags: string[]; excludeTags: string[] } {

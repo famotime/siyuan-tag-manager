@@ -29,6 +29,16 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(repeatAppend.includeTags).toEqual(['tool/siyuan', 'typescript']);
     });
 
+    it('toggleFilterSelection 多选切换与反选正确', () => {
+      const initial = { includeTags: ['vue'], excludeTags: ['react'] };
+      const toggled = TagFilterEngine.toggleFilterSelection(initial, 'react');
+      expect(toggled.includeTags).toEqual(['vue', 'react']);
+      expect(toggled.excludeTags).toEqual([]);
+
+      const toggledAgain = TagFilterEngine.toggleFilterSelection(toggled, 'vue');
+      expect(toggledAgain.includeTags).toEqual(['react']);
+    });
+
     it('resetFilterWithTags 能正确清空并重置为指定多标签', () => {
       const reset = TagFilterEngine.resetFilterWithTags(['tagA', 'tagB']);
       expect(reset.includeTags).toEqual(['tagA', 'tagB']);

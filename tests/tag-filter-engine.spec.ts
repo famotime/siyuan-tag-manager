@@ -123,11 +123,49 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
     });
   });
 
-  describe('resetFilterWithTags 重置并建立新组合筛选测试', () => {
-    it('以传入标签建立包含条件，排除条件清空且去除重复与空标签', () => {
-      const result = TagFilterEngine.resetFilterWithTags(['Vue', 'React', 'Vue', '  ', 'TypeScript']);
-      expect(result.includeTags).toEqual(['Vue', 'React', 'TypeScript']);
+  describe('toggleFilterSelection 多选切换与反选状态解析测试', () => {
+    it('若目标标签未被包含，则以 AND 追加至 includeTags', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: [],
+      };
+
+      const result = TagFilterEngine.toggleFilterSelection(initial, 'TypeScript');
+      expect(result.includeTags).toEqual(['Vue', 'TypeScript']);
       expect(result.excludeTags).toEqual([]);
+    });
+
+    it('若目标标签已被包含，则从 includeTags 中移除实现反选', () => {
+      const initial = {
+        includeTags: ['Vue', 'TypeScript'],
+        excludeTags: [],
+      };
+
+      const result = TagFilterEngine.toggleFilterSelection(initial, 'TypeScript');
+      expect(result.includeTags).toEqual(['Vue']);
+      expect(result.excludeTags).toEqual([]);
+    });
+
+    it('若目标标签处于 excludeTags 中，切换时应从 excludeTags 移除并加入 includeTags', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: ['TypeScript', 'Angular'],
+      };
+
+      const result = TagFilterEngine.toggleFilterSelection(initial, 'TypeScript');
+      expect(result.includeTags).toEqual(['Vue', 'TypeScript']);
+      expect(result.excludeTags).toEqual(['Angular']);
+    });
+
+    it('传入空标签时保持原状态不变', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: ['Legacy'],
+      };
+
+      const result = TagFilterEngine.toggleFilterSelection(initial, '   ');
+      expect(result.includeTags).toEqual(['Vue']);
+      expect(result.excludeTags).toEqual(['Legacy']);
     });
   });
 });

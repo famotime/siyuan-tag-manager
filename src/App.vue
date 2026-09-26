@@ -61,10 +61,13 @@
         v-if="currentTab === 'tree'"
         :all-tags="allTags"
         :loading="loading"
+        :selected-tags="activeFilter.includeTags"
         :get-tag-style="getTagStyle"
         :get-tag-icon="getTagIcon"
         @tag-click="onTagClick"
         @quick-filter="onQuickFilter"
+        @clear-selected="clearFilterTags"
+        @switch-to-filter="switchTab('filter')"
         @open-menu="openRowMenu"
       />
 
@@ -318,7 +321,10 @@ function switchTab(tabId: TabType) {
 }
 
 function onTagClick(label: string, event: MouseEvent) {
-  currentTab.value = 'filter';
+  const isMultiSelect = Boolean(event && (event.ctrlKey || event.metaKey || event.shiftKey));
+  if (!isMultiSelect) {
+    currentTab.value = 'filter';
+  }
   handleTagClick(label, event);
 }
 

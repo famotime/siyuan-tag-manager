@@ -47,8 +47,14 @@ export function useTagFilter() {
   }
 
   function handleTagClick(label: string, event?: MouseEvent) {
-    const isAppend = Boolean(event && (event.ctrlKey || event.metaKey || event.shiftKey));
-    handleQuickFilter(label, isAppend);
+    const isMultiSelect = Boolean(event && (event.ctrlKey || event.metaKey || event.shiftKey));
+    selectedSmartViewId.value = '';
+    if (isMultiSelect) {
+      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label);
+    } else {
+      activeFilter.value = TagFilterEngine.resolveFilterSelection(activeFilter.value, label, false);
+    }
+    runQuery();
   }
 
   function toggleTagFilter(label: string) {

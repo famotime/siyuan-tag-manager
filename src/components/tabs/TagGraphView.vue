@@ -69,7 +69,7 @@
             </span>
           </div>
           <button
-            class="b3-button b3-button--outline tm-btn-sm"
+            class="tm-icon-btn tm-btn-sm"
             v-tooltip="'与聚焦标签联合筛选'"
             aria-label="组合筛选"
             @click="emit('combine-filter', selectedGraphTag, item.label)"

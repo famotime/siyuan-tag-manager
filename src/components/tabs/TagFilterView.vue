@@ -15,7 +15,7 @@
           </option>
         </select>
         <button
-          class="b3-button b3-button--outline tm-btn-sm"
+          class="tm-icon-btn tm-btn-sm"
           :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
           v-tooltip="'将当前组合保存为智能视图'"
           aria-label="保存为智能视图"

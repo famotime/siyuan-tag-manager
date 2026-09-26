@@ -245,4 +245,10 @@ export const LINE_ICONS: Record<string, IconPathData> = {
       { type: 'line', x1: 16, y1: 3, x2: 14, y2: 21 },
     ],
   },
+  // 选中勾选
+  'check': {
+    paths: [
+      { type: 'polyline', points: '20 6 9 17 4 12' },
+    ],
+  },
 };

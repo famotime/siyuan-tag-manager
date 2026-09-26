@@ -65,21 +65,21 @@
         <div class="tm-issue-op">
           <button
             v-if="issue.suggestedAction === 'merge'"
-            class="b3-button b3-button--outline tm-btn-sm"
-            v-tooltip="'将所有异构大小写合并至高频标准规范'"
+            class="tm-icon-btn tm-btn-sm"
+            v-tooltip="'一键合并规范：将所有异构大小写合并至高频标准规范'"
+            aria-label="一键合并规范"
             @click="emit('auto-resolve', issue)"
           >
-            <SyLineIcon name="git-merge" :size="12" />
-            <span>一键合并规范</span>
+            <SyLineIcon name="git-merge" :size="13" />
           </button>
           <button
             v-else-if="issue.suggestedAction === 'clean'"
-            class="b3-button b3-button--cancel tm-btn-sm"
-            v-tooltip="'彻底清理并从全库移除此无用标签'"
+            class="tm-icon-btn tm-btn-sm tm-btn-danger"
+            v-tooltip="'清理删除：彻底清理并从全库移除此无用标签'"
+            aria-label="清理删除"
             @click="emit('remove-tag', issue.primaryLabel)"
           >
-            <SyLineIcon name="trash" :size="12" />
-            <span>清理删除</span>
+            <SyLineIcon name="trash" :size="13" class="text-danger" />
           </button>
         </div>
       </div>
