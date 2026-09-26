@@ -32,6 +32,12 @@ export interface ITagMetadata {
   backgroundColor?: string;
   /** 字体颜色（如 "#1A73E8"） */
   textColor?: string;
+  /** 暗黑模式背景高亮颜色（自适应无眩光） */
+  darkBackgroundColor?: string;
+  /** 暗黑模式字体颜色（高对比度） */
+  darkTextColor?: string;
+  /** 绑定的预设色盘 ID */
+  presetId?: string;
   /** 自定义图标（Emoji 字符或 SVG 图标名） */
   icon?: string;
   /** 所属分组 ID */

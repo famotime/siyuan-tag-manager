@@ -1,27 +1,42 @@
 <template>
-  <div class="tag-manager-container">
-    <!-- 头部工具栏与导航切换 -->
+  <div class="tag-manager-container" @click="closeRowMenu">
+    <!-- 顶部工作台标题栏与快捷操作 -->
     <header class="tm-header">
       <div class="tm-title-row">
         <div class="tm-brand">
-          <span class="tm-brand-icon">🏷️</span>
+          <span class="tm-brand-icon">
+            <SyLineIcon name="tag" :size="16" />
+          </span>
           <span class="tm-brand-title">标签管家</span>
           <span class="tm-tag-badge">{{ allTags.length }} 个标签</span>
         </div>
         <div class="tm-actions">
-          <button class="b3-button b3-button--outline tm-btn-sm" title="批量为文档打标" @click="batchModal.visible = true">
-            📑 批量打标
+          <button
+            class="tm-icon-btn tm-btn-sm"
+            v-tooltip="'批量为文档打标'"
+            @click="batchModal.visible = true"
+          >
+            <SyLineIcon name="layers-plus" :size="14" />
           </button>
-          <button class="b3-button b3-button--outline tm-btn-sm" :disabled="loading" title="刷新标签数据" @click="refreshTags">
-            <span :class="{'tm-rotate': loading}">🔄</span>
+          <button
+            class="tm-icon-btn tm-btn-sm"
+            :disabled="loading"
+            v-tooltip="'刷新全库标签数据'"
+            @click="refreshTags"
+          >
+            <SyLineIcon name="refresh-cw" :size="14" :spin="loading" />
           </button>
-          <button class="b3-button b3-button--text tm-btn-sm" title="关闭" @click="closePanel">
-            ✕
+          <button
+            class="tm-icon-btn tm-btn-sm"
+            v-tooltip="'折叠标签管家侧栏'"
+            @click="closePanel"
+          >
+            <SyLineIcon name="close" :size="14" />
           </button>
         </div>
       </div>
 
-      <!-- 选项卡导航 -->
+      <!-- 选项卡导航 (统一显式线框图标) -->
       <nav class="tm-nav-tabs">
         <button
           v-for="tab in tabs"
@@ -30,8 +45,8 @@
           :class="{ active: currentTab === tab.id }"
           @click="switchTab(tab.id)"
         >
-          <span>{{ tab.icon }}</span>
-          <span>{{ tab.name }}</span>
+          <SyLineIcon :name="tab.iconName" :size="14" />
+          <span class="tm-tab-name">{{ tab.name }}</span>
           <span v-if="tab.badge !== undefined && tab.badge > 0" class="tm-tab-badge">
             {{ tab.badge }}
           </span>
@@ -39,85 +54,104 @@
       </nav>
     </header>
 
-    <!-- 主体内容区 -->
+    <!-- 主体内容区域 -->
     <main class="tm-body">
       <!-- TAB 1: 标签全景资产树 -->
       <section v-if="currentTab === 'tree'" class="tm-tab-content">
-        <!-- 搜索与排序栏（支持拼音首字母模糊联想，如 ytb -> YouTube） -->
+        <!-- 搜索、排序与展开/收起工具栏 -->
         <div class="tm-filter-bar">
-          <div class="b3-form__icon fn__flex-1">
+          <div class="tm-search-box fn__flex-1">
+            <SyLineIcon name="search" :size="13" class="tm-search-icon" />
             <input
               v-model="searchKeyword"
-              class="b3-text-field fn__block"
+              class="b3-text-field tm-search-input"
               placeholder="搜索标签（支持拼音首字母如 ytb、别名）..."
             />
+            <button
+              v-if="searchKeyword"
+              class="tm-icon-btn tm-clear-btn"
+              v-tooltip="'清空搜索'"
+              @click="searchKeyword = ''"
+            >
+              <SyLineIcon name="close" :size="12" />
+            </button>
           </div>
-          <select v-model="sortMode" class="b3-select" style="margin-left: 8px;">
-            <option value="count_desc">引用数 (从多到少)</option>
-            <option value="count_asc">引用数 (从少到多)</option>
-            <option value="name_asc">名称拼音 (A-Z)</option>
-            <option value="name_desc">名称拼音 (Z-A)</option>
-          </select>
+
+          <div class="tm-filter-tools">
+            <button
+              class="tm-icon-btn tm-btn-sm"
+              v-tooltip="allCollapsed ? '展开所有层级' : '折叠所有层级'"
+              @click="toggleCollapseAll"
+            >
+              <SyLineIcon :name="allCollapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
+            </button>
+            <select v-model="sortMode" class="b3-select tm-sort-select">
+              <option value="count_desc">引用数 (多→少)</option>
+              <option value="count_asc">引用数 (少→多)</option>
+              <option value="name_asc">拼音 (A→Z)</option>
+              <option value="name_desc">拼音 (Z→A)</option>
+            </select>
+          </div>
         </div>
 
         <!-- 标签树列表 -->
         <div class="tm-tree-scroller">
-          <div v-if="displayTreeNodes.length === 0" class="tm-empty">
-            {{ loading ? '正在加载标签资产...' : '未匹配到任何标签' }}
+          <div v-if="displayTreeNodes.length === 0" class="tm-empty-state">
+            <SyLineIcon name="folder-tree" :size="32" class="tm-empty-icon" />
+            <div class="tm-empty-text">
+              {{ loading ? '正在加载标签资产...' : '未匹配到任何相关标签' }}
+            </div>
           </div>
           <div v-else class="tm-tree-nodes">
             <div
               v-for="node in displayTreeNodes"
+              v-show="isNodeVisible(node)"
               :key="node.label"
               class="tm-tree-node"
-              :style="{ paddingLeft: `${node.depth * 16 + 8}px` }"
+              :style="{ paddingLeft: `${node.depth * 14 + 6}px` }"
             >
+              <!-- 展开/折叠箭头指示 -->
+              <span
+                class="tm-node-expander"
+                :class="{ 'is-leaf': !hasSubTags(node.label) }"
+                @click.stop="toggleNodeCollapse(node.label)"
+              >
+                <SyLineIcon
+                  v-if="hasSubTags(node.label)"
+                  :name="collapsedSet.has(node.label) ? 'chevron-right' : 'chevron-down'"
+                  :size="11"
+                />
+              </span>
+
+              <!-- 节点主内容 -->
               <div class="tm-node-content" @click="handleQuickFilter(node.label)">
-                <span class="tm-node-icon">{{ getTagIcon(node.label) }}</span>
                 <span
                   class="tm-node-name"
                   :style="getTagStyle(node.label)"
                   :title="node.label"
                 >
+                  <span v-if="getTagIcon(node.label)" class="tm-custom-icon">{{ getTagIcon(node.label) }}</span>
+                  <SyLineIcon v-else name="hash" :size="12" class="tm-default-hash" />
                   {{ node.name }}
                 </span>
-                <span class="tm-node-count">{{ node.count }}</span>
+                <span class="tm-node-count" v-tooltip="`全库共 ${node.count} 处引用`">{{ node.count }}</span>
               </div>
+
+              <!-- 渐进式暴露操作区：仅暴露高频筛选 + 更多菜单，彻底解决 Fitts's Law 痛点 -->
               <div class="tm-node-actions">
                 <button
-                  class="tm-mini-btn"
-                  title="🎨 设置色彩样式与别名"
-                  @click.stop="openStyleDialog(node.label)"
-                >
-                  🎨
-                </button>
-                <button
-                  class="tm-mini-btn"
-                  title="📄 一键升格为实体主题文档"
-                  @click.stop="handleConvertToDoc(node.label)"
-                >
-                  📄
-                </button>
-                <button
-                  class="tm-mini-btn"
-                  title="加入即时交叉筛选"
+                  class="tm-icon-btn tm-action-btn"
+                  v-tooltip="'加入即时组合筛选'"
                   @click.stop="handleQuickFilter(node.label)"
                 >
-                  🔍
+                  <SyLineIcon name="search-plus" :size="13" />
                 </button>
                 <button
-                  class="tm-mini-btn"
-                  title="查看知识共现与生命周期"
-                  @click.stop="viewTagNetwork(node.label)"
+                  class="tm-icon-btn tm-action-btn"
+                  v-tooltip="'更多操作选项'"
+                  @click.stop="openRowMenu(node.label, $event)"
                 >
-                  🕸️
-                </button>
-                <button
-                  class="tm-mini-btn"
-                  title="重构合并到其他标签"
-                  @click.stop="openMergeDialog(node.label)"
-                >
-                  🔀
+                  <SyLineIcon name="more-horizontal" :size="13" />
                 </button>
               </div>
             </div>
@@ -130,78 +164,106 @@
         <!-- 智能保存视图管理 -->
         <div class="tm-views-toolbar">
           <div class="tm-views-select-row">
-            <span class="tm-views-lbl">智能视图：</span>
+            <SyLineIcon name="bookmark-star" :size="14" class="tm-views-icon" />
             <select v-model="selectedSmartViewId" class="b3-select tm-views-select" @change="applySmartView">
               <option value="">-- 选择或切换常用智能视图 --</option>
               <option v-for="v in savedViews" :key="v.id" :value="v.id">
-                ⭐ {{ v.title }}
+                {{ v.title }}
               </option>
             </select>
             <button
               class="b3-button b3-button--outline tm-btn-sm"
               :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
-              title="将当前组合保存为智能视图"
+              v-tooltip="'将当前组合保存为智能视图'"
               @click="openSaveViewDialog"
             >
-              💾 保存当前
+              <SyLineIcon name="save" :size="12" />
+              <span>保存</span>
             </button>
           </div>
         </div>
 
-        <!-- 激活的筛选条件池 -->
+        <!-- 激活的筛选条件池 (紧凑胶囊) -->
         <div class="tm-filter-box">
-          <div class="tm-section-hint">点击切换：➕必含 (AND) | ➖排除 (NOT) | ✕移除</div>
+          <div class="tm-section-hint">
+            <span>点击切换：</span>
+            <b class="text-primary">AND (必含)</b>
+            <span> | </span>
+            <b class="text-danger">NOT (排除)</b>
+          </div>
           <div class="tm-active-chips">
             <div
               v-for="tag in activeFilter.includeTags"
               :key="`inc-${tag}`"
               class="tm-chip tm-chip--inc"
+              v-tooltip="'点击切换为排除 (NOT)'"
               @click="toggleTagCondition(tag, 'exclude')"
             >
+              <span class="tm-chip-indicator"></span>
               <span class="tm-chip-prefix">AND</span>
-              <span>#{{ tag }}</span>
-              <span class="tm-chip-remove" @click.stop="removeFilterTag(tag)">✕</span>
+              <span class="tm-chip-label">#{{ tag }}</span>
+              <span class="tm-chip-remove" v-tooltip="'移除此条件'" @click.stop="removeFilterTag(tag)">
+                <SyLineIcon name="close" :size="10" />
+              </span>
             </div>
             <div
               v-for="tag in activeFilter.excludeTags"
               :key="`exc-${tag}`"
               class="tm-chip tm-chip--exc"
+              v-tooltip="'点击切换为包含 (AND)'"
               @click="toggleTagCondition(tag, 'include')"
             >
+              <span class="tm-chip-indicator"></span>
               <span class="tm-chip-prefix">NOT</span>
-              <span>#{{ tag }}</span>
-              <span class="tm-chip-remove" @click.stop="removeFilterTag(tag)">✕</span>
+              <span class="tm-chip-label">#{{ tag }}</span>
+              <span class="tm-chip-remove" v-tooltip="'移除此条件'" @click.stop="removeFilterTag(tag)">
+                <SyLineIcon name="close" :size="10" />
+              </span>
             </div>
             <div v-if="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0" class="tm-filter-placeholder">
-              👈 请从下方点选标签，展开多维交叉切片分析
+              👈 点击下方候选标签，展开多维交叉组合检索
             </div>
           </div>
 
-          <!-- 快速候选标签流 -->
-          <div class="tm-quick-tags">
-            <span
-              v-for="tag in topQuickTags"
-              :key="tag.label"
-              class="tm-quick-tag"
-              :class="{
-                'is-included': activeFilter.includeTags.includes(tag.label),
-                'is-excluded': activeFilter.excludeTags.includes(tag.label)
-              }"
-              @click="toggleTagFilter(tag.label)"
+          <!-- 快速候选标签流 (可折叠) -->
+          <div class="tm-quick-tags-wrapper">
+            <div class="tm-quick-tags" :class="{ 'is-expanded': expandQuickTags }">
+              <span
+                v-for="tag in topQuickTags"
+                :key="tag.label"
+                class="tm-quick-tag"
+                :class="{
+                  'is-included': activeFilter.includeTags.includes(tag.label),
+                  'is-excluded': activeFilter.excludeTags.includes(tag.label)
+                }"
+                @click="toggleTagFilter(tag.label)"
+              >
+                #{{ tag.label }} <small>({{ tag.count }})</small>
+              </span>
+            </div>
+            <button
+              v-if="allTags.length > 12"
+              class="tm-quick-expand-btn"
+              @click="expandQuickTags = !expandQuickTags"
             >
-              #{{ tag.label }} ({{ tag.count }})
-            </span>
+              {{ expandQuickTags ? '收起候选' : `展开更多 (${topQuickTags.length})` }}
+              <SyLineIcon :name="expandQuickTags ? 'chevron-down' : 'chevron-right'" :size="10" />
+            </button>
           </div>
         </div>
 
-        <!-- 结果卡片流 -->
+        <!-- 检索结果卡片流 -->
         <div class="tm-results-header">
-          <span>匹配结果：{{ matchedBlocks.length }} 条记录</span>
-          <span v-if="queryLoading" class="tm-loading-text">正在极速检索...</span>
+          <span>匹配结果：<b>{{ matchedBlocks.length }}</b> 条记录</span>
+          <span v-if="queryLoading" class="tm-loading-indicator">
+            <SyLineIcon name="refresh-cw" :size="12" :spin="true" />
+            <span>检索中...</span>
+          </span>
         </div>
         <div class="tm-card-stream">
-          <div v-if="matchedBlocks.length === 0 && !queryLoading" class="tm-empty">
-            没有符合多维组合条件的块记录
+          <div v-if="matchedBlocks.length === 0 && !queryLoading" class="tm-empty-state">
+            <SyLineIcon name="filter-funnel" :size="28" class="tm-empty-icon" />
+            <div class="tm-empty-text">没有符合多维组合条件的块记录</div>
           </div>
           <div
             v-for="block in matchedBlocks"
@@ -209,11 +271,17 @@
             class="tm-card"
             @click="jumpToBlock(block.rootId, block.id)"
           >
-            <div class="tm-card-doc">📄 {{ block.docTitle }}</div>
+            <div class="tm-card-doc">
+              <SyLineIcon name="file-up" :size="13" class="tm-doc-icon" />
+              <span>{{ block.docTitle }}</span>
+            </div>
             <div class="tm-card-content" v-html="highlightTags(block.content || block.markdown)"></div>
             <div class="tm-card-footer">
               <span class="tm-card-time">{{ block.updated }}</span>
-              <span class="tm-card-jump">点击跳转定位 ↗</span>
+              <span class="tm-card-jump">
+                <span>定位跳转</span>
+                <SyLineIcon name="external-link" :size="11" />
+              </span>
             </div>
           </div>
         </div>
@@ -226,13 +294,13 @@
             <span>活跃节点: <b>{{ graphData.nodes.length }}</b></span>
             <span>共现连接: <b>{{ graphData.links.length }}</b></span>
           </div>
-          <div class="tm-graph-hint">探索知识共现网络与关注演变</div>
+          <div class="tm-graph-hint">探索知识共现拓扑与生命周期演变</div>
         </div>
 
-        <!-- 聚焦标签选择 -->
+        <!-- 聚焦标签选择与时序分析 -->
         <div class="tm-network-box">
           <div class="tm-network-header">
-            <span>聚焦标签：</span>
+            <span class="tm-label-title">聚焦标签：</span>
             <select v-model="selectedGraphTag" class="b3-select tm-select-tag" @change="onFocusTagChange">
               <option v-for="tag in allTags" :key="tag.label" :value="tag.label">
                 #{{ tag.label }} ({{ tag.count }})
@@ -240,11 +308,15 @@
             </select>
           </div>
 
-          <!-- 时序生命周期分析看板 (特性 15) -->
+          <!-- 时序生命周期卡片 (线框指示器) -->
           <div v-if="timelineStats" class="tm-timeline-stats-card">
             <div class="tm-timeline-top">
               <span class="tm-timeline-trend-badge" :class="`trend-${timelineStats.activityTrend}`">
-                {{ timelineStats.activityTrend === 'rising' ? '🚀 近期活跃' : timelineStats.activityTrend === 'cooling' ? '❄️ 冷却沉寂' : '🟢 平稳常驻' }}
+                <SyLineIcon
+                  :name="timelineStats.activityTrend === 'rising' ? 'trending-up' : timelineStats.activityTrend === 'cooling' ? 'trending-down' : 'activity'"
+                  :size="12"
+                />
+                <span>{{ timelineStats.activityTrend === 'rising' ? '近期活跃' : timelineStats.activityTrend === 'cooling' ? '冷却沉寂' : '平稳常驻' }}</span>
               </span>
               <span class="tm-timeline-last-updated">最后打标：{{ timelineStats.lastUpdated || '未知' }}</span>
             </div>
@@ -264,10 +336,10 @@
             </div>
           </div>
 
-          <!-- 伴随标签列表 -->
+          <!-- 伴随标签列表 (Jaccard 进度胶囊) -->
           <div class="tm-section-hint" style="margin-top: 10px;">最密切关联的伴随标签 (TOP Associated)：</div>
           <div class="tm-associated-list">
-            <div v-if="associatedTags.length === 0" class="tm-empty" style="padding: 12px;">
+            <div v-if="associatedTags.length === 0" class="tm-empty-hint">
               该标签与其他标签暂无高频共现记录
             </div>
             <div
@@ -277,14 +349,17 @@
             >
               <div class="tm-assoc-info">
                 <span class="tm-assoc-label">#{{ item.label }}</span>
-                <span class="tm-assoc-meta">共现 {{ item.weight }} 次 · 相似度 {{ (item.jaccard * 100).toFixed(1) }}%</span>
+                <span class="tm-assoc-meta">
+                  共现 {{ item.weight }} 次 · 亲密相似度 {{ (item.jaccard * 100).toFixed(1) }}%
+                </span>
               </div>
               <button
                 class="b3-button b3-button--outline tm-btn-sm"
-                title="同时筛选这两个标签"
+                v-tooltip="'与聚焦标签联合筛选'"
                 @click="combineFilterWithAssociated(selectedGraphTag, item.label)"
               >
-                + 组合筛选
+                <SyLineIcon name="search-plus" :size="12" />
+                <span>组合筛选</span>
               </button>
             </div>
           </div>
@@ -300,9 +375,15 @@
               class="tm-link-row"
               @click="combineFilterWithAssociated(link.source, link.target)"
             >
-              <span class="tm-link-badge">🔗 共现 {{ link.weight }} 次</span>
+              <span class="tm-link-badge">
+                <SyLineIcon name="link" :size="11" />
+                <span>{{ link.weight }} 次</span>
+              </span>
               <span class="tm-link-pair">#{{ link.source }} ⟷ #{{ link.target }}</span>
-              <span class="tm-link-btn">探查 ↗</span>
+              <span class="tm-link-btn">
+                <span>探查</span>
+                <SyLineIcon name="external-link" :size="10" />
+              </span>
             </div>
           </div>
         </div>
@@ -313,20 +394,38 @@
         <!-- 统计面板 -->
         <div class="tm-health-dash">
           <div class="tm-health-score">
-            <div class="tm-score-num">{{ healthResult.summary.healthyRate }}%</div>
+            <div
+              class="tm-score-num"
+              :class="{
+                'is-good': healthResult.summary.healthyRate >= 90,
+                'is-warn': healthResult.summary.healthyRate >= 70 && healthResult.summary.healthyRate < 90,
+                'is-danger': healthResult.summary.healthyRate < 70
+              }"
+            >
+              {{ healthResult.summary.healthyRate }}%
+            </div>
             <div class="tm-score-lbl">健康度评分</div>
           </div>
           <div class="tm-stat-grid">
             <div class="tm-stat-card">
-              <div class="tm-stat-val text-warning">{{ healthResult.summary.caseConflicts }}</div>
+              <div class="tm-stat-val text-warning">
+                <SyLineIcon name="alert-triangle" :size="14" />
+                <span>{{ healthResult.summary.caseConflicts }}</span>
+              </div>
               <div class="tm-stat-lbl">大小写冲突</div>
             </div>
             <div class="tm-stat-card">
-              <div class="tm-stat-val text-info">{{ healthResult.summary.lowFrequency }}</div>
+              <div class="tm-stat-val text-info">
+                <SyLineIcon name="info" :size="14" />
+                <span>{{ healthResult.summary.lowFrequency }}</span>
+              </div>
               <div class="tm-stat-lbl">低频标签 (1次)</div>
             </div>
             <div class="tm-stat-card">
-              <div class="tm-stat-val text-danger">{{ healthResult.summary.orphans }}</div>
+              <div class="tm-stat-val text-danger">
+                <SyLineIcon name="trash" :size="14" />
+                <span>{{ healthResult.summary.orphans }}</span>
+              </div>
               <div class="tm-stat-lbl">孤儿废弃标签</div>
             </div>
           </div>
@@ -335,7 +434,8 @@
         <!-- 体检清单 -->
         <div class="tm-issues-list">
           <div v-if="healthResult.issues.length === 0" class="tm-empty-success">
-            🎉 太棒了！知识库标签体系非常规范，未发现大小写冲突与孤儿标签！
+            <SyLineIcon name="check-circle" :size="24" class="tm-success-icon" />
+            <div>太棒了！知识库标签体系非常规范，未发现大小写冲突与孤儿标签！</div>
           </div>
           <div
             v-for="issue in healthResult.issues"
@@ -344,7 +444,10 @@
             :class="`is-${issue.severity}`"
           >
             <div class="tm-issue-icon">
-              {{ issue.type === 'case_conflict' ? '⚠️' : 'ℹ️' }}
+              <SyLineIcon
+                :name="issue.type === 'case_conflict' ? 'alert-triangle' : 'info'"
+                :size="16"
+              />
             </div>
             <div class="tm-issue-info">
               <div class="tm-issue-title">{{ issue.primaryLabel }}</div>
@@ -354,16 +457,20 @@
               <button
                 v-if="issue.suggestedAction === 'merge'"
                 class="b3-button b3-button--outline tm-btn-sm"
+                v-tooltip="'将所有异构大小写合并至高频标准规范'"
                 @click="autoResolveIssue(issue)"
               >
-                一键合并规范化
+                <SyLineIcon name="git-merge" :size="12" />
+                <span>一键合并规范</span>
               </button>
               <button
                 v-else-if="issue.suggestedAction === 'clean'"
                 class="b3-button b3-button--cancel tm-btn-sm"
+                v-tooltip="'彻底清理并从全库移除此无用标签'"
                 @click="handleRemoveTag(issue.primaryLabel)"
               >
-                清理删除
+                <SyLineIcon name="trash" :size="12" />
+                <span>清理删除</span>
               </button>
             </div>
           </div>
@@ -371,42 +478,96 @@
       </section>
     </main>
 
-    <!-- 样式与别名设置弹窗 (Color Picker & Alias Modal) -->
+    <!-- 浮动行内菜单 (Floating Action Popover, 替代臃肿平铺按钮) -->
+    <div
+      v-if="rowMenu.visible"
+      class="tm-row-menu"
+      :style="{ top: `${rowMenu.top}px`, left: `${rowMenu.left}px` }"
+      @click.stop
+    >
+      <div class="tm-row-menu-header">
+        <SyLineIcon name="tag" :size="12" />
+        <span class="tm-row-menu-title">#{{ rowMenu.label }}</span>
+      </div>
+      <div class="tm-row-menu-item" @click="handleRowAction('style')">
+        <SyLineIcon name="palette" :size="13" />
+        <span>定制色彩与别名</span>
+      </div>
+      <div class="tm-row-menu-item" @click="handleRowAction('doc')">
+        <SyLineIcon name="file-up" :size="13" />
+        <span>升格为主题聚合文档</span>
+      </div>
+      <div class="tm-row-menu-item" @click="handleRowAction('graph')">
+        <SyLineIcon name="git-fork-nodes" :size="13" />
+        <span>查看共现图谱与时序</span>
+      </div>
+      <div class="tm-row-menu-item" @click="handleRowAction('merge')">
+        <SyLineIcon name="git-merge" :size="13" />
+        <span>重构合并到其他标签...</span>
+      </div>
+      <div class="tm-row-menu-divider"></div>
+      <div class="tm-row-menu-item is-danger" @click="handleRowAction('remove')">
+        <SyLineIcon name="trash" :size="13" />
+        <span>从全库安全删除标签</span>
+      </div>
+    </div>
+
+    <!-- 样式与别名设置弹窗 (双主题自适应调色板) -->
     <div v-if="styleModal.visible" class="tm-modal-mask" @click.self="styleModal.visible = false">
       <div class="tm-modal-card">
-        <div class="tm-modal-title">🎨 设置标签样式与别名</div>
+        <div class="tm-modal-title">
+          <SyLineIcon name="palette" :size="16" />
+          <span>设置标签样式与别名</span>
+        </div>
         <div class="tm-modal-body">
-          <p>正在定制标签：<b>#{{ styleModal.label }}#</b></p>
+          <p class="tm-modal-target">正在定制标签：<b>#{{ styleModal.label }}#</b></p>
+
+          <!-- 8 组精调双主题自适应色盘预设 -->
           <div class="tm-form-group">
-            <label>预设背景色彩：</label>
-            <div class="tm-color-palette">
-              <span
-                v-for="preset in colorPresets"
-                :key="preset.bg"
-                class="tm-color-swatch"
-                :style="{ backgroundColor: preset.bg, color: preset.text }"
-                @click="applyColorPreset(preset)"
+            <label>预设双主题自适应色彩 (Light / Dark 智能对偶)：</label>
+            <div class="tm-color-palette-grid">
+              <div
+                v-for="preset in DUAL_THEME_COLOR_PRESETS"
+                :key="preset.id"
+                class="tm-preset-card"
+                :class="{ 'is-selected': styleModal.presetId === preset.id }"
+                @click="applyDualThemePreset(preset)"
               >
-                Aa
-              </span>
+                <div class="tm-preset-preview">
+                  <span
+                    class="tm-preset-chip light-chip"
+                    :style="{ backgroundColor: preset.lightBg, color: preset.lightText, borderColor: preset.lightBorder }"
+                  >
+                    Aa
+                  </span>
+                  <span
+                    class="tm-preset-chip dark-chip"
+                    :style="{ backgroundColor: preset.darkBg, color: preset.darkText, borderColor: preset.darkBorder }"
+                  >
+                    Aa
+                  </span>
+                </div>
+                <span class="tm-preset-name">{{ preset.name }}</span>
+              </div>
             </div>
           </div>
+
           <div class="tm-form-row">
             <div class="tm-form-group fn__flex-1">
               <label>背景颜色 (Hex):</label>
-              <input v-model="styleModal.backgroundColor" class="b3-text-field fn__block" placeholder="#E8F0FE" />
+              <input v-model="styleModal.backgroundColor" class="b3-text-field fn__block" placeholder="#EBF3FE" />
             </div>
             <div class="tm-form-group fn__flex-1" style="margin-left: 8px;">
               <label>文字颜色 (Hex):</label>
-              <input v-model="styleModal.textColor" class="b3-text-field fn__block" placeholder="#1A73E8" />
+              <input v-model="styleModal.textColor" class="b3-text-field fn__block" placeholder="#1A56DB" />
             </div>
           </div>
           <div class="tm-form-group">
-            <label>自定义 Emoji / 图标：</label>
+            <label>自定义 Emoji / 符号前缀：</label>
             <input v-model="styleModal.icon" class="b3-text-field fn__block" placeholder="例如：🎬, 💡, 🚀, 💻" />
           </div>
           <div class="tm-form-group">
-            <label>别名列表（逗号分隔，支持拼音首字母模糊联想）：</label>
+            <label>别名列表（逗号分隔，支持拼音首字母如 ytb 检索）：</label>
             <input v-model="styleModal.aliasesText" class="b3-text-field fn__block" placeholder="例如：油管, 视频平台" />
           </div>
         </div>
@@ -420,11 +581,19 @@
     <!-- 保存智能视图弹窗 -->
     <div v-if="saveViewModal.visible" class="tm-modal-mask" @click.self="saveViewModal.visible = false">
       <div class="tm-modal-card">
-        <div class="tm-modal-title">💾 保存为智能视图</div>
+        <div class="tm-modal-title">
+          <SyLineIcon name="save" :size="16" />
+          <span>保存为智能视图</span>
+        </div>
         <div class="tm-modal-body">
           <div class="tm-form-group">
             <label>视图名称：</label>
-            <input v-model="saveViewModal.title" class="b3-text-field fn__block" placeholder="例如：AI视频开发重点" />
+            <input
+              v-model="saveViewModal.title"
+              class="b3-text-field fn__block"
+              placeholder="例如：AI视频与提示词重点"
+              @keydown.enter="confirmSaveSmartView"
+            />
           </div>
           <div class="tm-section-hint">
             包含: {{ activeFilter.includeTags.map(t => `#${t}`).join(', ') || '无' }}<br>
@@ -441,7 +610,10 @@
     <!-- 批量打标弹窗 -->
     <div v-if="batchModal.visible" class="tm-modal-mask" @click.self="batchModal.visible = false">
       <div class="tm-modal-card">
-        <div class="tm-modal-title">📑 批量文档打标</div>
+        <div class="tm-modal-title">
+          <SyLineIcon name="layers-plus" :size="16" />
+          <span>批量文档打标</span>
+        </div>
         <div class="tm-modal-body">
           <div class="tm-form-group">
             <label>目标文档 ID (每行一个 ID)：</label>
@@ -449,7 +621,7 @@
               v-model="batchModal.docIdsText"
               class="b3-text-field fn__block"
               rows="3"
-              placeholder="粘贴思源文档块 ID，如 20260926080000-xxxxxxx"
+              placeholder="粘贴思源文档块 ID，例如 20260926080000-xxxxxxx"
             ></textarea>
           </div>
           <div class="tm-form-group">
@@ -457,14 +629,14 @@
             <input
               v-model="batchModal.tagsText"
               class="b3-text-field fn__block"
-              placeholder="例如：YouTube, AI, 产品案例"
+              placeholder="例如：YouTube, AI, 产品设计"
             />
           </div>
         </div>
         <div class="tm-modal-footer">
           <button class="b3-button b3-button--cancel" @click="batchModal.visible = false">取消</button>
           <button class="b3-button b3-button--primary" :disabled="batchModal.executing" @click="executeBatchTag">
-            {{ batchModal.executing ? '执行中...' : '开始批量打标' }}
+            {{ batchModal.executing ? '执行打标中...' : '开始批量打标' }}
           </button>
         </div>
       </div>
@@ -473,21 +645,25 @@
     <!-- 合并重构对话弹窗 -->
     <div v-if="mergeModal.visible" class="tm-modal-mask" @click.self="mergeModal.visible = false">
       <div class="tm-modal-card">
-        <div class="tm-modal-title">🔀 标签重构与合并</div>
+        <div class="tm-modal-title">
+          <SyLineIcon name="git-merge" :size="16" />
+          <span>标签重构与合并</span>
+        </div>
         <div class="tm-modal-body">
-          <p>将源标签 <b>#{{ mergeModal.sourceLabel }}#</b> 合并到目标标签：</p>
+          <p class="tm-modal-target">将源标签 <b>#{{ mergeModal.sourceLabel }}#</b> 合并到目标标签：</p>
           <div class="tm-form-group">
-            <label>目标标签：</label>
+            <label>目标规范化标签名称：</label>
             <input
               v-model="mergeModal.targetLabel"
               class="b3-text-field fn__block"
               placeholder="例如：Prompt 或 tech/python"
+              @keydown.enter="confirmMerge"
             />
           </div>
           <div class="tm-form-checkbox">
             <label>
               <input v-model="mergeModal.setAsAlias" type="checkbox" />
-              合并后将 "{{ mergeModal.sourceLabel }}" 保存为别名
+              合并后将原名 "{{ mergeModal.sourceLabel }}" 沉淀为别名
             </label>
           </div>
         </div>
@@ -503,7 +679,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagHealthIssue, ITagItem, ITagMatchedBlock, ITagMetadata, ISmartTagView } from './types/tag';
 import { TagApiClient } from './services/TagApiClient';
@@ -516,6 +692,8 @@ import { TagVisualService } from './services/TagVisualService';
 import { TagDocConverterService } from './services/TagDocConverterService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock, usePlugin } from './main';
+import SyLineIcon from './components/SiyuanTheme/SyLineIcon.vue';
+import { DUAL_THEME_COLOR_PRESETS, type IColorPreset } from './styles/palette';
 
 // 状态管理
 const currentTab = ref<'tree' | 'filter' | 'graph' | 'hygiene'>('tree');
@@ -526,6 +704,13 @@ const sortMode = ref<TagSortMode>('count_desc');
 
 // 标签元数据映射表 Map<label, ITagMetadata>
 const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
+
+// 树节点折叠状态控制
+const collapsedSet = ref<Set<string>>(new Set());
+const allCollapsed = ref(false);
+
+// 快速候选标签折叠控制
+const expandQuickTags = ref(false);
 
 // 智能视图列表
 const savedViews = ref<ISmartTagView[]>([]);
@@ -551,22 +736,28 @@ const timelineStats = ref<ITagTimelineStats | null>(null);
 // 健康体检结果
 const healthResult = ref(TagGovernanceService.runHealthInspection([]));
 
-// 预设柔和色彩组合
-const colorPresets = [
-  { bg: '#E8F0FE', text: '#1A73E8' }, // 经典蓝
-  { bg: '#E6F4EA', text: '#137333' }, // 护眼绿
-  { bg: '#FEF7E0', text: '#B06000' }, // 柔和橙
-  { bg: '#FCE8E6', text: '#C5221F' }, // 警示红
-  { bg: '#F3E8FD', text: '#8430CE' }, // 优雅紫
-  { bg: '#E0F2F1', text: '#00695C' }, // 青蓝
-];
+// 浮动行内菜单状态 (Floating Row Action Menu)
+const rowMenu = ref<{
+  visible: boolean;
+  label: string;
+  top: number;
+  left: number;
+}>({
+  visible: false,
+  label: '',
+  top: 0,
+  left: 0,
+});
 
 // 样式弹窗
 const styleModal = ref({
   visible: false,
   label: '',
+  presetId: '',
   backgroundColor: '',
   textColor: '',
+  darkBackgroundColor: '',
+  darkTextColor: '',
   icon: '',
   aliasesText: '',
 });
@@ -595,10 +786,10 @@ const mergeModal = ref({
 });
 
 const tabs = computed(() => [
-  { id: 'tree' as const, name: '标签全景', icon: '🗂️' },
-  { id: 'filter' as const, name: '多维筛选', icon: '⚡', badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length },
-  { id: 'graph' as const, name: '认知图谱', icon: '🕸️' },
-  { id: 'hygiene' as const, name: '健康治理', icon: '🩺', badge: healthResult.value.issues.length },
+  { id: 'tree' as const, name: '标签全景', iconName: 'folder-tree' },
+  { id: 'filter' as const, name: '多维筛选', iconName: 'filter-funnel', badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length },
+  { id: 'graph' as const, name: '认知图谱', iconName: 'git-fork-nodes' },
+  { id: 'hygiene' as const, name: '健康治理', iconName: 'shield-check', badge: healthResult.value.issues.length },
 ]);
 
 const displayTreeNodes = computed(() => {
@@ -609,7 +800,10 @@ const displayTreeNodes = computed(() => {
   return TagTreeService.buildTree(matches.map(m => m.tag), sortMode.value);
 });
 
-const topQuickTags = computed(() => allTags.value.slice(0, 30));
+const topQuickTags = computed(() => {
+  const limit = expandQuickTags.value ? 50 : 12;
+  return allTags.value.slice(0, limit);
+});
 
 const topLinks = computed(() => {
   return [...graphData.value.links]
@@ -617,8 +811,88 @@ const topLinks = computed(() => {
     .slice(0, 15);
 });
 
+// 折叠逻辑辅助
+function hasSubTags(label: string): boolean {
+  return allTags.value.some(t => t.label.startsWith(`${label}/`) && t.label !== label);
+}
+
+function toggleNodeCollapse(label: string) {
+  if (collapsedSet.value.has(label)) {
+    collapsedSet.value.delete(label);
+  } else {
+    collapsedSet.value.add(label);
+  }
+}
+
+function isNodeVisible(node: ITagItem): boolean {
+  if (searchKeyword.value.trim()) return true;
+  const parts = node.label.split('/');
+  for (let i = 1; i < parts.length; i++) {
+    const parent = parts.slice(0, i).join('/');
+    if (collapsedSet.value.has(parent)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function toggleCollapseAll() {
+  allCollapsed.value = !allCollapsed.value;
+  if (allCollapsed.value) {
+    allTags.value.forEach(t => {
+      if (hasSubTags(t.label)) {
+        collapsedSet.value.add(t.label);
+      }
+    });
+  } else {
+    collapsedSet.value.clear();
+  }
+}
+
+// 浮动更多操作菜单
+function openRowMenu(label: string, event: MouseEvent) {
+  const target = event.currentTarget as HTMLElement;
+  const rect = target.getBoundingClientRect();
+  const menuWidth = 180;
+  let left = rect.left - menuWidth + 24;
+  if (left < 10) left = 10;
+  let top = rect.bottom + 4;
+  if (top + 200 > window.innerHeight) {
+    top = rect.top - 200;
+  }
+
+  rowMenu.value = {
+    visible: true,
+    label,
+    top,
+    left,
+  };
+}
+
+function closeRowMenu() {
+  if (rowMenu.value.visible) {
+    rowMenu.value.visible = false;
+  }
+}
+
+function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove') {
+  const label = rowMenu.value.label;
+  closeRowMenu();
+  if (action === 'style') {
+    openStyleDialog(label);
+  } else if (action === 'doc') {
+    handleConvertToDoc(label);
+  } else if (action === 'graph') {
+    viewTagNetwork(label);
+  } else if (action === 'merge') {
+    openMergeDialog(label);
+  } else if (action === 'remove') {
+    handleRemoveTag(label);
+  }
+}
+
 function getTagIcon(label: string): string {
-  return metadataMap.value.get(label)?.icon || '🔖';
+  return metadataMap.value.get(label)?.icon || '';
 }
 
 function getTagStyle(label: string): Record<string, string> {
@@ -636,6 +910,7 @@ function getTagStyle(label: string): Record<string, string> {
 
 function switchTab(tabId: 'tree' | 'filter' | 'graph' | 'hygiene') {
   currentTab.value = tabId;
+  closeRowMenu();
   if (tabId === 'graph') {
     if (graphData.value.nodes.length === 0) {
       loadGraphData();
@@ -686,32 +961,41 @@ async function refreshTags() {
   }
 }
 
-// 样式与别名设置
+// 样式与别名设置 (双主题自适应)
 function openStyleDialog(label: string) {
   const meta = metadataMap.value.get(label);
   styleModal.value = {
     visible: true,
     label,
+    presetId: meta?.groupId || '',
     backgroundColor: meta?.backgroundColor || '',
     textColor: meta?.textColor || '',
+    darkBackgroundColor: meta?.darkBackgroundColor || '',
+    darkTextColor: meta?.darkTextColor || '',
     icon: meta?.icon || '',
     aliasesText: (meta?.aliases || []).join(', '),
   };
 }
 
-function applyColorPreset(preset: { bg: string; text: string }) {
-  styleModal.value.backgroundColor = preset.bg;
-  styleModal.value.textColor = preset.text;
+function applyDualThemePreset(preset: IColorPreset) {
+  styleModal.value.presetId = preset.id;
+  styleModal.value.backgroundColor = preset.lightBg;
+  styleModal.value.textColor = preset.lightText;
+  styleModal.value.darkBackgroundColor = preset.darkBg;
+  styleModal.value.darkTextColor = preset.darkText;
 }
 
 async function saveTagStyle() {
-  const { label, backgroundColor, textColor, icon, aliasesText } = styleModal.value;
+  const { label, presetId, backgroundColor, textColor, darkBackgroundColor, darkTextColor, icon, aliasesText } = styleModal.value;
   const aliases = aliasesText.split(',').map(s => s.trim()).filter(Boolean);
 
   const meta: ITagMetadata = {
     label,
+    groupId: presetId || undefined,
     backgroundColor,
     textColor,
+    darkBackgroundColor: darkBackgroundColor || undefined,
+    darkTextColor: darkTextColor || undefined,
     icon,
     aliases,
     updatedAt: Date.now(),
@@ -730,19 +1014,17 @@ async function saveTagStyle() {
 
   const css = TagVisualService.generateCssRules(metaList);
   TagVisualService.applyStyles(css);
-  showMessage(`已成功更新标签 "#${label}#" 的样式与别名！`, 3000, 'info');
+  showMessage(`已成功更新标签 "#${label}#" 的双主题样式与别名！`, 3000, 'info');
 }
 
 // 一键升格为实体文档 (Tag to Doc)
 async function handleConvertToDoc(label: string) {
   loading.value = true;
   try {
-    // 提取当前标签命中的块
     const blocks = await TagApiClient.queryMatchedBlocks({ includeTags: [label], limit: 30 });
     const res = await TagDocConverterService.createDocFromTag(label, blocks);
     if (res.success && res.docId) {
-      showMessage(`🎉 已成功创建主题聚合文档《${label}》！`, 4000, 'info');
-      // 打开新创建的文档
+      showMessage(`已成功创建主题聚合文档《${label}》！`, 4000, 'info');
       if ((window as any).siyuan?.openTab) {
         (window as any).siyuan.openTab({
           app: (window as any).siyuan.appId,
@@ -1036,8 +1318,40 @@ function closePanel() {
   toggleTagManagerDock();
 }
 
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (rowMenu.value.visible) {
+      rowMenu.value.visible = false;
+      return;
+    }
+    if (styleModal.value.visible) {
+      styleModal.value.visible = false;
+      return;
+    }
+    if (saveViewModal.value.visible) {
+      saveViewModal.value.visible = false;
+      return;
+    }
+    if (batchModal.value.visible) {
+      batchModal.value.visible = false;
+      return;
+    }
+    if (mergeModal.value.visible) {
+      mergeModal.value.visible = false;
+      return;
+    }
+    // 无弹窗时关闭侧栏
+    closePanel();
+  }
+}
+
 onMounted(() => {
+  window.addEventListener('keydown', handleGlobalKeydown);
   refreshTags();
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown);
 });
 </script>
 
@@ -1049,15 +1363,19 @@ onMounted(() => {
   width: 100%;
   background: var(--b3-theme-background);
   color: var(--b3-theme-on-background);
+  font-family: var(--b3-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
   font-size: 13px;
   overflow: hidden;
   box-sizing: border-box;
+  position: relative;
 }
 
+/* 顶部标题行 */
 .tm-header {
   border-bottom: 1px solid var(--b3-border-color);
   padding: 8px 12px 0 12px;
   background: var(--b3-theme-surface);
+  flex-shrink: 0;
 }
 
 .tm-title-row {
@@ -1075,36 +1393,36 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.tm-brand-icon {
+  display: inline-flex;
+  color: var(--b3-theme-primary);
+}
+
 .tm-tag-badge {
   font-size: 11px;
   background: var(--b3-theme-primary-light);
   color: var(--b3-theme-primary);
   padding: 1px 6px;
   border-radius: 10px;
+  font-weight: 500;
 }
 
 .tm-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
 }
 
 .tm-btn-sm {
-  padding: 2px 6px;
-  font-size: 12px;
-  min-height: 24px;
+  width: 24px;
   height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.tm-rotate {
-  display: inline-block;
-  animation: rotate 1s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
+/* 选项卡导航 */
 .tm-nav-tabs {
   display: flex;
   gap: 4px;
@@ -1120,12 +1438,14 @@ onMounted(() => {
   border-bottom: 2px solid transparent;
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s;
+  gap: 5px;
+  transition: all 0.15s ease;
+  user-select: none;
 }
 
 .tm-nav-tab:hover {
   background: var(--b3-theme-background-light);
+  color: var(--b3-theme-primary);
 }
 
 .tm-nav-tab.active {
@@ -1136,12 +1456,14 @@ onMounted(() => {
 
 .tm-tab-badge {
   font-size: 10px;
-  background: var(--b3-theme-error);
+  background: var(--b3-theme-primary);
   color: #fff;
   padding: 0 4px;
   border-radius: 8px;
+  font-weight: bold;
 }
 
+/* 主体容器 */
 .tm-body {
   flex: 1;
   overflow: hidden;
@@ -1157,11 +1479,56 @@ onMounted(() => {
   padding: 8px 12px;
 }
 
+/* 搜索与工具栏 */
 .tm-filter-bar {
   display: flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 8px;
 }
 
+.tm-search-box {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.tm-search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--b3-theme-on-surface-light);
+  pointer-events: none;
+}
+
+.tm-search-input {
+  width: 100%;
+  padding-left: 26px !important;
+  padding-right: 22px !important;
+  font-size: 12px;
+  height: 28px;
+}
+
+.tm-clear-btn {
+  position: absolute;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.tm-filter-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-sort-select {
+  font-size: 11px;
+  height: 28px;
+  padding: 0 6px;
+}
+
+/* 树节点列表 */
 .tm-tree-scroller {
   flex: 1;
   overflow-y: auto;
@@ -1176,20 +1543,37 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background-color 0.15s;
+  min-height: 26px;
 }
 
 .tm-tree-node:hover {
   background: var(--b3-theme-background-light);
 }
 
+.tm-node-expander {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--b3-theme-on-surface-light);
+  cursor: pointer;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.tm-node-expander.is-leaf {
+  visibility: hidden;
+}
+
 .tm-node-content {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex: 1;
   overflow: hidden;
 }
@@ -1198,39 +1582,112 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.tm-default-hash {
+  opacity: 0.5;
+}
+
+.tm-custom-icon {
+  font-size: 12px;
 }
 
 .tm-node-count {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--b3-theme-on-surface-light);
   background: var(--b3-theme-surface);
-  padding: 0 5px;
+  border: 1px solid var(--b3-border-color);
+  padding: 0 4px;
   border-radius: 8px;
+  font-family: var(--b3-font-family-code, monospace);
+  flex-shrink: 0;
 }
 
 .tm-node-actions {
   display: none;
+  align-items: center;
   gap: 2px;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .tm-tree-node:hover .tm-node-actions {
   display: flex;
 }
 
-.tm-mini-btn {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 2px;
-  font-size: 12px;
-  border-radius: 3px;
+.tm-action-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
 }
 
-.tm-mini-btn:hover {
+/* 浮动右键/更多菜单 */
+.tm-row-menu {
+  position: fixed;
+  z-index: 99999;
   background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  padding: 4px 0;
+  width: 180px;
+  backdrop-filter: blur(8px);
 }
 
-/* 智能视图 */
+.tm-row-menu-header {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  border-bottom: 1px solid var(--b3-border-color);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-row-menu-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+
+.tm-row-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--b3-theme-on-surface);
+  transition: all 0.12s ease;
+}
+
+.tm-row-menu-item:hover {
+  background: var(--b3-theme-background-light);
+  color: var(--b3-theme-primary);
+}
+
+.tm-row-menu-item.is-danger {
+  color: #dc3545;
+}
+
+.tm-row-menu-item.is-danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+.tm-row-menu-divider {
+  height: 1px;
+  background: var(--b3-border-color);
+  margin: 4px 0;
+}
+
+/* 智能视图栏 */
 .tm-views-toolbar {
   margin-bottom: 8px;
 }
@@ -1241,17 +1698,17 @@ onMounted(() => {
   gap: 6px;
 }
 
-.tm-views-lbl {
-  font-size: 12px;
-  color: var(--b3-theme-on-surface-light);
+.tm-views-icon {
+  color: var(--b3-theme-primary);
 }
 
 .tm-views-select {
   flex: 1;
   font-size: 12px;
+  height: 28px;
 }
 
-/* 筛选样式 */
+/* 筛选条件池 */
 .tm-filter-box {
   background: var(--b3-theme-surface);
   border-radius: 6px;
@@ -1282,12 +1739,22 @@ onMounted(() => {
   font-size: 11px;
   cursor: pointer;
   user-select: none;
+  transition: all 0.15s ease;
+}
+
+.tm-chip-indicator {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
 }
 
 .tm-chip--inc {
   background: var(--b3-theme-primary-light);
   color: var(--b3-theme-primary);
   border: 1px solid var(--b3-theme-primary);
+}
+.tm-chip--inc .tm-chip-indicator {
+  background: var(--b3-theme-primary);
 }
 
 .tm-chip--exc {
@@ -1296,55 +1763,113 @@ onMounted(() => {
   border: 1px solid #dc3545;
   text-decoration: line-through;
 }
+.tm-chip--exc .tm-chip-indicator {
+  background: #dc3545;
+}
 
 .tm-chip-prefix {
   font-weight: 700;
   font-size: 9px;
 }
 
+.tm-chip-label {
+  font-weight: 500;
+}
+
 .tm-chip-remove {
-  font-weight: bold;
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+.tm-chip-remove:hover {
+  opacity: 1;
+}
+
+.tm-filter-placeholder {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  display: flex;
+  align-items: center;
+}
+
+.tm-quick-tags-wrapper {
+  margin-top: 8px;
+  border-top: 1px dashed var(--b3-border-color);
+  padding-top: 6px;
 }
 
 .tm-quick-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 8px;
-  max-height: 80px;
+  max-height: 52px;
+  overflow: hidden;
+  transition: max-height 0.2s ease;
+}
+
+.tm-quick-tags.is-expanded {
+  max-height: 160px;
   overflow-y: auto;
 }
 
 .tm-quick-tag {
   font-size: 11px;
   background: var(--b3-theme-background);
-  padding: 2px 6px;
+  padding: 1px 6px;
   border-radius: 4px;
   cursor: pointer;
   border: 1px solid var(--b3-border-color);
+  color: var(--b3-theme-on-surface);
+  transition: all 0.15s ease;
 }
 
 .tm-quick-tag:hover {
   border-color: var(--b3-theme-primary);
+  color: var(--b3-theme-primary);
 }
 
 .tm-quick-tag.is-included {
   background: var(--b3-theme-primary);
   color: #fff;
+  border-color: var(--b3-theme-primary);
 }
 
 .tm-quick-tag.is-excluded {
   background: #dc3545;
   color: #fff;
+  border-color: #dc3545;
+}
+
+.tm-quick-expand-btn {
+  border: none;
+  background: transparent;
+  color: var(--b3-theme-primary);
+  font-size: 10px;
+  padding: 2px 4px;
+  cursor: pointer;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .tm-results-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 4px 0;
   font-size: 12px;
   color: var(--b3-theme-on-surface-light);
+}
+
+.tm-loading-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--b3-theme-primary);
+  font-size: 11px;
 }
 
 .tm-card-stream {
@@ -1361,12 +1886,13 @@ onMounted(() => {
   border-radius: 6px;
   padding: 8px 10px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
 
 .tm-card:hover {
   border-color: var(--b3-theme-primary);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .tm-card-doc {
@@ -1374,6 +1900,9 @@ onMounted(() => {
   font-size: 12px;
   margin-bottom: 4px;
   color: var(--b3-theme-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tm-card-content {
@@ -1385,12 +1914,27 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
+.tm-matched-tag {
+  background-color: var(--b3-theme-primary-light);
+  color: var(--b3-theme-primary);
+  padding: 0 3px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
 .tm-card-footer {
   display: flex;
   justify-content: space-between;
   margin-top: 6px;
   font-size: 10px;
   color: var(--b3-theme-on-surface-light);
+}
+
+.tm-card-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--b3-theme-primary);
 }
 
 /* 认知图谱与生命周期 */
@@ -1431,8 +1975,16 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
+.tm-label-title {
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 .tm-select-tag {
   flex: 1;
+  font-size: 12px;
+  height: 28px;
 }
 
 .tm-timeline-stats-card {
@@ -1453,13 +2005,25 @@ onMounted(() => {
 .tm-timeline-trend-badge {
   font-size: 11px;
   font-weight: 600;
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.trend-rising { background: rgba(40, 167, 69, 0.15); color: #28a745; }
-.trend-cooling { background: rgba(108, 117, 125, 0.15); color: #6c757d; }
-.trend-stable { background: rgba(0, 123, 255, 0.15); color: #007bff; }
+.trend-rising {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+.trend-cooling {
+  background: rgba(108, 117, 125, 0.15);
+  color: #6c757d;
+}
+.trend-stable {
+  background: rgba(0, 123, 255, 0.15);
+  color: #007bff;
+}
 
 .tm-timeline-last-updated {
   font-size: 10px;
@@ -1543,7 +2107,7 @@ onMounted(() => {
   border: 1px solid var(--b3-border-color);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
 }
 
 .tm-link-row:hover {
@@ -1556,6 +2120,9 @@ onMounted(() => {
   color: var(--b3-theme-primary);
   padding: 1px 6px;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tm-link-pair {
@@ -1566,33 +2133,12 @@ onMounted(() => {
 .tm-link-btn {
   font-size: 10px;
   color: var(--b3-theme-primary);
-}
-
-/* 色彩调色板 */
-.tm-color-palette {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.tm-color-swatch {
-  width: 28px;
-  height: 28px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  font-size: 12px;
-  border: 1px solid var(--b3-border-color);
+  gap: 2px;
 }
 
-.tm-form-row {
-  display: flex;
-}
-
-/* 健康体检 */
+/* 标签健康治理 */
 .tm-health-dash {
   display: flex;
   gap: 12px;
@@ -1615,7 +2161,16 @@ onMounted(() => {
 .tm-score-num {
   font-size: 24px;
   font-weight: 700;
+}
+
+.tm-score-num.is-good {
   color: #28a745;
+}
+.tm-score-num.is-warn {
+  color: #f39c12;
+}
+.tm-score-num.is-danger {
+  color: #e74c3c;
 }
 
 .tm-score-lbl {
@@ -1635,13 +2190,23 @@ onMounted(() => {
 }
 
 .tm-stat-val {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
-.text-warning { color: #f39c12; }
-.text-info { color: #17a2b8; }
-.text-danger { color: #e74c3c; }
+.text-warning {
+  color: #f39c12;
+}
+.text-info {
+  color: #17a2b8;
+}
+.text-danger {
+  color: #e74c3c;
+}
 
 .tm-issues-list {
   flex: 1;
@@ -1670,6 +2235,12 @@ onMounted(() => {
   border-left: 4px solid #17a2b8;
 }
 
+.tm-issue-icon {
+  display: flex;
+  align-items: center;
+  color: var(--b3-theme-on-surface-light);
+}
+
 .tm-issue-info {
   flex: 1;
 }
@@ -1685,39 +2256,103 @@ onMounted(() => {
   margin-top: 2px;
 }
 
-.tm-empty, .tm-empty-success {
-  text-align: center;
-  padding: 30px;
+.tm-issue-op {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
   color: var(--b3-theme-on-surface-light);
 }
 
-.tm-empty-success {
-  color: #28a745;
-  font-weight: 500;
+.tm-empty-icon {
+  opacity: 0.35;
+  margin-bottom: 8px;
 }
 
-/* 弹窗 */
+.tm-empty-text {
+  font-size: 12px;
+}
+
+.tm-empty-hint {
+  padding: 12px;
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  text-align: center;
+}
+
+.tm-empty-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: #28a745;
+  font-weight: 500;
+  gap: 8px;
+  text-align: center;
+}
+
+.tm-success-icon {
+  color: #28a745;
+}
+
+/* 模态对话框 */
 .tm-modal-mask {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 99999;
 }
 
 .tm-modal-card {
   background: var(--b3-theme-surface);
   border-radius: 8px;
-  width: 400px;
+  width: 440px;
+  max-width: 90vw;
   padding: 16px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--b3-border-color);
+  animation: tm-modal-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tm-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .tm-modal-title {
   font-weight: 600;
   font-size: 15px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--b3-theme-on-surface);
+}
+
+.tm-modal-target {
+  font-size: 12px;
+  color: var(--b3-theme-on-surface-light);
   margin-bottom: 12px;
 }
 
@@ -1733,6 +2368,62 @@ onMounted(() => {
   display: block;
   font-size: 12px;
   margin-bottom: 4px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+/* 双主题调色板网格 */
+.tm-color-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tm-preset-card {
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: var(--b3-theme-background);
+  transition: all 0.15s ease;
+}
+
+.tm-preset-card:hover {
+  border-color: var(--b3-theme-primary);
+}
+
+.tm-preset-card.is-selected {
+  border-color: var(--b3-theme-primary);
+  background: var(--b3-theme-primary-light);
+}
+
+.tm-preset-preview {
+  display: flex;
+  gap: 2px;
+}
+
+.tm-preset-chip {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.tm-preset-name {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface);
+}
+
+.tm-form-row {
+  display: flex;
 }
 
 .tm-form-checkbox {

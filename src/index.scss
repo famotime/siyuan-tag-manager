@@ -1,8 +1,181 @@
-/* 思源笔记原生侧栏 Dock 宿主容器样式定义 */
-.siyuan-tag-manager-host {
-  display: flex;
-  flex-direction: column;
+// 思源标签管家全局样式系统 (Design System Stylesheet)
+// 遵循《04-ui-ux-design-specification-and-optimization-plan.md》规范
+
+/* 1. 显式线框图标防思源 CSS 污染防御规则 */
+.sy-line-icon svg,
+svg.tm-line-svg {
+  fill: none !important;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 2. 8 套双主题自适应标签色盘预设类 */
+.tm-tag-style--tech-blue {
+  background-color: #EBF3FE !important;
+  color: #1A56DB !important;
+  border: 1px solid rgba(26, 86, 219, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--tech-blue,
+body.theme--dark .tm-tag-style--tech-blue {
+  background-color: rgba(26, 86, 219, 0.22) !important;
+  color: #8EB0FD !important;
+  border: 1px solid rgba(142, 176, 253, 0.25) !important;
+}
+
+.tm-tag-style--emerald {
+  background-color: #E8F7F0 !important;
+  color: #0E6E45 !important;
+  border: 1px solid rgba(14, 110, 69, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--emerald,
+body.theme--dark .tm-tag-style--emerald {
+  background-color: rgba(16, 185, 129, 0.20) !important;
+  color: #6EE7B7 !important;
+  border: 1px solid rgba(110, 231, 183, 0.25) !important;
+}
+
+.tm-tag-style--amber-gold {
+  background-color: #FEF3E6 !important;
+  color: #B45309 !important;
+  border: 1px solid rgba(180, 83, 9, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--amber-gold,
+body.theme--dark .tm-tag-style--amber-gold {
+  background-color: rgba(245, 158, 11, 0.20) !important;
+  color: #FCD34D !important;
+  border: 1px solid rgba(252, 211, 77, 0.25) !important;
+}
+
+.tm-tag-style--coral-rose {
+  background-color: #FEEBEB !important;
+  color: #C5221F !important;
+  border: 1px solid rgba(197, 34, 31, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--coral-rose,
+body.theme--dark .tm-tag-style--coral-rose {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+  color: #FCA5A5 !important;
+  border: 1px solid rgba(252, 165, 165, 0.25) !important;
+}
+
+.tm-tag-style--violet {
+  background-color: #F3ECFE !important;
+  color: #6929C4 !important;
+  border: 1px solid rgba(105, 41, 196, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--violet,
+body.theme--dark .tm-tag-style--violet {
+  background-color: rgba(139, 92, 246, 0.22) !important;
+  color: #C4B5FD !important;
+  border: 1px solid rgba(196, 181, 253, 0.25) !important;
+}
+
+.tm-tag-style--cyan-aqua {
+  background-color: #E3F8FA !important;
+  color: #006E7F !important;
+  border: 1px solid rgba(0, 110, 127, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--cyan-aqua,
+body.theme--dark .tm-tag-style--cyan-aqua {
+  background-color: rgba(6, 182, 212, 0.20) !important;
+  color: #67E8F9 !important;
+  border: 1px solid rgba(103, 232, 249, 0.25) !important;
+}
+
+.tm-tag-style--rose-berry {
+  background-color: #FDF0F5 !important;
+  color: #9F1853 !important;
+  border: 1px solid rgba(159, 24, 83, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--rose-berry,
+body.theme--dark .tm-tag-style--rose-berry {
+  background-color: rgba(244, 63, 94, 0.20) !important;
+  color: #FDA4AF !important;
+  border: 1px solid rgba(253, 164, 175, 0.25) !important;
+}
+
+.tm-tag-style--slate-grey {
+  background-color: #F1F3F5 !important;
+  color: #495057 !important;
+  border: 1px solid rgba(73, 80, 87, 0.15) !important;
+}
+[data-theme-mode="dark"] .tm-tag-style--slate-grey,
+body.theme--dark .tm-tag-style--slate-grey {
+  background-color: rgba(148, 163, 184, 0.20) !important;
+  color: #CBD5E1 !important;
+  border: 1px solid rgba(203, 213, 225, 0.25) !important;
+}
+
+/* 3. 抽屉把手拖拽条 (Resize Splitter Handle) */
+.tm-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 5px;
   height: 100%;
-  width: 100%;
-  overflow: hidden;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 100;
+  transition: background-color 0.2s;
+
+  &:hover, &.is-resizing {
+    background-color: var(--b3-theme-primary);
+  }
+}
+
+/* 4. 微型图标按钮规范 (tm-icon-btn) */
+.tm-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--b3-theme-on-surface);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+
+  &:hover {
+    background: var(--b3-theme-background-light);
+    color: var(--b3-theme-primary);
+    border-color: var(--b3-border-color);
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+
+  &.is-active {
+    background: var(--b3-theme-primary-light);
+    color: var(--b3-theme-primary);
+  }
+
+  &[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}
+
+/* 5. 模态弹窗优雅动画与毛玻璃 */
+.tm-modal-fade-enter-active,
+.tm-modal-fade-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tm-modal-fade-enter-from,
+.tm-modal-fade-leave-to {
+  opacity: 0;
+}
+
+.tm-modal-scale-enter-active,
+.tm-modal-scale-leave-active {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tm-modal-scale-enter-from,
+.tm-modal-scale-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
 }
