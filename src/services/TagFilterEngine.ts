@@ -137,5 +137,17 @@ export class TagFilterEngine {
       excludeTags: [],
     };
   }
+
+  /**
+   * 重置并以指定的标签列表建立新的组合筛选条件（清空原有的所有包含与排除筛选状态）
+   * @param tags 新组合筛选的标签列表（如关联组合筛选或共现探查）
+   */
+  public static resetFilterWithTags(tags: string[]): { includeTags: string[]; excludeTags: string[] } {
+    const validTags = tags.map(t => (t || '').trim()).filter(Boolean);
+    return {
+      includeTags: Array.from(new Set(validTags)),
+      excludeTags: [],
+    };
+  }
 }
 

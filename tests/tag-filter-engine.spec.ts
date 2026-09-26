@@ -120,5 +120,13 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       expect(result.excludeTags).toEqual([]);
     });
   });
+
+  describe('resetFilterWithTags 重置并建立新组合筛选测试', () => {
+    it('以传入标签建立包含条件，排除条件清空且去除重复与空标签', () => {
+      const result = TagFilterEngine.resetFilterWithTags(['Vue', 'React', 'Vue', '  ', 'TypeScript']);
+      expect(result.includeTags).toEqual(['Vue', 'React', 'TypeScript']);
+      expect(result.excludeTags).toEqual([]);
+    });
+  });
 });
 

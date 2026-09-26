@@ -391,10 +391,10 @@
               <button
                 class="b3-button b3-button--outline tm-btn-sm"
                 v-tooltip="'与聚焦标签联合筛选'"
+                aria-label="组合筛选"
                 @click="combineFilterWithAssociated(selectedGraphTag, item.label)"
               >
                 <SyLineIcon name="search-plus" :size="12" />
-                <span>组合筛选</span>
               </button>
             </div>
           </div>
@@ -1196,7 +1196,9 @@ function viewTagNetwork(label: string) {
 
 function combineFilterWithAssociated(tagA: string, tagB: string) {
   currentTab.value = 'filter';
-  activeFilter.value.includeTags = Array.from(new Set([...activeFilter.value.includeTags, tagA, tagB]));
+  selectedSmartViewId.value = '';
+  // 先清空多维筛选界面的现有包含与排除筛选项，再以当前选择的标签建立组合筛选
+  activeFilter.value = TagFilterEngine.resetFilterWithTags([tagA, tagB]);
   runQuery();
 }
 
