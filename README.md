@@ -50,9 +50,14 @@ As notes and tags grow over time, SiYuan's native tag mechanism presents critica
 - **Co-occurrence Metrics**: Calculates Jaccard similarity and companion weights to reveal which concepts frequently appear together.
 - **Discovery of Hidden Connections**: Focus on any core tag to uncover its closest companion topics and launch cross-filtering with one click.
 
-### 5. 📑 Batch Tagging & Smart Refactoring
-- **Batch Document Tagging**: Paste multiple document IDs to apply tags in bulk, eliminating repetitive manual work.
-- **Seamless Merge & Aliasing**: Merge legacy tags into new taxonomy structures without breaking references, while preserving old names as aliases.
+### 5. 📑 Tag Groups & Multi-document Batch Tagging
+- **Tag Groups**: Package frequently paired tags into reusable bundles (e.g. Frontend Stack, Book Summary) and apply them to current docs or blocks in 1 click.
+- **Native DocTree Context Menu**: Multi-select documents in SiYuan's native file tree and right-click `🏷️ Batch Tagging (X docs)` for instant batch tagging.
+- **Interactive Multi-source Selector**: Fuzzy search doc titles, load entire notebooks, or paste IDs to safely apply tags with automated deduplication.
+
+### 6. 🩺 Smart Reference Promotion (Ref to Tag)
+- **Bridging Bi-directional Links & Tags**: Scans block/doc references in notes and matches anchor text, target titles, names, and aliases against existing tags to recommend 1-click promotion.
+- **Instant & Global Hygiene**: Diagnose current active notes or run vault-wide scans with source badges (`[Name]`, `[Alias]`, `[Title]`, `[Ref]`).
 
 ---
 
@@ -83,4 +88,13 @@ As notes and tags grow over time, SiYuan's native tag mechanism presents critica
 | **Maintenance** | No health checks; manual single rename/delete only | **Health score, case conflict diagnosis, low-frequency pruning** | Keeps your knowledge base clean and sustainable |
 | **Concept Associations** | No co-occurrence awareness | **Co-occurrence network analysis & Jaccard association metrics** | Uncovers hidden concept connections & sparks ideas |
 | **Bulk Operations** | Manual document-by-document tagging | **Batch document tagging & global tag migration** | 10x faster batch taxonomy management |
+
+---
+
+## 📚 Advanced Documentation & User Guides
+
+- 📖 **[User Guide: Tag Groups, Batch Tagging & Ref Promotion](./docs/user-guide-groups-batch-and-ref.md)**: In-depth user scenarios, native tree workflow, fuzzy matching rules, and best practices.
+- 🎨 **[Tag Styling & Alias Engine Guide](./docs/tag-style-and-alias-guide.md)**: WCAG AA+ dual theme palette, real-time DOM decorator, and pinyin abbreviation search.
+- 🏛️ **[Project Architecture & Code Structure](./docs/project-structure.md)**: Layered design, service responsibilities, and data contracts.
+
 

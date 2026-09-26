@@ -16,6 +16,8 @@ siyuan-tag-manager/
 │   ├── 04-ui-ux-design-specification...    # UI/UX 深度体验规范与优化方案
 │   ├── project-structure.md                # [本文件] 模块结构与职责映射
 │   ├── refactor-plan.md                    # 结构化代码重构执行计划与日志
+│   ├── tag-style-and-alias-guide.md        # 标签双主题样式与别名引擎深度指南
+│   ├── user-guide-groups-batch-and-ref.md  # [实战手册] 标签组、批量打标与引用智能识别用户指南
 │   └── README.md                           # 文档中心索引
 ├── src/                                    # 源代码目录
 │   ├── components/                         # UI 组件库
