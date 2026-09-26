@@ -10,15 +10,28 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
   });
 
   describe('request 基础通信与鉴权头', () => {
-    it('当接口返回 code === 0 时正确解析返回 data', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        json: async () => ({ code: 0, msg: '', data: [{ label: 'vue', count: 5 }] }),
-      } as any);
+    it('当接口返回 code === 0 时正确解析返回 data（支持 block_count 与 doc_count）', async () => {
+      let executedSql = '';
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init: any) => {
+        executedSql = JSON.parse(init.body).stmt;
+        return Promise.resolve({
+          json: async () => ({
+            code: 0,
+            msg: '',
+            data: [{ label: 'vue', block_count: 5, doc_count: 3 }],
+          }),
+        });
+      });
 
       const tags = await TagApiClient.fetchAllTags();
+      expect(executedSql).toContain('INNER JOIN blocks b ON s.block_id = b.id');
+      expect(executedSql).toContain('count(DISTINCT b.id) as block_count');
+      expect(executedSql).toContain('count(DISTINCT b.root_id) as doc_count');
       expect(tags).toHaveLength(1);
       expect(tags[0].name).toBe('vue');
       expect(tags[0].count).toBe(5);
+      expect(tags[0].blockCount).toBe(5);
+      expect(tags[0].docCount).toBe(3);
     });
 
     it('当接口返回非零 code 时抛出带有 msg 的异常', async () => {
@@ -153,6 +166,36 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
       expect(blocks).toHaveLength(1);
       expect(blocks[0].id).toBe('block-1');
       expect(blocks[0].docTitle).toBe('测试文档');
+    });
+
+    it('queryMatchedBlocks 能正确识别并解析文档级根块 (type = d) 中的 ial tags 属性', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        json: async () => ({
+          code: 0,
+          data: [
+            {
+              id: 'doc-block-1',
+              rootId: 'doc-block-1',
+              docTitle: '2026-05-17 Query Builder 示例',
+              content: '2026-05-17 Query Builder 示例',
+              markdown: '',
+              type: 'd',
+              updated: '20260614103132',
+              ial: '{: bookmark="✨" id="doc-block-1" tags="AI出海,AIGC" title="2026-05-17 Query Builder 示例" type="doc"}',
+            },
+          ],
+        }),
+      } as any);
+
+      const blocks = await TagApiClient.queryMatchedBlocks({
+        includeTags: ['AI出海'],
+        limit: 10,
+      });
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].type).toBe('d');
+      expect(blocks[0].content).toContain('#AI出海#');
+      expect(blocks[0].content).toContain('#AIGC#');
     });
 
     it('fetchTagTimestamps 能提取指定标签的所有时间戳并过滤空值', async () => {

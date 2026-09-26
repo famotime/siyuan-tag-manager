@@ -699,6 +699,18 @@
   gap: 4px;
 }
 
+.tm-doc-badge {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background-color: var(--tm-badge-neutral-bg, rgba(0, 0, 0, 0.05));
+  color: var(--b3-theme-on-surface-light);
+  border: 1px solid var(--b3-border-color);
+  margin-left: 2px;
+}
+
 .tm-card-content {
   font-size: 12px;
   line-height: 1.5;

@@ -37,7 +37,7 @@ export class TagFilterEngine {
     const optionals = (options.optionalTags || []).map(t => t.trim()).filter(Boolean);
     const notebookIds = (options.notebookIds || []).map(t => t.trim()).filter(Boolean);
 
-    const conditions: string[] = ["b.type NOT IN ('d')"];
+    const conditions: string[] = [];
 
     // 1. 必含标签 (AND): 每个标签都必须作为子查询命中
     for (const tag of includes) {
@@ -63,11 +63,11 @@ export class TagFilterEngine {
       conditions.push(`b.box IN (${safeBoxList})`);
     }
 
-    const whereClause = conditions.join(' AND ');
+    const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1';
     const limit = options.limit && options.limit > 0 ? options.limit : 50;
     const offset = options.offset && options.offset > 0 ? options.offset : 0;
 
-    return `SELECT b.id, b.content, b.markdown, b.type, b.root_id as rootId, b.updated, d.content as docTitle `
+    return `SELECT b.id, b.content, b.markdown, b.type, b.root_id as rootId, b.updated, b.ial, d.content as docTitle `
       + `FROM blocks b `
       + `LEFT JOIN blocks d ON b.root_id = d.id `
       + `WHERE ${whereClause} `

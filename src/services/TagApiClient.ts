@@ -45,21 +45,27 @@ export class TagApiClient {
    * 获取全库所有标签（基于 SQL 高性能聚合，失败时平滑降级至 getTag 接口）
    */
   public static async fetchAllTags(): Promise<ITagItem[]> {
-    const sql = `SELECT content as label, count(1) as count `
-      + `FROM spans `
-      + `WHERE type LIKE '%tag%' AND content != '' `
-      + `GROUP BY content `
-      + `ORDER BY count DESC;`;
+    const sql = `SELECT s.content as label, count(DISTINCT b.id) as block_count, count(DISTINCT b.root_id) as doc_count `
+      + `FROM spans s `
+      + `INNER JOIN blocks b ON s.block_id = b.id `
+      + `WHERE s.type LIKE '%tag%' AND s.content != '' `
+      + `GROUP BY s.content `
+      + `ORDER BY block_count DESC;`;
 
     try {
-      const rows: Array<{ label: string; count: number }> = await this.request('/api/query/sql', { stmt: sql });
+      const rows: Array<{ label: string; block_count?: number; doc_count?: number; count?: number }> =
+        await this.request('/api/query/sql', { stmt: sql });
       return (rows || []).map(r => {
         const label = String(r.label || '');
         const parts = label.split('/');
+        const blockCount = Number(r.block_count ?? r.count ?? 0);
+        const docCount = Number(r.doc_count ?? blockCount);
         return {
           name: parts[parts.length - 1],
           label,
-          count: Number(r.count || 0),
+          count: blockCount,
+          blockCount,
+          docCount,
           depth: Math.max(0, parts.length - 1),
         };
       });
@@ -76,10 +82,13 @@ export class TagApiClient {
   private static flattenKernelTags(tags: any[], depth = 0): ITagItem[] {
     const result: ITagItem[] = [];
     for (const t of tags) {
+      const count = Number(t.count || 0);
       result.push({
         name: t.name || t.label,
         label: t.label,
-        count: Number(t.count || 0),
+        count,
+        blockCount: count,
+        docCount: count,
         depth,
       });
       if (t.children && t.children.length > 0) {
@@ -161,16 +170,28 @@ export class TagApiClient {
     const sql = TagFilterEngine.buildQuerySql(options);
     const rows: any[] = await this.request('/api/query/sql', { stmt: sql });
 
-    return (rows || []).map(r => ({
-      id: r.id,
-      rootId: r.rootId,
-      docTitle: r.docTitle || '未命名文档',
-      content: r.content || '',
-      markdown: r.markdown || '',
-      type: r.type,
-      updated: r.updated || '',
-      matchedTags: options.includeTags || [],
-    }));
+    return (rows || []).map(r => {
+      let content = r.content || '';
+      // 若为文档级根块 (type === 'd')，且正文中未包含 #tag# 文本，从 ial 中提取 tags 属性展示
+      if (r.type === 'd' && r.ial) {
+        const tagMatch = String(r.ial).match(/tags="([^"]+)"/);
+        if (tagMatch && tagMatch[1]) {
+          const docTags = tagMatch[1].split(',').map((t: string) => `#${t.trim()}#`).join(' ');
+          content = docTags ? `${content ? content + ' · ' : ''}${docTags}` : content;
+        }
+      }
+
+      return {
+        id: r.id,
+        rootId: r.rootId,
+        docTitle: r.docTitle || '未命名文档',
+        content,
+        markdown: r.markdown || '',
+        type: r.type,
+        updated: r.updated || '',
+        matchedTags: options.includeTags || [],
+      };
+    });
   }
 
   /**
@@ -180,10 +201,11 @@ export class TagApiClient {
     graph: any;
     spansCount: number;
   }> {
-    const sql = `SELECT block_id, content `
-      + `FROM spans `
-      + `WHERE type LIKE '%tag%' AND content != '' `
-      + `ORDER BY block_id;`;
+    const sql = `SELECT s.block_id, s.content `
+      + `FROM spans s `
+      + `INNER JOIN blocks b ON s.block_id = b.id `
+      + `WHERE s.type LIKE '%tag%' AND s.content != '' `
+      + `ORDER BY s.block_id;`;
 
     const rows: Array<{ block_id: string; content: string }> = await this.request('/api/query/sql', { stmt: sql });
     const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);

@@ -10,8 +10,12 @@ export interface ITagItem {
   name: string;
   /** 完整标签路径（如 "tech/Python" 或 "Prompt"） */
   label: string;
-  /** 引用计数（关联的块/文档数量） */
+  /** 引用计数（关联的块引用总数） */
   count: number;
+  /** 关联的去重块数 */
+  blockCount?: number;
+  /** 关联的去重文档数 */
+  docCount?: number;
   /** 树深度（0 为根层级） */
   depth: number;
   /** 子标签列表 */

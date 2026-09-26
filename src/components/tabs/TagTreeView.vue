@@ -76,7 +76,7 @@
               <SyLineIcon v-else name="hash" :size="12" class="tm-default-hash" />
               {{ node.name }}
             </span>
-            <span class="tm-node-count" v-tooltip="`全库共 ${node.count} 处引用`">{{ node.count }}</span>
+            <span class="tm-node-count" v-tooltip="formatNodeTooltip(node)">{{ node.count }}</span>
           </div>
 
           <!-- 渐进式暴露操作区：仅暴露高频筛选 + 更多菜单 -->
@@ -170,5 +170,12 @@ function toggleCollapseAll() {
   } else {
     collapsedSet.value.clear();
   }
+}
+
+function formatNodeTooltip(node: ITagItem): string {
+  if (node.docCount !== undefined && node.blockCount !== undefined) {
+    return `全库关联 ${node.docCount} 个文档，${node.blockCount} 处块引用`;
+  }
+  return `全库共 ${node.count} 处引用`;
 }
 </script>

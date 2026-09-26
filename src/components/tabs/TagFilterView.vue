@@ -150,8 +150,9 @@
         @click="emit('jump-block', block.rootId, block.id)"
       >
         <div class="tm-card-doc">
-          <SyLineIcon name="file-up" :size="13" class="tm-doc-icon" />
+          <SyLineIcon :name="block.type === 'd' ? 'file-text' : 'file-up'" :size="13" class="tm-doc-icon" />
           <span>{{ block.docTitle }}</span>
+          <span v-if="block.type === 'd'" class="tm-doc-badge">文档</span>
         </div>
         <div class="tm-card-content" v-html="highlightTags(block.content || block.markdown)"></div>
         <div class="tm-card-footer">

@@ -28,6 +28,8 @@ export class TagTreeService {
             name: partName,
             label: currentPath,
             count: isLeaf ? tag.count : 0,
+            blockCount: isLeaf ? (tag.blockCount ?? tag.count) : 0,
+            docCount: isLeaf ? (tag.docCount ?? 0) : 0,
             depth: i,
             children: [],
             metadata: isLeaf ? tag.metadata : undefined,
@@ -35,6 +37,8 @@ export class TagTreeService {
           currentLevel.push(existing);
         } else if (isLeaf) {
           existing.count = tag.count;
+          existing.blockCount = tag.blockCount ?? tag.count;
+          existing.docCount = tag.docCount ?? 0;
           if (tag.metadata) {
             existing.metadata = tag.metadata;
           }
@@ -62,6 +66,14 @@ export class TagTreeService {
         // 如果父节点本身没有单独的引用，或者为了呈现整棵子树热度，聚合子节点计数
         const childrenSum = node.children.reduce((acc, c) => acc + c.count, 0);
         node.count = Math.max(node.count, childrenSum);
+        if (node.blockCount !== undefined) {
+          const childrenBlocks = node.children.reduce((acc, c) => acc + (c.blockCount ?? c.count), 0);
+          node.blockCount = Math.max(node.blockCount, childrenBlocks);
+        }
+        if (node.docCount !== undefined) {
+          const childrenDocs = node.children.reduce((acc, c) => acc + (c.docCount ?? 0), 0);
+          node.docCount = Math.max(node.docCount, childrenDocs);
+        }
       }
     }
     this.sortNodes(nodes, sortMode);

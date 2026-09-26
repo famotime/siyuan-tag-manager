@@ -9,6 +9,8 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
     });
 
     expect(sql).toContain("b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'YouTube')");
+    expect(sql).toContain('b.ial');
+    expect(sql).not.toContain("b.type NOT IN ('d')");
     expect(sql).toContain('LIMIT 50 OFFSET 0');
   });
 
