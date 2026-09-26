@@ -104,7 +104,7 @@ export default class TagManagerPlugin extends Plugin {
       },
     });
 
-    showMessage('🏷️ 标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
+    showMessage('标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
   }
 
   async onunload() {

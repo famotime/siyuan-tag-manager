@@ -221,7 +221,8 @@
               </span>
             </div>
             <div v-if="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0" class="tm-filter-placeholder">
-              👈 点击下方候选标签，展开多维交叉组合检索
+              <SyLineIcon name="filter-funnel" :size="12" style="margin-right: 5px; opacity: 0.7;" />
+              <span>点击下方候选标签，展开多维交叉组合检索</span>
             </div>
           </div>
 
