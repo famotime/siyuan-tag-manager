@@ -43,10 +43,28 @@ describe('TagRefPromoteService 引用识别为同名标签测试', () => {
         ref_content: '',
         def_content: 'React',
       },
+      // 文档 4: 引用锚文本为无语义的“点此查看”，但被引用块显式命名为 Docker
+      {
+        doc_id: 'doc_4',
+        doc_title: '微服务运维日志',
+        doc_ial: '',
+        ref_content: '点此查看',
+        def_content: '某段非同名代码',
+        def_name: 'Docker',
+      },
+      // 文档 5: 引用锚文本为“核心框架”，被引用文档设置了别名 Vue
+      {
+        doc_id: 'doc_5',
+        doc_title: 'Web 技术选型',
+        doc_ial: '',
+        ref_content: '核心框架',
+        def_content: '某文档',
+        def_doc_alias: 'mvvm, Vue, 渐进式',
+      },
     ];
 
     const candidates = TagRefPromoteService.processQueryRows(rows, existingTags);
-    expect(candidates.length).toBe(2);
+    expect(candidates.length).toBe(4);
 
     const doc1 = candidates.find(c => c.docId === 'doc_1');
     expect(doc1).toBeDefined();
@@ -60,6 +78,18 @@ describe('TagRefPromoteService 引用识别为同名标签测试', () => {
     expect(doc3).toBeDefined();
     expect(doc3?.matchedTags[0].tag).toBe('frontend/React');
     expect(doc3?.matchedTags[0].reason).toBe('target_doc_title');
+
+    // 验证目标块命名命中
+    const doc4 = candidates.find(c => c.docId === 'doc_4');
+    expect(doc4).toBeDefined();
+    expect(doc4?.matchedTags[0].tag).toBe('Docker');
+    expect(doc4?.matchedTags[0].reason).toBe('target_name');
+
+    // 验证目标文档别名命中
+    const doc5 = candidates.find(c => c.docId === 'doc_5');
+    expect(doc5).toBeDefined();
+    expect(doc5?.matchedTags[0].tag).toBe('frontend/Vue');
+    expect(doc5?.matchedTags[0].reason).toBe('target_alias');
   });
 
   it('scanRefsToTags 正确构造 SQL 并返回匹配候选', async () => {

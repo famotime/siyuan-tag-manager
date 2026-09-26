@@ -175,10 +175,10 @@
             <div class="tm-candidate-matches">
               <div
                 v-for="m in item.matchedTags"
-                :key="m.tag"
+                :key="m.tag + m.reason"
                 class="tm-match-pill"
               >
-                <span class="match-ref-text">引用 "{{ m.refContent }}"</span>
+                <span class="match-ref-text">{{ formatMatchReason(m.reason, m.refContent) }}</span>
                 <span class="match-arrow">➔</span>
                 <span class="match-tag-badge">#{{ m.tag }}#</span>
               </div>
@@ -237,6 +237,19 @@ function toggleSelectAll(e: Event) {
   candidates.value.forEach(c => {
     c.selected = checked;
   });
+}
+
+function formatMatchReason(reason: string, refContent: string): string {
+  switch (reason) {
+    case 'target_name':
+      return `命名「${refContent}」`;
+    case 'target_alias':
+      return `别名「${refContent}」`;
+    case 'target_doc_title':
+      return `标题「${refContent}」`;
+    default:
+      return `引用「${refContent}」`;
+  }
 }
 
 async function scanAllRefs() {
