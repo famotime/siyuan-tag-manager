@@ -111,8 +111,10 @@
       <TagHygieneView
         v-if="currentTab === 'hygiene'"
         :health-result="healthResult"
+        :all-tags="allTags"
         @auto-resolve="onAutoResolveIssue"
         @remove-tag="handleRemoveTag"
+        @refresh-tags="refreshAllData"
       />
     </main>
 
