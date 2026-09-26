@@ -195,12 +195,18 @@ function handleSave() {
 .tm-group-tag-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 5px;
+  padding: 3px 8px;
   font-size: 12px;
-  background-color: var(--b3-theme-primary-light);
-  color: var(--b3-theme-primary);
+  font-weight: 500;
+  background-color: var(--tm-badge-primary-bg, #ebf3fe);
+  color: var(--tm-badge-primary-text, #1a56db);
+  border: 1px solid var(--tm-badge-primary-border, rgba(26, 86, 219, 0.22));
   border-radius: 4px;
+
+  .chip-text {
+    line-height: 1.3;
+  }
 
   .chip-del-btn {
     border: none;
@@ -208,13 +214,13 @@ function handleSave() {
     padding: 0;
     cursor: pointer;
     color: inherit;
-    opacity: 0.7;
+    opacity: 0.75;
     display: inline-flex;
     align-items: center;
 
     &:hover {
       opacity: 1;
-      color: var(--b3-theme-error);
+      color: var(--tm-badge-danger-text, #b91c1c);
     }
   }
 }
