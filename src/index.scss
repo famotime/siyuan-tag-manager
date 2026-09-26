@@ -1,0 +1,8 @@
+/* 思源笔记原生侧栏 Dock 宿主容器样式定义 */
+.siyuan-tag-manager-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}

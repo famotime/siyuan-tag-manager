@@ -1,71 +1,72 @@
-import { Plugin } from 'siyuan';
+import type { Plugin } from 'siyuan';
 import { createApp, type App as VueApp } from 'vue';
 import App from './App.vue';
 
+export const DOCK_TYPE = 'tag-manager-dock';
+
 let plugin: Plugin | null = null;
-let vueApp: VueApp | null = null;
-let containerEl: HTMLElement | null = null;
 
 export function usePlugin(pluginProps?: Plugin): Plugin {
   if (pluginProps) {
     plugin = pluginProps;
   }
-  return plugin!;
+  if (!plugin) {
+    throw new Error('[siyuan-tag-manager] plugin not bound yet');
+  }
+  return plugin;
 }
 
-/**
- * 初始化并挂载标签管家抽屉/面板
- */
-export function init(pluginInstance: Plugin) {
-  usePlugin(pluginInstance);
+const mounts = new WeakMap<HTMLElement, VueApp>();
 
-  if (document.getElementById('siyuan-tag-manager-dock')) {
+/**
+ * 把面板挂载到 dock 容器上。multi-mount 安全：同一 host 重复调用会被忽略。
+ */
+export function mountPanel(host: HTMLElement): void {
+  if (mounts.has(host)) {
     return;
   }
-
-  containerEl = document.createElement('div');
-  containerEl.id = 'siyuan-tag-manager-dock';
-  containerEl.style.position = 'fixed';
-  containerEl.style.top = '40px';
-  containerEl.style.right = '10px';
-  containerEl.style.bottom = '40px';
-  containerEl.style.width = '380px';
-  containerEl.style.zIndex = '999';
-  containerEl.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
-  containerEl.style.borderRadius = '8px';
-  containerEl.style.overflow = 'hidden';
-  containerEl.style.display = 'none'; // 默认折叠，通过顶栏触发展示
-
-  vueApp = createApp(App);
-  vueApp.mount(containerEl);
-  document.body.appendChild(containerEl);
+  host.classList.add('siyuan-tag-manager-host');
+  const app = createApp(App);
+  app.provide('plugin', usePlugin());
+  app.mount(host);
+  mounts.set(host, app);
 }
 
 /**
- * 切换标签管家工作台的显示/隐藏状态
+ * 卸载 dock 容器上的面板并清理关联资源
  */
-export function toggleTagManagerDrawer() {
-  if (!containerEl) {
-    if (plugin) {
-      init(plugin);
+export function unmountPanel(host: HTMLElement): void {
+  const app = mounts.get(host);
+  if (!app) {
+    return;
+  }
+  app.unmount();
+  mounts.delete(host);
+  host.classList.remove('siyuan-tag-manager-host');
+}
+
+/**
+ * 切换思源笔记原生标签管家 Dock 侧栏展开/折叠
+ */
+export function toggleTagManagerDock(dockType: string = DOCK_TYPE): boolean {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  // 1. 尝试在侧栏查找 Dock item 按钮触发原生点击
+  const selectors = [
+    `span.dock__item[data-type*="${dockType}"]`,
+    `span.dock__item[data-type*="iconTagManager"]`,
+    `[data-type*="${dockType}"]`,
+  ];
+
+  for (const selector of selectors) {
+    const el = document.querySelector(selector) as HTMLElement | null;
+    if (el) {
+      el.click();
+      return true;
     }
   }
-  if (containerEl) {
-    const isHidden = containerEl.style.display === 'none';
-    containerEl.style.display = isHidden ? 'flex' : 'none';
-  }
-}
 
-/**
- * 销毁应用
- */
-export function destroy() {
-  if (vueApp) {
-    vueApp.unmount();
-    vueApp = null;
-  }
-  if (containerEl) {
-    containerEl.remove();
-    containerEl = null;
-  }
+  return false;
 }

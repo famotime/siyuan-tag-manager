@@ -8,9 +8,11 @@ import {
 } from 'siyuan';
 import PluginInfoString from '@/../plugin.json';
 import {
-  destroy,
-  init,
-  toggleTagManagerDrawer,
+  DOCK_TYPE,
+  mountPanel,
+  toggleTagManagerDock,
+  unmountPanel,
+  usePlugin,
 } from '@/main';
 import '@/index.scss';
 import { TagVisualService } from '@/services/TagVisualService';
@@ -41,55 +43,73 @@ export default class TagManagerPlugin extends Plugin {
     // 1. 注册专属图标
     this.addIcons(TAG_MANAGER_ICON_SVG);
 
-    // 2. 加载本地持久化配置并应用动态样式
+    // 2. 注入全局 plugin 实例引用
+    usePlugin(this);
+
+    // 3. 加载本地持久化配置并应用动态样式
     const localData = await this.loadData(STORAGE_NAME).catch(() => null);
     if (localData && Array.isArray(localData.metadataList)) {
       const css = TagVisualService.generateCssRules(localData.metadataList);
       TagVisualService.applyStyles(css);
     }
 
-    // 3. 注册快捷命令 (Alt+Shift+T 快速唤起标签管家工作台)
+    // 4. 注册思源笔记原生 Dock 侧栏 (参考 siyuan-property-manager 标准实现)
+    this.addDock({
+      config: {
+        position: 'RightTop',
+        size: { width: 360, height: 0 },
+        icon: 'iconTagManager',
+        title: (this.i18n.dockTitle as string) ?? '标签管家',
+        hotkey: '⌥⇧T',
+      },
+      data: {},
+      type: DOCK_TYPE,
+      init() {
+        mountPanel(this.element as HTMLElement);
+      },
+      destroy() {
+        unmountPanel(this.element as HTMLElement);
+      },
+    });
+
+    // 5. 注册快捷命令 (Alt+Shift+T 快速展开/切换标签管家原生侧栏)
     this.addCommand({
       langKey: 'openTagManager',
-      langText: '打开标签管家工作台',
+      langText: (this.i18n.openTagManager as string) ?? '打开标签管家工作台',
       hotkey: '⌥⇧T',
       hotkeys: ['⌥⇧T', 'Alt+Shift+T'],
       enabled: () => true,
       execute: (_context: ICommandContext) => {
-        toggleTagManagerDrawer();
+        toggleTagManagerDock(DOCK_TYPE);
       },
     });
 
-    // 4. 注册顶栏图标
+    // 6. 注册顶栏图标 (点击可快速切换原生侧栏展开/折叠)
     this.addTopBar({
       id: 'siyuan-tag-manager-topbar',
       icon: 'iconTagManager',
-      title: '标签管家 (Tag Manager)',
+      title: (this.i18n.dockTitle as string) ?? '标签管家 (Tag Manager)',
       callback: () => {
-        toggleTagManagerDrawer();
+        toggleTagManagerDock(DOCK_TYPE);
       },
       contextMenu: (menu) => {
         menu.addItem({
-          id: 'tm-open-dashboard',
+          id: 'tm-open-dock',
           icon: 'iconTagManager',
-          label: '展开工作台抽屉',
+          label: (this.i18n.toggleDock as string) ?? '展开/折叠侧栏',
           click: () => {
-            toggleTagManagerDrawer();
+            toggleTagManagerDock(DOCK_TYPE);
           },
         });
       },
     });
 
-    // 5. 初始化挂载 Vue UI 容器
-    init(this);
-
-    showMessage('🏷️ 标签管家已成功就绪！可点击顶栏图标或按 Alt+Shift+T 唤起', 4000, 'info');
+    showMessage('🏷️ 标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
   }
 
   async onunload() {
-    // 清理动态注入样式与 DOM
+    // 清理动态注入样式（原生 dock 关闭或插件卸载时思源会自动触发 unmountPanel 回调）
     TagVisualService.removeStyles();
-    destroy();
   }
 
   async onDataChanged(reason?: TPluginDataChangeReason): Promise<void> {

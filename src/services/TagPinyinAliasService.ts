@@ -1,4 +1,3 @@
-// @ts-expect-error pinyin-match lacks strict ts types in some configs
 import PinyinMatch from 'pinyin-match';
 import type { ITagItem } from '../types/tag';
 

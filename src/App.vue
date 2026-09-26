@@ -515,7 +515,7 @@ import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccu
 import { TagVisualService } from './services/TagVisualService';
 import { TagDocConverterService } from './services/TagDocConverterService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
-import { usePlugin } from './main';
+import { toggleTagManagerDock, usePlugin } from './main';
 
 // 状态管理
 const currentTab = ref<'tree' | 'filter' | 'graph' | 'hygiene'>('tree');
@@ -1033,10 +1033,7 @@ async function handleRemoveTag(label: string) {
 }
 
 function closePanel() {
-  const container = document.getElementById('siyuan-tag-manager-dock');
-  if (container) {
-    container.style.display = 'none';
-  }
+  toggleTagManagerDock();
 }
 
 onMounted(() => {

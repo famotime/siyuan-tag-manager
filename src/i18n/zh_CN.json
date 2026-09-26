@@ -1,3 +1,6 @@
 {
-  "addTopBarIcon": "PluginSampleViteVue"
+  "dockTitle": "标签管家",
+  "openTagManager": "打开标签管家工作台",
+  "toggleDock": "展开/折叠标签管家侧栏",
+  "addTopBarIcon": "标签管家"
 }
