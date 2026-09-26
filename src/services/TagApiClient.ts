@@ -50,7 +50,8 @@ export class TagApiClient {
       + `INNER JOIN blocks b ON s.block_id = b.id `
       + `WHERE s.type LIKE '%tag%' AND s.content != '' `
       + `GROUP BY s.content `
-      + `ORDER BY block_count DESC;`;
+      + `ORDER BY block_count DESC `
+      + `LIMIT 9999;`;
 
     try {
       const rows: Array<{ label: string; block_count?: number; doc_count?: number; count?: number }> =
@@ -205,15 +206,16 @@ export class TagApiClient {
       + `FROM spans s `
       + `INNER JOIN blocks b ON s.block_id = b.id `
       + `WHERE s.type LIKE '%tag%' AND s.content != '' `
-      + `ORDER BY s.block_id;`;
+      + `ORDER BY s.block_id `
+      + `LIMIT 9999;`;
 
     const rows: Array<{ block_id: string; content: string }> = await this.request('/api/query/sql', { stmt: sql });
     const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);
 
-    // 统计各标签总引用数
+    // 统计各标签总引用数（以块为粒度去重累加，与 block_count 保持一致）
     const tagCounts = new Map<string, number>();
     for (const tags of blockMap.values()) {
-      for (const t of tags) {
+      for (const t of new Set(tags)) {
         tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
       }
     }
@@ -236,7 +238,8 @@ export class TagApiClient {
       + `FROM blocks b `
       + `JOIN spans s ON b.id = s.block_id `
       + `WHERE s.type LIKE '%tag%' AND s.content = '${clean}' `
-      + `ORDER BY b.updated DESC;`;
+      + `ORDER BY b.updated DESC `
+      + `LIMIT 9999;`;
 
     const rows: Array<{ updated: string }> = await this.request('/api/query/sql', { stmt: sql });
     return (rows || []).map(r => r.updated).filter(Boolean);

@@ -27,6 +27,7 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
       expect(executedSql).toContain('INNER JOIN blocks b ON s.block_id = b.id');
       expect(executedSql).toContain('count(DISTINCT b.id) as block_count');
       expect(executedSql).toContain('count(DISTINCT b.root_id) as doc_count');
+      expect(executedSql).toContain('LIMIT 9999');
       expect(tags).toHaveLength(1);
       expect(tags[0].name).toBe('vue');
       expect(tags[0].count).toBe(5);
@@ -198,20 +199,56 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
       expect(blocks[0].content).toContain('#AIGC#');
     });
 
-    it('fetchTagTimestamps 能提取指定标签的所有时间戳并过滤空值', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        json: async () => ({
-          code: 0,
-          data: [
-            { updated: '20260926100000' },
-            { updated: '20260925120000' },
-            { updated: '' },
-          ],
-        }),
-      } as any);
+    it('fetchTagTimestamps 能提取指定标签的所有时间戳并过滤空值，且包含 LIMIT 9999', async () => {
+      let executedSql = '';
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init: any) => {
+        executedSql = JSON.parse(init.body).stmt;
+        return Promise.resolve({
+          json: async () => ({
+            code: 0,
+            data: [
+              { updated: '20260926100000' },
+              { updated: '20260925120000' },
+              { updated: '' },
+            ],
+          }),
+        });
+      });
 
       const timestamps = await TagApiClient.fetchTagTimestamps('Vue');
+      expect(executedSql).toContain('LIMIT 9999');
       expect(timestamps).toEqual(['20260926100000', '20260925120000']);
+    });
+
+    it('fetchCooccurrenceGraph 包含 LIMIT 9999，且能够正确构建全量共现图谱并完成块内标签去重统计', async () => {
+      let executedSql = '';
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init: any) => {
+        executedSql = JSON.parse(init.body).stmt;
+        return Promise.resolve({
+          json: async () => ({
+            code: 0,
+            data: [
+              { block_id: 'b1', content: 'Python' },
+              { block_id: 'b1', content: 'AI出海' },
+              // 同一个块内包含两个重复标签，应通过 Set 块级去重统计
+              { block_id: 'b1', content: 'Python' },
+              { block_id: 'b2', content: 'Python' },
+              { block_id: 'b2', content: 'AI出海' },
+              { block_id: 'b3', content: 'Python' },
+            ],
+          }),
+        });
+      });
+
+      const res = await TagApiClient.fetchCooccurrenceGraph();
+      expect(executedSql).toContain('LIMIT 9999');
+      expect(res.spansCount).toBe(6);
+      expect(res.graph.nodes).toHaveLength(2);
+      expect(res.graph.links).toHaveLength(1);
+      const link = res.graph.links[0];
+      expect(link.weight).toBe(2); // b1 和 b2 中共现 2 次
+      const pythonNode = res.graph.nodes.find((n: any) => n.id === 'Python');
+      expect(pythonNode?.count).toBe(3); // 出现在 b1, b2, b3 三个块中
     });
   });
 });
