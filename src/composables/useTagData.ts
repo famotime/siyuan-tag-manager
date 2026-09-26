@@ -5,6 +5,7 @@ import { TagApiClient } from '../services/TagApiClient';
 import { TagVisualService } from '../services/TagVisualService';
 import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
+import { TagCreationService } from '../services/TagCreationService';
 import { usePlugin } from '../main';
 
 // 共享的标签资产与元数据状态
@@ -12,8 +13,23 @@ const allTags = ref<ITagItem[]>([]);
 const loading = ref(false);
 const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
 const tagGroups = ref<ITagGroup[]>([]);
+const customTags = ref<string[]>([]);
 
 export function useTagData() {
+  /**
+   * 统一持久化插件配置
+   */
+  async function persistConfig(savedViews: any[] = []) {
+    const plugin = usePlugin();
+    const metaList = Array.from(metadataMap.value.values());
+    await plugin.saveData('tag-manager-config.json', {
+      metadataList: metaList,
+      savedViews,
+      tagGroups: tagGroups.value,
+      customTags: customTags.value,
+    });
+  }
+
   /**
    * 刷新全库标签数据与本地元数据配置
    */
@@ -34,10 +50,33 @@ export function useTagData() {
         tagGroups.value = localData.tagGroups;
       }
 
+      if (localData?.customTags && Array.isArray(localData.customTags)) {
+        customTags.value = localData.customTags;
+      }
+
       const tags = await TagApiClient.fetchAllTags();
       tags.forEach(t => {
         t.metadata = metadataMap.value.get(t.label);
       });
+
+      // 合并本地在侧面板创建但尚未被文档引用的自定义标签
+      const existingTagSet = new Set(tags.map(t => t.label.toLowerCase()));
+      for (const cTag of customTags.value) {
+        const clean = TagCreationService.cleanTag(cTag);
+        if (clean && !existingTagSet.has(clean.toLowerCase())) {
+          existingTagSet.add(clean.toLowerCase());
+          const parts = clean.split('/');
+          tags.push({
+            name: parts[parts.length - 1],
+            label: clean,
+            count: 0,
+            blockCount: 0,
+            docCount: 0,
+            depth: Math.max(0, parts.length - 1),
+            metadata: metadataMap.value.get(clean),
+          });
+        }
+      }
 
       allTags.value = tags;
       if (onLoaded) {
@@ -56,13 +95,24 @@ export function useTagData() {
     return metadataMap.value.get(label)?.icon || '';
   }
 
+  function isDarkMode(): boolean {
+    if (typeof document === 'undefined') return false;
+    return document.documentElement.getAttribute('data-theme-mode') === 'dark'
+      || (document.body && document.body.classList.contains('theme--dark'));
+  }
+
   function getTagStyle(label: string): Record<string, string> {
     const meta = metadataMap.value.get(label);
     if (!meta) return {};
     const s: Record<string, string> = {};
-    if (meta.backgroundColor) s.backgroundColor = meta.backgroundColor;
-    if (meta.textColor) s.color = meta.textColor;
-    if (meta.backgroundColor || meta.textColor) {
+    const dark = isDarkMode();
+
+    const bg = dark && meta.darkBackgroundColor ? meta.darkBackgroundColor : meta.backgroundColor;
+    const color = dark && meta.darkTextColor ? meta.darkTextColor : meta.textColor;
+
+    if (bg) s.backgroundColor = bg;
+    if (color) s.color = color;
+    if (bg || color) {
       s.borderRadius = '4px';
       s.padding = '1px 6px';
     }
@@ -71,15 +121,9 @@ export function useTagData() {
 
   async function saveTagMetadata(meta: ITagMetadata, savedViews: any[] = []) {
     metadataMap.value.set(meta.label, meta);
+    await persistConfig(savedViews);
 
-    const plugin = usePlugin();
     const metaList = Array.from(metadataMap.value.values());
-    await plugin.saveData('tag-manager-config.json', {
-      metadataList: metaList,
-      savedViews,
-      tagGroups: tagGroups.value,
-    });
-
     const css = TagVisualService.generateCssRules(metaList);
     TagVisualService.applyStyles(css);
     if (typeof document !== 'undefined') {
@@ -89,22 +133,63 @@ export function useTagData() {
 
   async function saveTagGroups(groups: ITagGroup[], savedViews: any[] = []) {
     tagGroups.value = groups;
-    const plugin = usePlugin();
-    const metaList = Array.from(metadataMap.value.values());
-    await plugin.saveData('tag-manager-config.json', {
-      metadataList: metaList,
-      savedViews,
-      tagGroups: groups,
-    });
+    await persistConfig(savedViews);
+  }
+
+  /**
+   * 将新标签仅添加到侧面板标签资产库中（不修改当前文档）
+   */
+  async function addCustomTag(rawLabel: string, savedViews: any[] = []): Promise<{ success: boolean; label: string; error?: string }> {
+    const validation = TagCreationService.validateTag(rawLabel);
+    if (!validation.valid) {
+      return { success: false, label: rawLabel, error: validation.error };
+    }
+
+    const label = validation.cleanLabel;
+    if (TagCreationService.isTagExisting(label, allTags.value)) {
+      return { success: false, label, error: `标签 "#${label}#" 已存在于侧面板中` };
+    }
+
+    if (!customTags.value.some(t => t.toLowerCase() === label.toLowerCase())) {
+      customTags.value.push(label);
+    }
+
+    const parts = label.split('/');
+    const newItem: ITagItem = {
+      name: parts[parts.length - 1],
+      label,
+      count: 0,
+      blockCount: 0,
+      docCount: 0,
+      depth: Math.max(0, parts.length - 1),
+      metadata: metadataMap.value.get(label),
+    };
+
+    allTags.value.push(newItem);
+    await persistConfig(savedViews);
+
+    return { success: true, label };
   }
 
   async function handleRemoveTag(label: string): Promise<boolean> {
-    if (!confirm(`确定要彻底删除标签 "${label}" 吗？此操作将移除全库关联引用的标签标记。`)) {
+    if (!confirm(`确定要彻底删除标签 "${label}" 吗？此操作将移除关联引用的标签标记。`)) {
       return false;
     }
     loading.value = true;
     try {
-      await TagApiClient.removeTag(label);
+      // 1. 若在 customTags 中，将其剔除并持久化
+      if (customTags.value.some(t => t.toLowerCase() === label.toLowerCase())) {
+        customTags.value = customTags.value.filter(t => t.toLowerCase() !== label.toLowerCase());
+        await persistConfig();
+      }
+
+      // 2. 调用思源内核删除（若在思源库中存在引用）
+      try {
+        await TagApiClient.removeTag(label);
+      } catch {
+        // 若为仅本地存在的侧面板标签，内核中无引用时忽略该错误
+      }
+
       showMessage(`已成功删除标签 "${label}"`, 3000, 'info');
       await refreshTags();
       return true;
@@ -143,6 +228,8 @@ export function useTagData() {
     allTags,
     loading,
     metadataMap,
+    customTags,
+    addCustomTag,
     refreshTags,
     getTagIcon,
     getTagStyle,

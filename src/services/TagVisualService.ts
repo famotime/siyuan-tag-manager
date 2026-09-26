@@ -73,15 +73,23 @@ export class TagVisualService {
 
       // 如果有任何颜色修饰，统一加轻量美化样式
       if (styleDeclarations.length > 0) {
+        // 彻底清除思源正文原生标签的下划线边框，统一胶囊样式
+        styleDeclarations.push('border-bottom: none !important;');
+        styleDeclarations.push('text-decoration: none !important;');
         styleDeclarations.push('border-radius: 4px;');
         styleDeclarations.push('padding: 1px 6px;');
         styleDeclarations.push('transition: all 0.2s ease;');
 
-        // 支持通过 data-tag 属性与 data-content 属性匹配正文标签，同时适配侧栏列表项
+        // 支持通过 data-tag / data-content 属性匹配正文标签、文档头部标签 doctag、侧面板标签树与常用组胶囊
         const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
         const selector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
           + `span[data-type~="tag"][data-tag="${escapedLabel}"], `
           + `span[data-type~="tag"][data-content="${escapedLabel}"], `
+          + `.b3-chips__doctag .b3-chip[data-tag="${escapedLabel}"], `
+          + `.b3-chips__doctag .b3-chip[data-content="${escapedLabel}"], `
+          + `.b3-chips .b3-chip[data-type="open-search"][data-tag="${escapedLabel}"], `
+          + `.tm-node-name[data-tag="${escapedLabel}"], `
+          + `.tm-group-tag-pill[data-tag="${escapedLabel}"], `
           + `.b3-list-item[data-label="${escapedLabel}"] .b3-list-item__text`;
 
         rules.push(`${selector} { ${styleDeclarations.join(' ')} }`);
@@ -104,6 +112,10 @@ export class TagVisualService {
           const darkDeclarations: string[] = [];
           if (darkBg) darkDeclarations.push(`background-color: ${darkBg} !important;`);
           if (darkText) darkDeclarations.push(`color: ${darkText} !important;`);
+          // 暗黑模式下同样严格保障下划线消除
+          darkDeclarations.push('border-bottom: none !important;');
+          darkDeclarations.push('text-decoration: none !important;');
+
           if (darkDeclarations.length > 0) {
             const darkSelector = `[data-theme-mode="dark"] .protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
               + `[data-theme-mode="dark"] span[data-type~="tag"][data-tag="${escapedLabel}"], `
@@ -111,11 +123,24 @@ export class TagVisualService {
               + `body.theme--dark span[data-type~="tag"][data-tag="${escapedLabel}"], `
               + `[data-theme-mode="dark"] span[data-type~="tag"][data-content="${escapedLabel}"], `
               + `body.theme--dark span[data-type~="tag"][data-content="${escapedLabel}"], `
+              + `[data-theme-mode="dark"] .b3-chips__doctag .b3-chip[data-tag="${escapedLabel}"], `
+              + `body.theme--dark .b3-chips__doctag .b3-chip[data-tag="${escapedLabel}"], `
+              + `[data-theme-mode="dark"] .b3-chips .b3-chip[data-type="open-search"][data-tag="${escapedLabel}"], `
+              + `body.theme--dark .b3-chips .b3-chip[data-type="open-search"][data-tag="${escapedLabel}"], `
+              + `[data-theme-mode="dark"] .tm-node-name[data-tag="${escapedLabel}"], `
+              + `body.theme--dark .tm-node-name[data-tag="${escapedLabel}"], `
+              + `[data-theme-mode="dark"] .tm-group-tag-pill[data-tag="${escapedLabel}"], `
+              + `body.theme--dark .tm-group-tag-pill[data-tag="${escapedLabel}"], `
               + `[data-theme-mode="dark"] .b3-list-item[data-label="${escapedLabel}"] .b3-list-item__text, `
               + `body.theme--dark .b3-list-item[data-label="${escapedLabel}"] .b3-list-item__text`;
             rules.push(`${darkSelector} { ${darkDeclarations.join(' ')} }`);
           }
         }
+
+        // 文档标签关闭图标协同优化
+        const closeBtnSelector = `.b3-chips__doctag .b3-chip[data-tag="${escapedLabel}"] svg.b3-chip__close, `
+          + `.b3-chips .b3-chip[data-type="open-search"][data-tag="${escapedLabel}"] svg.b3-chip__close`;
+        rules.push(`${closeBtnSelector} { color: inherit !important; opacity: 0.75; }`);
       }
 
       // 如果配置了自定义 Emoji/图标
@@ -123,7 +148,11 @@ export class TagVisualService {
         const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
         const iconSelector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
           + `span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
-          + `span[data-type~="tag"][data-content="${escapedLabel}"]::before`;
+          + `span[data-type~="tag"][data-content="${escapedLabel}"]::before, `
+          + `.b3-chips__doctag .b3-chip[data-tag="${escapedLabel}"]::before, `
+          + `.b3-chips__doctag .b3-chip[data-content="${escapedLabel}"]::before, `
+          + `.b3-chips .b3-chip[data-type="open-search"][data-tag="${escapedLabel}"]::before, `
+          + `.tm-group-tag-pill[data-tag="${escapedLabel}"]::before`;
         rules.push(`${iconSelector} { content: "${meta.icon} "; font-size: 0.9em; margin-right: 2px; }`);
       }
     }

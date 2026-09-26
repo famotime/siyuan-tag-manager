@@ -71,4 +71,42 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(plan?.sourceLabels).toEqual(['Vue']);
     });
   });
+
+  describe('useTagData 侧面板独立标签资产管理测试', () => {
+    it('addCustomTag 仅添加到侧面板 allTags 与 customTags，不修改文档', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { useTagData } = await import('../src/composables/useTagData');
+
+      let savedData: any = null;
+      const mockPlugin = {
+        loadData: async () => ({ customTags: [] }),
+        saveData: async (_file: string, data: any) => {
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      const { allTags, customTags, addCustomTag } = useTagData();
+
+      // 添加新标签
+      const res = await addCustomTag('#Frontend/NextJS#');
+      expect(res.success).toBe(true);
+      expect(res.label).toBe('Frontend/NextJS');
+
+      // 验证仅在 allTags 和 customTags 中增加
+      expect(customTags.value).toContain('Frontend/NextJS');
+      const tagItem = allTags.value.find(t => t.label === 'Frontend/NextJS');
+      expect(tagItem).toBeDefined();
+      expect(tagItem?.count).toBe(0);
+      expect(tagItem?.name).toBe('NextJS');
+
+      // 验证本地配置持久化
+      expect(savedData?.customTags).toContain('Frontend/NextJS');
+
+      // 重复添加同一个标签会被拦截
+      const repeatRes = await addCustomTag('Frontend/NextJS');
+      expect(repeatRes.success).toBe(false);
+      expect(repeatRes.error).toContain('已存在');
+    });
+  });
 });

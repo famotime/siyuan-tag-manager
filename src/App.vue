@@ -74,6 +74,7 @@
         @open-edit-group="openEditGroupDialog"
         @delete-group="handleDeleteGroup"
         @apply-group="handleApplyGroup"
+        @create-tag="handleCreateTag"
       />
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
@@ -188,6 +189,7 @@ import { TagFilterEngine } from './services/TagFilterEngine';
 import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagBatchService } from './services/TagBatchService';
 import { TagGroupService } from './services/TagGroupService';
+import { TagCreationService } from './services/TagCreationService';
 import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
@@ -218,6 +220,7 @@ const {
   metadataMap,
   tagGroups,
   refreshTags,
+  addCustomTag,
   getTagIcon,
   getTagStyle,
   saveTagMetadata,
@@ -552,6 +555,16 @@ async function handleApplyGroup(group: ITagGroup) {
     } else {
       showMessage(`套用失败: ${res.error}`, 4000, 'error');
     }
+  }
+}
+
+async function handleCreateTag(label: string) {
+  const res = await addCustomTag(label, savedViews.value);
+
+  if (res.success) {
+    showMessage(`已成功创建新标签 "#${res.label}#" 并添加至侧面板！`, 3000, 'info');
+  } else {
+    showMessage(res.error || '创建标签失败', 4000, 'error');
   }
 }
 

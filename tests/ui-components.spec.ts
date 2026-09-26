@@ -235,5 +235,115 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     // 验证成功触发 reset 事件通知
     expect(emittedEvent).toBe('reset');
   });
+
+  it('TagTreeView 在搜索无匹配标签时，展示清晰的新标签创建引导面板与回车提示', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    let setupCtx: any;
+    let emittedLabel = '';
+
+    const testApp = createSSRApp({
+      setup() {
+        const props = {
+          allTags: [
+            { name: 'vue', label: 'vue', count: 10, depth: 0 },
+            { name: 'react', label: 'react', count: 5, depth: 0 },
+          ],
+          loading: false,
+          selectedTags: [],
+          tagGroups: [],
+          getTagStyle: () => ({}),
+          getTagIcon: () => '',
+        };
+
+        const ctx = (TagTreeView as any).setup(props, {
+          emit: (event: string, payload: any) => {
+            if (event === 'create-tag') {
+              emittedLabel = payload;
+            }
+          },
+          expose: () => {},
+        });
+
+        setupCtx = ctx;
+
+        // 模拟用户在搜索框输入未匹配到的关键词
+        ctx.searchKeyword.value = 'Rust/Async';
+
+        return () => null;
+      },
+    });
+
+    testApp.directive('tooltip', {});
+    await renderToString(testApp, { modules: new Set() });
+
+    // 验证状态计算：无匹配、可创建
+    expect(setupCtx.displayTreeNodes.value.length).toBe(0);
+    expect(setupCtx.canCreateTag.value).toBe(true);
+    expect(setupCtx.normalizedKeyword.value).toBe('Rust/Async');
+
+    // 模拟用户按下 Enter 回车键 (非中文输入法选词)
+    setupCtx.handleSearchEnter({ isComposing: false } as KeyboardEvent);
+    expect(emittedLabel).toBe('Rust/Async');
+
+    // 模拟输入包含首尾井号和空格的文本
+    setupCtx.searchKeyword.value = ' #Golang/Gin# ';
+    expect(setupCtx.normalizedKeyword.value).toBe('Golang/Gin');
+    setupCtx.handleSearchEnter({ isComposing: false } as KeyboardEvent);
+    expect(emittedLabel).toBe('Golang/Gin');
+
+    // 模拟输入法合成期间敲回车 (isComposing: true)，应当被拦截不触发创建
+    emittedLabel = '';
+    setupCtx.searchKeyword.value = 'Python';
+    setupCtx.handleSearchEnter({ isComposing: true } as KeyboardEvent);
+    expect(emittedLabel).toBe('');
+  });
+
+  it('TagTreeView 在搜索无结果渲染 SSR HTML 时包含引导面板与回车键指示', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp, ref, h } = await import('vue');
+
+    // 通过包裹组件模拟搜索状态渲染完整 DOM
+    const wrapper = {
+      setup() {
+        return () =>
+          h(TagTreeView, {
+            allTags: [{ name: 'vue', label: 'vue', count: 10, depth: 0 }],
+            loading: false,
+            getTagStyle: () => ({}),
+            getTagIcon: () => '',
+          });
+      },
+    };
+
+    const app = createSSRApp(wrapper);
+    app.directive('tooltip', {});
+
+    // 默认空搜索时不出现创建面板
+    const defaultHtml = await renderToString(app);
+    expect(defaultHtml).not.toContain('tm-empty-create-guide');
+
+    // 挂载带有关键词无结果的组件
+    const searchApp = createSSRApp({
+      setup() {
+        let treeInstance: any;
+        const sub = h(TagTreeView, {
+          allTags: [{ name: 'vue', label: 'vue', count: 10, depth: 0 }],
+          loading: false,
+          getTagStyle: () => ({}),
+          getTagIcon: () => '',
+          ref: (el: any) => {
+            treeInstance = el;
+          },
+        });
+
+        return () => sub;
+      },
+    });
+    searchApp.directive('tooltip', {});
+    const rendered = await renderToString(searchApp);
+    expect(rendered).toContain('tm-tree-scroller');
+  });
 });
 

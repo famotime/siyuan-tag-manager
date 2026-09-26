@@ -166,6 +166,35 @@
   padding: 0;
 }
 
+.tm-search-enter-badge {
+  position: absolute;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 3px;
+  background: var(--tm-badge-primary-bg, #ebf3fe);
+  color: var(--tm-badge-primary-text, #1a56db);
+  border: 1px solid var(--tm-badge-primary-border, rgba(26, 86, 219, 0.22));
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--b3-theme-primary);
+    color: var(--b3-theme-on-primary, #ffffff);
+    border-color: var(--b3-theme-primary);
+  }
+}
+
+.tm-search-input.has-create-hint {
+  padding-right: 76px !important;
+}
+
 .tm-filter-tools {
   display: flex;
   align-items: center;
@@ -1565,4 +1594,161 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   display: inline-flex;
   align-items: center;
 }
+
+/* 树顶部快捷创建提示横条（部分匹配但无同名标签时） */
+.tm-tree-create-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin: 4px 6px 6px 6px;
+  background: var(--tm-badge-primary-bg, #ebf3fe);
+  border: 1px dashed var(--tm-badge-primary-border, rgba(26, 86, 219, 0.35));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--b3-theme-primary) 15%, transparent);
+    border-color: var(--b3-theme-primary);
+  }
+}
+
+.tm-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-banner-icon {
+  color: var(--b3-theme-primary);
+  flex-shrink: 0;
+}
+
+.tm-banner-hint {
+  color: var(--b3-theme-on-surface-light);
+  flex-shrink: 0;
+}
+
+.tm-banner-tag {
+  color: var(--tm-badge-primary-text, #1a56db);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-banner-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--b3-theme-primary);
+  color: var(--b3-theme-on-primary, #ffffff);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+
+  &:hover {
+    opacity: 0.88;
+  }
+}
+
+/* 搜索无结果时的极简添加引导样式 */
+.tm-tree-empty-wrapper {
+  padding: 12px 10px;
+}
+
+.tm-empty-state--create {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 16px;
+  gap: 12px;
+  color: var(--b3-theme-on-surface-light);
+
+  .tm-empty-icon {
+    opacity: 0.45;
+    margin-bottom: 0;
+    color: var(--b3-theme-primary);
+  }
+
+  .tm-empty-text {
+    font-size: 12px;
+    color: var(--b3-theme-on-surface-light);
+  }
+}
+
+.tm-btn-create-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--tm-badge-primary-text, #1a56db);
+  background: var(--tm-badge-primary-bg, #ebf3fe);
+  border: 1px solid var(--tm-badge-primary-border, rgba(26, 86, 219, 0.25));
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  strong {
+    font-weight: 600;
+  }
+
+  &:hover {
+    background: var(--b3-theme-primary);
+    color: var(--b3-theme-on-primary, #ffffff);
+    border-color: var(--b3-theme-primary);
+
+    .tm-guide-kbd {
+      background: rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+  }
+}
+
+.tm-guide-warning-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--tm-badge-danger-text, #b91c1c);
+  background: var(--tm-badge-danger-bg, #feebeb);
+  border: 1px solid var(--tm-badge-danger-border, rgba(197, 34, 31, 0.25));
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.tm-guide-kbd {
+  display: inline-flex;
+  align-items: center;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 0 4px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  transition: all 0.15s ease;
+}
+
+[data-theme-mode="dark"] .tm-guide-kbd,
+body.theme--dark .tm-guide-kbd {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
 

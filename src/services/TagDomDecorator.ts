@@ -23,7 +23,27 @@ export class TagDomDecorator {
   }
 
   /**
-   * 为指定根节点下的所有 span[data-type~="tag"] 注入 data-tag 与 data-content 属性
+   * 从元素中提取文本内容（优先提取纯文本子节点，排除关闭按钮等 SVG 子节点干扰）
+   */
+  public static extractElementText(el: Element): string {
+    if (el.childNodes && el.childNodes.length > 0) {
+      let text = '';
+      for (let i = 0; i < el.childNodes.length; i++) {
+        const node = el.childNodes[i];
+        // 3 为 Node.TEXT_NODE
+        if (node.nodeType === 3) {
+          text += node.textContent || '';
+        }
+      }
+      if (text.trim()) {
+        return text;
+      }
+    }
+    return el.textContent || '';
+  }
+
+  /**
+   * 为指定根节点下的所有正文行内标签与文档头部标签注入 data-tag 与 data-content 属性
    * 严格保障操作幂等，相同标签不重复 setAttribute 避免重绘触发循环
    * @param root 待扫描的根元素或 Document
    * @returns 成功打标/修改的节点数量
@@ -32,19 +52,21 @@ export class TagDomDecorator {
     if (!root || typeof root.querySelectorAll !== 'function') return 0;
 
     let count = 0;
-    const tagSpans = root.querySelectorAll('span[data-type~="tag"]');
-    for (let i = 0; i < tagSpans.length; i++) {
-      const span = tagSpans[i] as HTMLElement;
-      const label = this.extractTagLabel(span.textContent);
+    // 同时扫描：正文行内标签 span[data-type~="tag"] 以及文档头部标签 .b3-chips__doctag .b3-chip
+    const targetElements = root.querySelectorAll('span[data-type~="tag"], .b3-chips__doctag .b3-chip, .b3-chips .b3-chip[data-type="open-search"]');
+    for (let i = 0; i < targetElements.length; i++) {
+      const el = targetElements[i] as HTMLElement;
+      const rawText = this.extractElementText(el);
+      const label = this.extractTagLabel(rawText);
       if (!label) continue;
 
       let modified = false;
-      if (span.getAttribute('data-tag') !== label) {
-        span.setAttribute('data-tag', label);
+      if (el.getAttribute('data-tag') !== label) {
+        el.setAttribute('data-tag', label);
         modified = true;
       }
-      if (span.getAttribute('data-content') !== label) {
-        span.setAttribute('data-content', label);
+      if (el.getAttribute('data-content') !== label) {
+        el.setAttribute('data-content', label);
         modified = true;
       }
 
@@ -62,12 +84,12 @@ export class TagDomDecorator {
   public static clearDecorations(root: Element | Document = document): void {
     if (!root || typeof root.querySelectorAll !== 'function') return;
 
-    const tagSpans = root.querySelectorAll('span[data-type~="tag"]');
-    for (let i = 0; i < tagSpans.length; i++) {
-      const span = tagSpans[i] as HTMLElement;
-      if (span.removeAttribute) {
-        span.removeAttribute('data-tag');
-        span.removeAttribute('data-content');
+    const targetElements = root.querySelectorAll('span[data-type~="tag"], .b3-chips__doctag .b3-chip, .b3-chips .b3-chip[data-type="open-search"]');
+    for (let i = 0; i < targetElements.length; i++) {
+      const el = targetElements[i] as HTMLElement;
+      if (el.removeAttribute) {
+        el.removeAttribute('data-tag');
+        el.removeAttribute('data-content');
       }
     }
   }

@@ -7,8 +7,20 @@
         <input
           v-model="searchKeyword"
           class="b3-text-field tm-search-input"
+          :class="{ 'has-create-hint': canCreateTag && displayTreeNodes.length === 0 }"
           placeholder="搜索标签（支持拼音首字母如 ytb、别名）..."
+          @focus="refreshActiveContext"
+          @keydown.enter.prevent="handleSearchEnter"
         />
+        <span
+          v-if="canCreateTag && displayTreeNodes.length === 0"
+          class="tm-search-enter-badge"
+          v-tooltip="'未找到匹配标签，按 Enter 键直接添加至侧面板'"
+          @click="triggerCreateTag"
+        >
+          <SyLineIcon name="corner-down-left" :size="9" />
+          <span>回车添加</span>
+        </span>
         <button
           v-if="searchKeyword"
           class="tm-icon-btn tm-clear-btn"
@@ -102,6 +114,7 @@
                 v-for="t in group.tags.slice(0, 5)"
                 :key="t"
                 class="tm-group-tag-pill"
+                :data-tag="t"
                 @click.stop="emit('tag-click', t, $event)"
               >
                 #{{ t }}#
@@ -145,13 +158,51 @@
 
     <!-- 标签树列表 -->
     <div class="tm-tree-scroller">
-      <div v-if="displayTreeNodes.length === 0" class="tm-empty-state">
-        <SyLineIcon name="folder-tree" :size="32" class="tm-empty-icon" />
-        <div class="tm-empty-text">
-          {{ loading ? '正在加载标签资产...' : '未匹配到任何相关标签' }}
+      <div v-if="displayTreeNodes.length === 0" class="tm-tree-empty-wrapper">
+        <!-- 场景 A：无匹配项时的极简添加引导指示 -->
+        <div v-if="searchKeyword.trim()" class="tm-empty-state tm-empty-state--create">
+          <SyLineIcon name="tag" :size="28" class="tm-empty-icon" />
+          <div class="tm-empty-text">未找到已有标签</div>
+
+          <!-- 简洁的操作按钮：按 Enter 回车或点击直接添加 -->
+          <button
+            v-if="canCreateTag"
+            class="b3-button b3-button--outline tm-btn-create-compact"
+            @click="triggerCreateTag"
+          >
+            <SyLineIcon name="plus" :size="12" />
+            <span>添加 <strong>#{{ normalizedKeyword }}#</strong></span>
+            <kbd class="tm-guide-kbd">↵ Enter</kbd>
+          </button>
+
+          <!-- 非法标签校验警告 -->
+          <div v-else-if="!validationResult.valid" class="tm-guide-warning-row">
+            <SyLineIcon name="alert-triangle" :size="12" />
+            <span>{{ validationResult.error }}</span>
+          </div>
+        </div>
+
+        <!-- 场景 B：默认空数据或全库未建立标签 -->
+        <div v-else class="tm-empty-state">
+          <SyLineIcon name="folder-tree" :size="32" class="tm-empty-icon" />
+          <div class="tm-empty-text">
+            {{ loading ? '正在加载标签资产...' : '未匹配到任何相关标签' }}
+          </div>
         </div>
       </div>
       <div v-else class="tm-tree-nodes">
+        <!-- 部分匹配但全库无同名标签时的快速新建提示条 -->
+        <div v-if="canCreateTag && !hasExactMatch" class="tm-tree-create-banner" @click="triggerCreateTag">
+          <div class="tm-banner-left">
+            <SyLineIcon name="plus" :size="12" class="tm-banner-icon" />
+            <span class="tm-banner-hint">可添加到侧面板：</span>
+            <span class="tm-banner-tag">#{{ normalizedKeyword }}#</span>
+          </div>
+          <button class="tm-banner-action-btn" v-tooltip="'点击或在搜索框按 Enter 添加至侧面板'">
+            <SyLineIcon name="corner-down-left" :size="10" />
+            <span>回车添加</span>
+          </button>
+        </div>
         <div
           v-for="node in displayTreeNodes"
           v-show="isNodeVisible(node)"
@@ -177,6 +228,7 @@
           <div class="tm-node-content" @click="emit('tag-click', node.label, $event)">
             <span
               class="tm-node-name"
+              :data-tag="node.label"
               :style="getTagStyle(node.label)"
               :title="formatNodeTitle(node.label)"
             >
@@ -215,10 +267,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import type { ITagItem, ITagGroup } from '../../types/tag';
 import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
+import { TagCreationService } from '../../services/TagCreationService';
+import { TagGroupService } from '../../services/TagGroupService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = withDefaults(
@@ -246,6 +300,7 @@ const emit = defineEmits<{
   (e: 'open-edit-group', group: ITagGroup): void;
   (e: 'delete-group', groupId: string): void;
   (e: 'apply-group', group: ITagGroup): void;
+  (e: 'create-tag', label: string): void;
 }>();
 
 const searchKeyword = ref('');
@@ -253,6 +308,44 @@ const sortMode = ref<TagSortMode>('count_desc');
 const collapsedSet = ref<Set<string>>(new Set());
 const allCollapsed = ref(false);
 const groupsExpanded = ref(false);
+const activeContext = ref<{ docId?: string; docTitle?: string; blockId?: string }>({});
+
+function refreshActiveContext() {
+  activeContext.value = TagGroupService.getActiveContext();
+}
+
+onMounted(() => {
+  refreshActiveContext();
+});
+
+const normalizedKeyword = computed(() => TagCreationService.cleanTag(searchKeyword.value));
+const validationResult = computed(() => TagCreationService.validateTag(searchKeyword.value));
+const hasExactMatch = computed(() => TagCreationService.isTagExisting(normalizedKeyword.value, props.allTags));
+const canCreateTag = computed(() => {
+  return normalizedKeyword.value.length > 0 && validationResult.value.valid && !hasExactMatch.value;
+});
+
+function handleSearchEnter(e: KeyboardEvent) {
+  if (e.isComposing) return;
+
+  // 1. 无任何匹配标签时，回车直接触发创建
+  if (displayTreeNodes.value.length === 0) {
+    if (canCreateTag.value) {
+      triggerCreateTag();
+    }
+    return;
+  }
+
+  // 2. 有部分匹配但无同名标签时，回车亦触发创建
+  if (canCreateTag.value && !hasExactMatch.value) {
+    triggerCreateTag();
+  }
+}
+
+function triggerCreateTag() {
+  if (!canCreateTag.value) return;
+  emit('create-tag', normalizedKeyword.value);
+}
 
 const selectedTagSet = computed(() => new Set(props.selectedTags || []));
 

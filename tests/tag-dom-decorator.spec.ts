@@ -62,6 +62,33 @@ describe('TagDomDecorator 正文标签 DOM 属性装饰器测试', () => {
       expect(mockSpans[1].getAttribute('data-content')).toBe('tech/vue');
     });
 
+    it('应支持扫描文档标签 .b3-chips__doctag .b3-chip 并正确提取标签名打标', () => {
+      const mockChip = {
+        childNodes: [
+          { nodeType: 3, textContent: 'Python' }, // Node.TEXT_NODE
+          { nodeType: 1, tagName: 'SVG' }, // SVG close icon
+        ],
+        textContent: 'Python',
+        attrs: new Map<string, string>(),
+        getAttribute(key: string) { return this.attrs.get(key) || null; },
+        setAttribute(key: string, val: string) { this.attrs.set(key, val); },
+      };
+
+      const mockRoot = {
+        querySelectorAll: vi.fn().mockImplementation((selector: string) => {
+          if (selector.includes('.b3-chip')) {
+            return [mockChip];
+          }
+          return [];
+        }),
+      } as any;
+
+      const count = TagDomDecorator.decorateElement(mockRoot);
+      expect(count).toBe(1);
+      expect(mockChip.getAttribute('data-tag')).toBe('Python');
+      expect(mockChip.getAttribute('data-content')).toBe('Python');
+    });
+
     it('对已打标且文本一致的节点保持幂等，不重复调用 setAttribute', () => {
       const setAttributeSpy = vi.fn();
       const mockSpan = {

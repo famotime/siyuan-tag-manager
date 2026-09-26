@@ -19,10 +19,15 @@ describe('TagVisualService 标签视觉与动态样式注入测试', () => {
 
     expect(css).toContain('data-tag="YouTube"');
     expect(css).toContain('data-content="YouTube"');
+    expect(css).toContain('.b3-chips__doctag .b3-chip[data-tag="YouTube"]');
+    expect(css).toContain('.tm-node-name[data-tag="YouTube"]');
+    expect(css).toContain('border-bottom: none !important;');
+    expect(css).toContain('text-decoration: none !important;');
     expect(css).not.toContain(':has-text(');
     expect(css).toContain('background-color: #FFE5E5 !important;');
     expect(css).toContain('color: #FF0000 !important;');
     expect(css).toContain('content: "🎬 "');
+    expect(css).toContain('.b3-chips__doctag .b3-chip[data-tag="YouTube"]::before');
   });
 
   it('能自动生成并注入适配思源暗黑模式的选择器规则，杜绝白炽眩光', () => {

@@ -282,4 +282,11 @@ export const LINE_ICONS: Record<string, IconPathData> = {
       { type: 'line', x1: 7, y1: 12, x2: 17, y2: 12 },
     ],
   },
+  // 回车键图标
+  'corner-down-left': {
+    paths: [
+      { type: 'polyline', points: '9 10 4 15 9 20' },
+      { type: 'path', d: 'M20 4v7a4 4 0 0 1-4 4H4' },
+    ],
+  },
 };
