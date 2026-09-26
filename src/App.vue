@@ -9,6 +9,9 @@
           <span class="tm-tag-badge">{{ allTags.length }} 个标签</span>
         </div>
         <div class="tm-actions">
+          <button class="b3-button b3-button--outline tm-btn-sm" title="批量为文档打标" @click="batchModal.visible = true">
+            📑 批量打标
+          </button>
           <button class="b3-button b3-button--outline tm-btn-sm" :disabled="loading" title="刷新标签数据" @click="refreshTags">
             <span :class="{'tm-rotate': loading}">🔄</span>
           </button>
@@ -25,7 +28,7 @@
           :key="tab.id"
           class="tm-nav-tab"
           :class="{ active: currentTab === tab.id }"
-          @click="currentTab = tab.id"
+          @click="switchTab(tab.id)"
         >
           <span>{{ tab.icon }}</span>
           <span>{{ tab.name }}</span>
@@ -40,13 +43,13 @@
     <main class="tm-body">
       <!-- TAB 1: 标签全景资产树 -->
       <section v-if="currentTab === 'tree'" class="tm-tab-content">
-        <!-- 搜索与排序栏 -->
+        <!-- 搜索与排序栏（支持拼音首字母模糊联想，如 ytb -> YouTube） -->
         <div class="tm-filter-bar">
           <div class="b3-form__icon fn__flex-1">
             <input
               v-model="searchKeyword"
               class="b3-text-field fn__block"
-              placeholder="搜索标签名称或别名..."
+              placeholder="搜索标签（支持拼音首字母如 ytb、别名）..."
             />
           </div>
           <select v-model="sortMode" class="b3-select" style="margin-left: 8px;">
@@ -59,12 +62,12 @@
 
         <!-- 标签树列表 -->
         <div class="tm-tree-scroller">
-          <div v-if="treeData.length === 0" class="tm-empty">
+          <div v-if="displayTreeNodes.length === 0" class="tm-empty">
             {{ loading ? '正在加载标签资产...' : '未匹配到任何标签' }}
           </div>
           <div v-else class="tm-tree-nodes">
             <div
-              v-for="node in treeData"
+              v-for="node in displayTreeNodes"
               :key="node.label"
               class="tm-tree-node"
               :style="{ paddingLeft: `${node.depth * 16 + 8}px` }"
@@ -84,6 +87,13 @@
                 </button>
                 <button
                   class="tm-mini-btn"
+                  title="查看知识共现关联"
+                  @click.stop="viewTagNetwork(node.label)"
+                >
+                  🕸️
+                </button>
+                <button
+                  class="tm-mini-btn"
                   title="重构合并到其他标签"
                   @click.stop="openMergeDialog(node.label)"
                 >
@@ -99,7 +109,7 @@
       <section v-if="currentTab === 'filter'" class="tm-tab-content">
         <!-- 激活的筛选条件池 -->
         <div class="tm-filter-box">
-          <div class="tm-section-hint">点击标签切换模式：➕必含 (AND) | ➖排除 (NOT)</div>
+          <div class="tm-section-hint">点击切换：➕必含 (AND) | ➖排除 (NOT) | ✕移除</div>
           <div class="tm-active-chips">
             <div
               v-for="tag in activeFilter.includeTags"
@@ -122,11 +132,11 @@
               <span class="tm-chip-remove" @click.stop="removeFilterTag(tag)">✕</span>
             </div>
             <div v-if="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0" class="tm-filter-placeholder">
-              👈 请从下方快速点选标签，展开多维组合分析
+              👈 请从下方点选标签，展开多维交叉切片分析
             </div>
           </div>
 
-          <!-- 快速候选候选标签流 -->
+          <!-- 快速候选标签流 -->
           <div class="tm-quick-tags">
             <span
               v-for="tag in topQuickTags"
@@ -168,7 +178,70 @@
         </div>
       </section>
 
-      <!-- TAB 3: 标签治理与健康体检 -->
+      <!-- TAB 3: 认知图谱与共现网络 -->
+      <section v-if="currentTab === 'graph'" class="tm-tab-content">
+        <div class="tm-graph-summary">
+          <div class="tm-graph-stat">
+            <span>活跃节点: <b>{{ graphData.nodes.length }}</b></span>
+            <span>共现连接: <b>{{ graphData.links.length }}</b></span>
+          </div>
+          <div class="tm-graph-hint">探索经常在同一块或文档中同时出现的知识关联</div>
+        </div>
+
+        <!-- 伴随标签分析面板 -->
+        <div class="tm-network-box">
+          <div class="tm-network-header">
+            <span>当前聚焦标签：</span>
+            <select v-model="selectedGraphTag" class="b3-select tm-select-tag" @change="updateAssociatedTags">
+              <option v-for="tag in allTags" :key="tag.label" :value="tag.label">
+                #{{ tag.label }} ({{ tag.count }})
+              </option>
+            </select>
+          </div>
+
+          <div class="tm-associated-list">
+            <div v-if="associatedTags.length === 0" class="tm-empty" style="padding: 16px;">
+              该标签与其他标签暂无高频共现记录
+            </div>
+            <div
+              v-for="item in associatedTags"
+              :key="item.label"
+              class="tm-assoc-item"
+            >
+              <div class="tm-assoc-info">
+                <span class="tm-assoc-label">#{{ item.label }}</span>
+                <span class="tm-assoc-meta">共现 {{ item.weight }} 次 · 相似度 {{ (item.jaccard * 100).toFixed(1) }}%</span>
+              </div>
+              <button
+                class="b3-button b3-button--outline tm-btn-sm"
+                title="同时筛选这两个标签"
+                @click="combineFilterWithAssociated(selectedGraphTag, item.label)"
+              >
+                + 组合筛选
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图谱连接流 -->
+        <div class="tm-graph-links-panel">
+          <div class="tm-section-hint">核心强共现连线 (Top Connections)：</div>
+          <div class="tm-links-scroller">
+            <div
+              v-for="link in topLinks"
+              :key="`${link.source}-${link.target}`"
+              class="tm-link-row"
+              @click="combineFilterWithAssociated(link.source, link.target)"
+            >
+              <span class="tm-link-badge">🔗 共现 {{ link.weight }} 次</span>
+              <span class="tm-link-pair">#{{ link.source }} ⟷ #{{ link.target }}</span>
+              <span class="tm-link-btn">探查 ↗</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: 标签治理与健康体检 -->
       <section v-if="currentTab === 'hygiene'" class="tm-tab-content">
         <!-- 统计面板 -->
         <div class="tm-health-dash">
@@ -231,6 +304,38 @@
       </section>
     </main>
 
+    <!-- 批量打标弹窗 -->
+    <div v-if="batchModal.visible" class="tm-modal-mask" @click.self="batchModal.visible = false">
+      <div class="tm-modal-card">
+        <div class="tm-modal-title">📑 批量文档打标</div>
+        <div class="tm-modal-body">
+          <div class="tm-form-group">
+            <label>目标文档 ID (每行一个 ID)：</label>
+            <textarea
+              v-model="batchModal.docIdsText"
+              class="b3-text-field fn__block"
+              rows="3"
+              placeholder="粘贴思源文档块 ID，如 20260926080000-xxxxxxx"
+            ></textarea>
+          </div>
+          <div class="tm-form-group">
+            <label>待添加的标签（支持多个，逗号分隔）：</label>
+            <input
+              v-model="batchModal.tagsText"
+              class="b3-text-field fn__block"
+              placeholder="例如：YouTube, AI, 产品案例"
+            />
+          </div>
+        </div>
+        <div class="tm-modal-footer">
+          <button class="b3-button b3-button--cancel" @click="batchModal.visible = false">取消</button>
+          <button class="b3-button b3-button--primary" :disabled="batchModal.executing" @click="executeBatchTag">
+            {{ batchModal.executing ? '执行中...' : '开始批量打标' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 合并重构对话弹窗 -->
     <div v-if="mergeModal.visible" class="tm-modal-mask" @click.self="mergeModal.visible = false">
       <div class="tm-modal-card">
@@ -264,16 +369,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagHealthIssue, ITagItem, ITagMatchedBlock } from './types/tag';
 import { TagApiClient } from './services/TagApiClient';
 import { TagTreeService, type TagSortMode } from './services/TagTreeService';
 import { TagGovernanceService } from './services/TagGovernanceService';
-import { TagVisualService } from './services/TagVisualService';
+import { TagPinyinAliasService } from './services/TagPinyinAliasService';
+import { TagBatchService } from './services/TagBatchService';
+import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
 
 // 状态管理
-const currentTab = ref<'tree' | 'filter' | 'hygiene'>('tree');
+const currentTab = ref<'tree' | 'filter' | 'graph' | 'hygiene'>('tree');
 const loading = ref(false);
 const allTags = ref<ITagItem[]>([]);
 const searchKeyword = ref('');
@@ -290,8 +397,21 @@ const activeFilter = ref<{
 const matchedBlocks = ref<ITagMatchedBlock[]>([]);
 const queryLoading = ref(false);
 
+// 图谱与共现
+const graphData = ref<ITagGraphData>({ nodes: [], links: [] });
+const selectedGraphTag = ref('');
+const associatedTags = ref<Array<{ label: string; weight: number; jaccard: number }>>([]);
+
 // 健康体检结果
 const healthResult = ref(TagGovernanceService.runHealthInspection([]));
+
+// 批量打标弹窗
+const batchModal = ref({
+  visible: false,
+  docIdsText: '',
+  tagsText: '',
+  executing: false,
+});
 
 // 合并弹窗
 const mergeModal = ref({
@@ -306,18 +426,37 @@ const mergeModal = ref({
 const tabs = computed(() => [
   { id: 'tree' as const, name: '标签全景', icon: '🗂️' },
   { id: 'filter' as const, name: '多维筛选', icon: '⚡', badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length },
+  { id: 'graph' as const, name: '认知图谱', icon: '🕸️' },
   { id: 'hygiene' as const, name: '健康治理', icon: '🩺', badge: healthResult.value.issues.length },
 ]);
 
-// 计算树形展示数据
-const treeData = computed(() => {
-  const tree = TagTreeService.buildTree(allTags.value, sortMode.value);
-  if (!searchKeyword.value) return tree;
-  return TagTreeService.filterTree(tree, searchKeyword.value);
+// 计算树形展示数据（集成拼音首字母模糊联想与别名匹配）
+const displayTreeNodes = computed(() => {
+  if (!searchKeyword.value.trim()) {
+    return TagTreeService.buildTree(allTags.value, sortMode.value);
+  }
+  // 使用拼音首字母引擎模糊匹配
+  const matches = TagPinyinAliasService.matchTags(allTags.value, searchKeyword.value, 50);
+  const matchedTags = matches.map(m => m.tag);
+  return TagTreeService.buildTree(matchedTags, sortMode.value);
 });
 
 // 高频候选标签（用于多维筛选快速点选）
 const topQuickTags = computed(() => allTags.value.slice(0, 30));
+
+// 图谱核心强连接
+const topLinks = computed(() => {
+  return [...graphData.value.links]
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 15);
+});
+
+function switchTab(tabId: 'tree' | 'filter' | 'graph' | 'hygiene') {
+  currentTab.value = tabId;
+  if (tabId === 'graph' && graphData.value.nodes.length === 0) {
+    loadGraphData();
+  }
+}
 
 // 刷新全库标签数据
 async function refreshTags() {
@@ -325,6 +464,9 @@ async function refreshTags() {
   try {
     const tags = await TagApiClient.fetchAllTags();
     allTags.value = tags;
+    if (tags.length > 0 && !selectedGraphTag.value) {
+      selectedGraphTag.value = tags[0].label;
+    }
     // 运行健康检查
     healthResult.value = TagGovernanceService.runHealthInspection(tags);
     // 触发筛选更新
@@ -336,6 +478,42 @@ async function refreshTags() {
   } finally {
     loading.value = false;
   }
+}
+
+// 加载共现图谱数据
+async function loadGraphData() {
+  loading.value = true;
+  try {
+    const res = await TagApiClient.fetchCooccurrenceGraph();
+    graphData.value = res.graph;
+    updateAssociatedTags();
+  } catch (err: any) {
+    showMessage(`加载共现网络失败: ${err.message || err}`, 4000, 'error');
+  } finally {
+    loading.value = false;
+  }
+}
+
+function updateAssociatedTags() {
+  if (!selectedGraphTag.value) return;
+  associatedTags.value = TagCooccurrenceService.findAssociatedTags(graphData.value, selectedGraphTag.value, 6);
+}
+
+function viewTagNetwork(label: string) {
+  selectedGraphTag.value = label;
+  currentTab.value = 'graph';
+  if (graphData.value.nodes.length === 0) {
+    loadGraphData();
+  } else {
+    updateAssociatedTags();
+  }
+}
+
+// 组合关联标签进行交叉筛选
+function combineFilterWithAssociated(tagA: string, tagB: string) {
+  currentTab.value = 'filter';
+  activeFilter.value.includeTags = Array.from(new Set([...activeFilter.value.includeTags, tagA, tagB]));
+  runQuery();
 }
 
 // 快速加入多维筛选
@@ -353,14 +531,11 @@ function toggleTagFilter(label: string) {
   const excIndex = activeFilter.value.excludeTags.indexOf(label);
 
   if (incIndex > -1) {
-    // 必含 -> 排除
     activeFilter.value.includeTags.splice(incIndex, 1);
     activeFilter.value.excludeTags.push(label);
   } else if (excIndex > -1) {
-    // 排除 -> 取消
     activeFilter.value.excludeTags.splice(excIndex, 1);
   } else {
-    // 未选 -> 必含
     activeFilter.value.includeTags.push(label);
   }
   runQuery();
@@ -421,6 +596,42 @@ function jumpToBlock(rootId: string, blockId: string) {
   }
 }
 
+// 执行批量打标
+async function executeBatchTag() {
+  const docIds = batchModal.value.docIdsText
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  const tags = batchModal.value.tagsText
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (docIds.length === 0 || tags.length === 0) {
+    showMessage('文档 ID 与待添加标签均不能为空', 3000, 'error');
+    return;
+  }
+
+  batchModal.value.executing = true;
+  try {
+    const res = await TagBatchService.batchTagDocuments(docIds, tags);
+    if (res.success) {
+      showMessage(`成功为 ${res.updatedCount} 篇文档更新标签`, 3000, 'info');
+      batchModal.value.visible = false;
+      batchModal.value.docIdsText = '';
+      batchModal.value.tagsText = '';
+      await refreshTags();
+    } else {
+      showMessage(`批量打标存在错误: ${res.errors.join('; ')}`, 5000, 'error');
+    }
+  } catch (err: any) {
+    showMessage(`批量打标失败: ${err.message || err}`, 4000, 'error');
+  } finally {
+    batchModal.value.executing = false;
+  }
+}
+
 // 打开合并对话框
 function openMergeDialog(sourceLabel: string) {
   mergeModal.value = {
@@ -459,7 +670,7 @@ async function confirmMerge() {
   }
 }
 
-// 一键自动修复冲突（如 Prompt 与 prompt）
+// 一键自动修复冲突
 async function autoResolveIssue(issue: ITagHealthIssue) {
   if (!issue.relatedLabels || issue.relatedLabels.length === 0) return;
   const planRes = TagGovernanceService.generateMergePlan(issue.primaryLabel, issue.relatedLabels, allTags.value, true);
@@ -843,6 +1054,130 @@ onMounted(() => {
   color: var(--b3-theme-on-surface-light);
 }
 
+/* 认知图谱样式 */
+.tm-graph-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--b3-theme-surface);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--b3-border-color);
+  margin-bottom: 8px;
+}
+
+.tm-graph-stat {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.tm-graph-hint {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.tm-network-box {
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.tm-network-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.tm-select-tag {
+  flex: 1;
+}
+
+.tm-associated-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tm-assoc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--b3-theme-background);
+  border: 1px solid var(--b3-border-color);
+  padding: 6px 10px;
+  border-radius: 4px;
+}
+
+.tm-assoc-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-assoc-label {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--b3-theme-primary);
+}
+
+.tm-assoc-meta {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
+  margin-top: 2px;
+}
+
+.tm-graph-links-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tm-links-scroller {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tm-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tm-link-row:hover {
+  border-color: var(--b3-theme-primary);
+}
+
+.tm-link-badge {
+  font-size: 10px;
+  background: var(--b3-theme-primary-light);
+  color: var(--b3-theme-primary);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.tm-link-pair {
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.tm-link-btn {
+  font-size: 10px;
+  color: var(--b3-theme-primary);
+}
+
 /* 健康体检 */
 .tm-health-dash {
   display: flex;
@@ -961,7 +1296,7 @@ onMounted(() => {
 .tm-modal-card {
   background: var(--b3-theme-surface);
   border-radius: 8px;
-  width: 360px;
+  width: 400px;
   padding: 16px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
@@ -978,6 +1313,12 @@ onMounted(() => {
 
 .tm-form-group {
   margin: 10px 0;
+}
+
+.tm-form-group label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
 }
 
 .tm-form-checkbox {

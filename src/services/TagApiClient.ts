@@ -1,4 +1,5 @@
 import { TagFilterEngine } from './TagFilterEngine';
+import { TagCooccurrenceService } from './TagCooccurrenceService';
 import type { ITagItem, ITagMatchedBlock, ITagMergePlan } from '../types/tag';
 
 /**
@@ -146,4 +147,37 @@ export class TagApiClient {
       matchedTags: options.includeTags || [],
     }));
   }
+
+  /**
+   * 获取全库标签共现网络图谱数据
+   */
+  public static async fetchCooccurrenceGraph(): Promise<{
+    graph: any;
+    spansCount: number;
+  }> {
+    const sql = `SELECT block_id, content `
+      + `FROM spans `
+      + `WHERE type LIKE '%tag%' AND content != '' `
+      + `ORDER BY block_id;`;
+
+    const rows: Array<{ block_id: string; content: string }> = await this.request('/api/query/sql', { stmt: sql });
+    const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);
+
+    // 统计各标签总引用数
+    const tagCounts = new Map<string, number>();
+    for (const tags of blockMap.values()) {
+      for (const t of tags) {
+        tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+      }
+    }
+
+    const graph = TagCooccurrenceService.buildCooccurrenceGraph(blockMap, tagCounts, 1);
+
+    return {
+      graph,
+      spansCount: rows?.length || 0,
+    };
+  }
 }
+
+

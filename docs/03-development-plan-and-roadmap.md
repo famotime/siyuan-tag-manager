@@ -94,8 +94,8 @@ gantt
 | **08** | 检索过滤 | 智能保存视图管理（Smart Views） | P1 | `tests/tag-filter-engine.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
 | **09** | 视觉体系 | 标签颜色、背景与 Emoji 图标自定义 | P1 | `tests/tag-visual.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
 | **10** | 视觉体系 | 零侵入 Protyle 正文内联样式注入器 | P1 | `tests/tag-visual.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
-| **11** | 打标交互 | 标签别名（Alias）与拼音首字母模糊联想 | P1 | `test-pinyin-alias.spec.ts` | `待开发` | `未执行` | 2026-09-26 |
-| **12** | 打标交互 | 文档树多选与块划选批量打标浮窗 | P1 | `test-batch-tagger.spec.ts` | `待开发` | `未执行` | 2026-09-26 |
-| **13** | 认知图谱 | 标签共现矩阵与 Jaccard 相似度算法 | P2 | `test-cooccurrence.spec.ts` | `待开发` | `未执行` | 2026-09-26 |
-| **14** | 认知图谱 | 可交互力导向网络图谱组件 | P2 | `test-force-graph.spec.ts` | `待开发` | `未执行` | 2026-09-26 |
+| **11** | 打标交互 | 标签别名（Alias）与拼音首字母模糊联想 | P1 | `tests/tag-pinyin-alias.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
+| **12** | 打标交互 | 文档树多选与块划选批量打标浮窗 | P1 | `tests/tag-batch.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
+| **13** | 认知图谱 | 标签共现矩阵与 Jaccard 相似度算法 | P2 | `tests/tag-cooccurrence.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
+| **14** | 认知图谱 | 可交互认知网络图谱与伴随标签推荐 | P2 | `tests/tag-cooccurrence.spec.ts` | `已完成` | `100% 通过` | 2026-09-26 |
 | **15** | 认知图谱 | 标签生命周期时序热力分析看板 | P2 | `test-timeline-heat.spec.ts` | `待开发` | `未执行` | 2026-09-26 |
