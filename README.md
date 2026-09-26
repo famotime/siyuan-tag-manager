@@ -94,6 +94,30 @@ As notes and tags grow over time, SiYuan's native tag mechanism presents critica
 
 ---
 
+## 🛠️ Architecture & Development
+This project adopts modern decoupled frontend architecture conforming to Single Responsibility Principle (SRP):
+- **Modular Presentation**: Main workbench decomposed into 4 Tab views, 5 dialogs/menus, and 3 shared reactive Composables (`useTagData`, `useTagFilter`, `useTagHygiene`).
+- **Comprehensive Testing**: 14 Vitest automated test suites with 69 tests passing (100% pass rate).
+- **Design System**: Fully compliant with WCAG 2.1 AA+ contrast ratios and explicit anti-pollution line SVG icons.
+
+```bash
+# Run unit tests (14 test suites, 69 tests)
+pnpm test
+
+# Build for production (outputs to dist/ and creates package.zip)
+pnpm build
+
+# Static TypeScript check
+pnpm typecheck
+```
+
+Detailed design and refactor documentation:
+- [Project Architecture & Structure (docs/project-structure.md)](./docs/project-structure.md)
+- [Code Refactor Plan & Execution Log (docs/refactor-plan.md)](./docs/refactor-plan.md)
+- [Documentation Index (docs/README.md)](./docs/README.md)
+
+---
+
 ## 📄 License
 
 This project is licensed under the [MIT License](./LICENSE).

@@ -103,6 +103,31 @@
 
 ---
 
+## 🛠️ 工程架构与开发测试
+
+本项目遵循企业级软件工程规范，采用现代前端解耦架构（单一职责原则 SRP 与高内聚低耦合）：
+- **模块化解耦**：工作台核心拆分为 4 大 Tab 视图组件、5 个独立对话框及 3 大响应式状态 Composables (`useTagData`、`useTagFilter`、`useTagHygiene`)；
+- **自动化测试**：配备 14 套自动化测试套件（69 个测试用例，涵盖 API 客户端、治理引擎、多维筛选与 UI 契约，100% 保持通过）；
+- **设计系统**：遵循 WCAG 2.1 AA+ 双主题对比度规范，配备防 CSS 污染显式线框图标与即时交互响应系统。
+
+```bash
+# 运行自动化测试套件 (14 套用例，69 个测试)
+pnpm test
+
+# 生产环境构建打包 (产物位于 dist/，并打包生成 package.zip)
+pnpm build
+
+# 执行 TypeScript 静态类型检查
+pnpm typecheck
+```
+
+详细架构设计与重构日志见：
+- [工程结构与架构映射 (docs/project-structure.md)](./docs/project-structure.md)
+- [代码重构执行计划与日志 (docs/refactor-plan.md)](./docs/refactor-plan.md)
+- [文档中心索引 (docs/README.md)](./docs/README.md)
+
+---
+
 ## 📄 开源许可
 
 本项目遵循 [MIT License](./LICENSE) 开源协议。

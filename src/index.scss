@@ -1,6 +1,8 @@
 // 思源标签管家全局样式系统 (Design System Stylesheet)
 // 遵循《04-ui-ux-design-specification-and-optimization-plan.md》规范
 
+@use './styles/components.scss';
+
 /* 0. 高对比度双主题语义徽章与芯片系统 (High Contrast Badges & Chips, 满足 WCAG AA+ 标准) */
 :root {
   /* 主色轻量徽章/芯片 (Primary Tint) - 8%~12% 柔和背景，深邃主色文字，防止在亮色模式下蓝底蓝字发虚 */

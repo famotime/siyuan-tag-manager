@@ -2,21 +2,38 @@ import { TagFilterEngine } from './TagFilterEngine';
 import { TagCooccurrenceService } from './TagCooccurrenceService';
 import type { ITagItem, ITagMatchedBlock, ITagMergePlan } from '../types/tag';
 
+export interface IQueryBlockOptions {
+  includeTags?: string[];
+  excludeTags?: string[];
+  optionalTags?: string[];
+  notebookIds?: string[];
+  limit?: number;
+  offset?: number;
+}
+
 /**
  * 思源笔记内核 API 交互与适配客户端
+ * 统一网络通信、鉴权头注入、错误捕获与降级逻辑
  */
 export class TagApiClient {
   /**
    * 基础 POST 请求封装
    */
   private static async request<T = any>(url: string, data: any): Promise<T> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
+      headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
+    }
+
     const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(data),
     });
+
     const json = await res.json();
     if (json.code !== 0) {
       throw new Error(json.msg || `Request failed with code ${json.code}`);
@@ -25,7 +42,7 @@ export class TagApiClient {
   }
 
   /**
-   * 获取全库所有标签（基于 SQL 高性能聚合）
+   * 获取全库所有标签（基于 SQL 高性能聚合，失败时平滑降级至 getTag 接口）
    */
   public static async fetchAllTags(): Promise<ITagItem[]> {
     const sql = `SELECT content as label, count(1) as count `
@@ -37,12 +54,13 @@ export class TagApiClient {
     try {
       const rows: Array<{ label: string; count: number }> = await this.request('/api/query/sql', { stmt: sql });
       return (rows || []).map(r => {
-        const parts = r.label.split('/');
+        const label = String(r.label || '');
+        const parts = label.split('/');
         return {
           name: parts[parts.length - 1],
-          label: r.label,
-          count: Number(r.count),
-          depth: parts.length - 1,
+          label,
+          count: Number(r.count || 0),
+          depth: Math.max(0, parts.length - 1),
         };
       });
     } catch {
@@ -61,7 +79,7 @@ export class TagApiClient {
       result.push({
         name: t.name || t.label,
         label: t.label,
-        count: t.count || 0,
+        count: Number(t.count || 0),
         depth,
       });
       if (t.children && t.children.length > 0) {
@@ -75,6 +93,9 @@ export class TagApiClient {
    * 重命名标签
    */
   public static async renameTag(oldLabel: string, newLabel: string): Promise<void> {
+    if (!oldLabel || !newLabel) {
+      throw new Error('旧标签与新标签名称均不能为空');
+    }
     await this.request('/api/tag/renameTag', {
       oldLabel,
       newLabel,
@@ -85,6 +106,9 @@ export class TagApiClient {
    * 删除标签
    */
   public static async removeTag(label: string): Promise<void> {
+    if (!label) {
+      throw new Error('待删除的标签名称不能为空');
+    }
     await this.request('/api/tag/removeTag', {
       label,
     });
@@ -98,6 +122,14 @@ export class TagApiClient {
     plan: ITagMergePlan,
     onProgress?: (current: number, total: number, currentLabel: string) => void,
   ): Promise<{ success: boolean; mergedCount: number; errors: string[] }> {
+    if (!plan || !plan.targetLabel || !Array.isArray(plan.sourceLabels)) {
+      return {
+        success: false,
+        mergedCount: 0,
+        errors: ['无效的合并计划配置'],
+      };
+    }
+
     const total = plan.sourceLabels.length;
     let mergedCount = 0;
     const errors: string[] = [];
@@ -125,14 +157,7 @@ export class TagApiClient {
   /**
    * 执行多维布尔筛选查询，获取命中的块列表
    */
-  public static async queryMatchedBlocks(options: {
-    includeTags?: string[];
-    excludeTags?: string[];
-    optionalTags?: string[];
-    notebookIds?: string[];
-    limit?: number;
-    offset?: number;
-  }): Promise<ITagMatchedBlock[]> {
+  public static async queryMatchedBlocks(options: IQueryBlockOptions): Promise<ITagMatchedBlock[]> {
     const sql = TagFilterEngine.buildQuerySql(options);
     const rows: any[] = await this.request('/api/query/sql', { stmt: sql });
 
@@ -183,6 +208,7 @@ export class TagApiClient {
    * 获取指定标签关联块的更新时间戳列表（用于生命周期与时序热力分析）
    */
   public static async fetchTagTimestamps(label: string): Promise<string[]> {
+    if (!label) return [];
     const clean = TagFilterEngine.escapeSql(label);
     const sql = `SELECT b.updated `
       + `FROM blocks b `
@@ -194,6 +220,3 @@ export class TagApiClient {
     return (rows || []).map(r => r.updated).filter(Boolean);
   }
 }
-
-
-
