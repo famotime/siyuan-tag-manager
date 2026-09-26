@@ -10,6 +10,7 @@ import { usePlugin } from '../main';
 const allTags = ref<ITagItem[]>([]);
 const loading = ref(false);
 const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
+const tagGroups = ref<ITagGroup[]>([]);
 
 export function useTagData() {
   /**
@@ -26,6 +27,10 @@ export function useTagData() {
         metadataMap.value = map;
         const css = TagVisualService.generateCssRules(localData.metadataList);
         TagVisualService.applyStyles(css);
+      }
+
+      if (localData?.tagGroups && Array.isArray(localData.tagGroups)) {
+        tagGroups.value = localData.tagGroups;
       }
 
       const tags = await TagApiClient.fetchAllTags();
@@ -71,10 +76,22 @@ export function useTagData() {
     await plugin.saveData('tag-manager-config.json', {
       metadataList: metaList,
       savedViews,
+      tagGroups: tagGroups.value,
     });
 
     const css = TagVisualService.generateCssRules(metaList);
     TagVisualService.applyStyles(css);
+  }
+
+  async function saveTagGroups(groups: ITagGroup[], savedViews: any[] = []) {
+    tagGroups.value = groups;
+    const plugin = usePlugin();
+    const metaList = Array.from(metadataMap.value.values());
+    await plugin.saveData('tag-manager-config.json', {
+      metadataList: metaList,
+      savedViews,
+      tagGroups: groups,
+    });
   }
 
   async function handleRemoveTag(label: string): Promise<boolean> {
@@ -126,6 +143,8 @@ export function useTagData() {
     getTagIcon,
     getTagStyle,
     saveTagMetadata,
+    tagGroups,
+    saveTagGroups,
     handleRemoveTag,
     handleConvertToDoc,
   };

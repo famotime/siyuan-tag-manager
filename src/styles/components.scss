@@ -1404,3 +1404,163 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* 标签组预设套件抽屉与卡片样式 */
+.tm-groups-section {
+  border-bottom: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-surface);
+  user-select: none;
+}
+
+.tm-groups-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--b3-theme-background-light);
+  }
+}
+
+.tm-groups-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface);
+}
+
+.tm-groups-icon {
+  color: var(--b3-theme-primary);
+}
+
+.tm-groups-badge {
+  font-size: 10px;
+  background: var(--b3-theme-background-light);
+  color: var(--b3-theme-on-surface);
+  padding: 0 5px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.tm-groups-body {
+  padding: 6px 12px 10px 12px;
+  background: var(--b3-theme-background);
+}
+
+.tm-groups-empty {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  text-align: center;
+  padding: 8px 0;
+  border: 1px dashed var(--b3-border-color);
+  border-radius: 4px;
+}
+
+.tm-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.tm-group-card {
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  padding: 6px 8px;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--b3-theme-primary-light);
+  }
+}
+
+.tm-group-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.tm-group-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tm-group-name {
+  font-weight: 600;
+  color: var(--b3-theme-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-group-count {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.tm-group-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.tm-group-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--b3-theme-primary);
+  background: var(--b3-theme-primary-light);
+  color: var(--b3-theme-primary);
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.15s ease;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.tm-group-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.tm-group-tag-pill {
+  font-size: 11px;
+  background: var(--b3-theme-background-light);
+  color: var(--b3-theme-on-surface);
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--b3-theme-primary-light);
+    color: var(--b3-theme-primary);
+  }
+}
+
+.tm-group-tag-more {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
+  display: inline-flex;
+  align-items: center;
+}
+

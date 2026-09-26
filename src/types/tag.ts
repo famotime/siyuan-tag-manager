@@ -64,10 +64,14 @@ export interface ITagGroup {
   id: string;
   /** 分组展示名称（如 "状态"、"主题"、"技术栈"） */
   name: string;
-  /** 分组主题色 */
+  /** 分组主题色或预设色盘 ID */
   color?: string;
-  /** 匹配规则 */
-  matchRules: {
+  /** 分组图标（可选） */
+  icon?: string;
+  /** 明确绑定的标签列表（用于批量套用打标） */
+  tags: string[];
+  /** 匹配规则（向后兼容） */
+  matchRules?: {
     /** 前缀匹配，如 "tech/" */
     prefix?: string[];
     /** 精确标签名匹配 */
@@ -75,6 +79,8 @@ export interface ITagGroup {
   };
   /** 排序序号 */
   sortOrder: number;
+  /** 更新时间戳 */
+  updatedAt?: number;
 }
 
 /**

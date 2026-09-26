@@ -36,6 +36,85 @@
       </div>
     </div>
 
+    <!-- 标签组预设套件折叠区 -->
+    <div class="tm-groups-section">
+      <div class="tm-groups-header" @click="groupsExpanded = !groupsExpanded">
+        <div class="tm-groups-title">
+          <SyLineIcon :name="groupsExpanded ? 'chevron-down' : 'chevron-right'" :size="11" />
+          <SyLineIcon name="layers-plus" :size="13" class="tm-groups-icon" />
+          <span>常用标签组</span>
+          <span class="tm-groups-badge">{{ (tagGroups || []).length }}</span>
+        </div>
+        <div class="tm-groups-header-actions" @click.stop>
+          <button
+            class="tm-icon-btn tm-btn-xs"
+            v-tooltip="'新建常用标签组'"
+            @click="emit('open-create-group')"
+          >
+            <SyLineIcon name="plus" :size="11" />
+          </button>
+        </div>
+      </div>
+
+      <div v-show="groupsExpanded" class="tm-groups-body">
+        <div v-if="!tagGroups || tagGroups.length === 0" class="tm-groups-empty">
+          <span>暂无标签组，点击右上角 + 创建常用标签套件</span>
+        </div>
+        <div v-else class="tm-groups-list">
+          <div
+            v-for="group in tagGroups"
+            :key="group.id"
+            class="tm-group-card"
+          >
+            <div class="tm-group-card-header">
+              <span class="tm-group-color-dot" :style="{ backgroundColor: group.color || 'var(--b3-theme-primary)' }"></span>
+              <span class="tm-group-name" :title="group.name">{{ group.name }}</span>
+              <span class="tm-group-count">{{ group.tags.length }} 标</span>
+
+              <div class="tm-group-card-actions">
+                <button
+                  class="tm-group-apply-btn"
+                  v-tooltip="'套用此组到当前打开的文档/焦点块'"
+                  @click="emit('apply-group', group)"
+                >
+                  <SyLineIcon name="tag" :size="10" />
+                  <span>套用</span>
+                </button>
+                <button
+                  class="tm-icon-btn tm-btn-xs"
+                  v-tooltip="'编辑标签组'"
+                  @click="emit('open-edit-group', group)"
+                >
+                  <SyLineIcon name="edit" :size="10" />
+                </button>
+                <button
+                  class="tm-icon-btn tm-btn-xs tm-btn-danger"
+                  v-tooltip="'删除标签组'"
+                  @click="emit('delete-group', group.id)"
+                >
+                  <SyLineIcon name="trash" :size="10" />
+                </button>
+              </div>
+            </div>
+
+            <div v-if="group.tags.length > 0" class="tm-group-card-tags">
+              <span
+                v-for="t in group.tags.slice(0, 5)"
+                :key="t"
+                class="tm-group-tag-pill"
+                @click.stop="emit('tag-click', t, $event)"
+              >
+                #{{ t }}#
+              </span>
+              <span v-if="group.tags.length > 5" class="tm-group-tag-more">
+                +{{ group.tags.length - 5 }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 多选状态控制横条 -->
     <div v-if="selectedTags && selectedTags.length > 0" class="tm-selection-bar">
       <div class="tm-selection-info">
@@ -137,7 +216,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { ITagItem } from '../../types/tag';
+import type { ITagItem, ITagGroup } from '../../types/tag';
 import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
@@ -149,9 +228,11 @@ const props = withDefaults(
     getTagStyle: (label: string) => Record<string, string>;
     getTagIcon: (label: string) => string;
     selectedTags?: string[];
+    tagGroups?: ITagGroup[];
   }>(),
   {
     selectedTags: () => [],
+    tagGroups: () => [],
   }
 );
 
@@ -161,12 +242,17 @@ const emit = defineEmits<{
   (e: 'open-menu', label: string, event: MouseEvent): void;
   (e: 'clear-selected'): void;
   (e: 'switch-to-filter'): void;
+  (e: 'open-create-group'): void;
+  (e: 'open-edit-group', group: ITagGroup): void;
+  (e: 'delete-group', groupId: string): void;
+  (e: 'apply-group', group: ITagGroup): void;
 }>();
 
 const searchKeyword = ref('');
 const sortMode = ref<TagSortMode>('count_desc');
 const collapsedSet = ref<Set<string>>(new Set());
 const allCollapsed = ref(false);
+const groupsExpanded = ref(false);
 
 const selectedTagSet = computed(() => new Set(props.selectedTags || []));
 

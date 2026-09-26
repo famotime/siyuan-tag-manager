@@ -33,10 +33,27 @@ export interface ISaveViewModalState {
   title: string;
 }
 
+export interface ITagGroupModalState {
+  visible: boolean;
+  isEdit: boolean;
+  groupId?: string;
+  name: string;
+  color?: string;
+  icon?: string;
+  tags: string[];
+}
+
+export interface IBatchDocItem {
+  id: string;
+  title: string;
+}
+
 export interface IBatchModalState {
   visible: boolean;
   docIdsText: string;
   tagsText: string;
+  targetDocs?: IBatchDocItem[];
+  selectedGroupIds?: string[];
   executing: boolean;
 }
 

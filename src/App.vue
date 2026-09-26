@@ -62,6 +62,7 @@
         :all-tags="allTags"
         :loading="loading"
         :selected-tags="activeFilter.includeTags"
+        :tag-groups="tagGroups"
         :get-tag-style="getTagStyle"
         :get-tag-icon="getTagIcon"
         @tag-click="onTagClick"
@@ -69,6 +70,10 @@
         @clear-selected="clearFilterTags"
         @switch-to-filter="switchTab('filter')"
         @open-menu="openRowMenu"
+        @open-create-group="openCreateGroupDialog"
+        @open-edit-group="openEditGroupDialog"
+        @delete-group="handleDeleteGroup"
+        @apply-group="handleApplyGroup"
       />
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
@@ -141,6 +146,14 @@
       @execute="executeBatchTag"
     />
 
+    <!-- 标签组维护弹窗 -->
+    <TagGroupModal
+      :state="groupModal"
+      :all-tags="allTags"
+      @close="groupModal.visible = false"
+      @save="handleSaveGroup"
+    />
+
     <!-- 合并重构对话弹窗 -->
     <TagMergeModal
       :state="mergeModal"
@@ -153,7 +166,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagHealthIssue, ITagMetadata } from './types/tag';
+import type { ITagHealthIssue, ITagMetadata, ITagGroup } from './types/tag';
 import type {
   TabType,
   IRowMenuState,
@@ -161,6 +174,7 @@ import type {
   ISaveViewModalState,
   IBatchModalState,
   IMergeModalState,
+  ITagGroupModalState,
 } from './types/ui';
 
 // 核心服务与工具
@@ -168,6 +182,7 @@ import { TagApiClient } from './services/TagApiClient';
 import { TagFilterEngine } from './services/TagFilterEngine';
 import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagBatchService } from './services/TagBatchService';
+import { TagGroupService } from './services/TagGroupService';
 import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
@@ -187,6 +202,7 @@ import TagRowMenu from './components/dialogs/TagRowMenu.vue';
 import TagStyleModal from './components/dialogs/TagStyleModal.vue';
 import TagSaveViewModal from './components/dialogs/TagSaveViewModal.vue';
 import TagBatchModal from './components/dialogs/TagBatchModal.vue';
+import TagGroupModal from './components/dialogs/TagGroupModal.vue';
 import TagMergeModal from './components/dialogs/TagMergeModal.vue';
 
 // 1. 数据状态与 Composables 初始化
@@ -194,10 +210,12 @@ const {
   allTags,
   loading,
   metadataMap,
+  tagGroups,
   refreshTags,
   getTagIcon,
   getTagStyle,
   saveTagMetadata,
+  saveTagGroups,
   handleRemoveTag,
   handleConvertToDoc,
 } = useTagData();
@@ -262,6 +280,16 @@ const mergeModal = ref<IMergeModalState>({
   targetLabel: '',
   setAsAlias: true,
   executing: false,
+});
+
+const groupModal = ref<ITagGroupModalState>({
+  visible: false,
+  isEdit: false,
+  groupId: undefined,
+  name: '',
+  color: '#4285F4',
+  icon: '',
+  tags: [],
 });
 
 // 3. 图谱与时序状态
@@ -422,6 +450,97 @@ async function confirmSaveSmartView() {
   const ok = await saveSmartView(saveViewModal.value.title, Array.from(metadataMap.value.values()));
   if (ok) {
     saveViewModal.value.visible = false;
+  }
+}
+
+// 标签组相关操作
+function openCreateGroupDialog() {
+  groupModal.value = {
+    visible: true,
+    isEdit: false,
+    groupId: undefined,
+    name: '',
+    color: '#4285F4',
+    icon: '',
+    tags: [],
+  };
+}
+
+function openEditGroupDialog(group: ITagGroup) {
+  groupModal.value = {
+    visible: true,
+    isEdit: true,
+    groupId: group.id,
+    name: group.name,
+    color: group.color || '#4285F4',
+    icon: group.icon || '',
+    tags: [...group.tags],
+  };
+}
+
+async function handleSaveGroup(payload: { name: string; tags: string[]; color?: string; icon?: string }) {
+  if (groupModal.value.isEdit && groupModal.value.groupId) {
+    const res = TagGroupService.updateGroup(tagGroups.value, groupModal.value.groupId, payload);
+    if (res.error) {
+      showMessage(res.error, 3000, 'error');
+      return;
+    }
+    await saveTagGroups(res.groups, savedViews.value);
+    showMessage(`已更新标签组「${payload.name}」`, 3000, 'info');
+  } else {
+    const res = TagGroupService.createGroup(tagGroups.value, payload);
+    if (res.error) {
+      showMessage(res.error, 3000, 'error');
+      return;
+    }
+    await saveTagGroups(res.groups, savedViews.value);
+    showMessage(`已成功创建标签组「${payload.name}」`, 3000, 'info');
+  }
+  groupModal.value.visible = false;
+}
+
+async function handleDeleteGroup(groupId: string) {
+  const g = tagGroups.value.find(item => item.id === groupId);
+  if (!confirm(`确定要删除标签组「${g?.name || '此组'}」吗？（不会删除标签本身）`)) {
+    return;
+  }
+  const next = TagGroupService.deleteGroup(tagGroups.value, groupId);
+  await saveTagGroups(next, savedViews.value);
+  showMessage(`已删除标签组「${g?.name || ''}」`, 3000, 'info');
+}
+
+async function handleApplyGroup(group: ITagGroup) {
+  if (!group.tags || group.tags.length === 0) {
+    showMessage(`标签组「${group.name}」内暂无标签`, 3000, 'info');
+    return;
+  }
+
+  const active = TagGroupService.getActiveContext();
+  if (!active.docId && !active.blockId) {
+    showMessage('未检测到当前打开的文档或聚焦块，请先在思源中打开文档或光标置于正文中', 4000, 'error');
+    return;
+  }
+
+  // 1. 若光标焦点位于非根块的具体内容块上，直接在该块末尾追加 #tag#
+  if (active.blockId) {
+    const res = await TagGroupService.applyGroupToBlock(active.blockId, group.tags);
+    if (res.success) {
+      showMessage(`已将标签组「${group.name}」(${group.tags.length}个标签) 追加至当前块`, 3000, 'info');
+      await refreshAllData();
+      return;
+    }
+  }
+
+  // 2. 否则默认以思源原生 IAL tags 属性方式注入当前活动文档根块
+  if (active.docId) {
+    const res = await TagGroupService.applyGroupToDoc(active.docId, group.tags);
+    if (res.success) {
+      const docName = active.docTitle ? `《${active.docTitle}》` : '当前文档';
+      showMessage(`已为 ${docName} 套用标签组「${group.name}」(${group.tags.length} 个标签)`, 3000, 'info');
+      await refreshAllData();
+    } else {
+      showMessage(`套用失败: ${res.error}`, 4000, 'error');
+    }
   }
 }
 
