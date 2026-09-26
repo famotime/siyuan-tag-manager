@@ -1,0 +1,91 @@
+import type { ISmartTagView } from '../types/tag';
+
+/**
+ * 标签布尔筛选与 SQL 查询组装引擎
+ */
+export class TagFilterEngine {
+  /**
+   * 安全转义 SQL 字符串与通配符
+   */
+  public static escapeSql(str: string): string {
+    if (!str) return '';
+    // 转义反斜杠和单引号
+    return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
+  }
+
+  /**
+   * 安全转义 LIKE 模式匹配中的特殊字符
+   */
+  public static escapeLike(str: string): string {
+    return this.escapeSql(str).replace(/%/g, '\\%').replace(/_/g, '\\_');
+  }
+
+  /**
+   * 根据多维布尔条件构建高效率的 SQL 查询语句
+   * @param options 筛选配置（必含、排除、可选、笔记本限定、分页）
+   */
+  public static buildQuerySql(options: {
+    includeTags?: string[];
+    excludeTags?: string[];
+    optionalTags?: string[];
+    notebookIds?: string[];
+    limit?: number;
+    offset?: number;
+  }): string {
+    const includes = (options.includeTags || []).map(t => t.trim()).filter(Boolean);
+    const excludes = (options.excludeTags || []).map(t => t.trim()).filter(Boolean);
+    const optionals = (options.optionalTags || []).map(t => t.trim()).filter(Boolean);
+    const notebookIds = (options.notebookIds || []).map(t => t.trim()).filter(Boolean);
+
+    const conditions: string[] = ["b.type NOT IN ('d')"];
+
+    // 1. 必含标签 (AND): 每个标签都必须作为子查询命中
+    for (const tag of includes) {
+      const safeTag = this.escapeSql(tag);
+      conditions.push(`b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
+    }
+
+    // 2. 排除标签 (NOT): 任意一个命中即排除
+    for (const tag of excludes) {
+      const safeTag = this.escapeSql(tag);
+      conditions.push(`b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
+    }
+
+    // 3. 可选标签 (OR): 如果指定了可选标签，则至少命中一个
+    if (optionals.length > 0) {
+      const safeList = optionals.map(t => `'${this.escapeSql(t)}'`).join(', ');
+      conditions.push(`b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN (${safeList}))`);
+    }
+
+    // 4. 限定笔记本
+    if (notebookIds.length > 0) {
+      const safeBoxList = notebookIds.map(box => `'${this.escapeSql(box)}'`).join(', ');
+      conditions.push(`b.box IN (${safeBoxList})`);
+    }
+
+    const whereClause = conditions.join(' AND ');
+    const limit = options.limit && options.limit > 0 ? options.limit : 50;
+    const offset = options.offset && options.offset > 0 ? options.offset : 0;
+
+    return `SELECT b.id, b.content, b.markdown, b.type, b.root_id as rootId, b.updated, d.content as docTitle `
+      + `FROM blocks b `
+      + `LEFT JOIN blocks d ON b.root_id = d.id `
+      + `WHERE ${whereClause} `
+      + `ORDER BY b.updated DESC `
+      + `LIMIT ${limit} OFFSET ${offset};`;
+  }
+
+  /**
+   * 将智能视图（ISmartTagView）转换为查询参数
+   */
+  public static viewToQuerySql(view: ISmartTagView, limit = 50, offset = 0): string {
+    return this.buildQuerySql({
+      includeTags: view.includeTags,
+      excludeTags: view.excludeTags,
+      optionalTags: view.optionalTags,
+      notebookIds: view.notebookIds,
+      limit,
+      offset,
+    });
+  }
+}

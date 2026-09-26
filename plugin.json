@@ -1,0 +1,57 @@
+{
+  "name": "siyuan-tag-manager",
+  "author": "Quincy Zou",
+  "url": "https://github.com/famotime/siyuan-tag-manager",
+  "version": "0.1.0",
+  "minAppVersion": "3.8.5",
+  "disabledInPublish": false,
+  "publish": {
+    "resources": [],
+    "data": []
+  },
+  "backends": [
+    "windows",
+    "linux",
+    "darwin",
+    "docker"
+  ],
+  "kernels": [
+    "all"
+  ],
+  "frontends": [
+    "desktop",
+    "desktop-window",
+    "browser-desktop"
+  ],
+  "displayName": {
+    "default": "Tag Manager",
+    "en": "Tag Manager",
+    "zh-CN": "标签管家"
+  },
+  "description": {
+    "default": "Professional tag asset management, visual styling, health hygiene, and multidimensional faceted search for SiYuan.",
+    "en": "Professional tag asset management, visual styling, health hygiene, and multidimensional faceted search for SiYuan.",
+    "zh-CN": "思源笔记专业级标签资产管理、视觉美化、健康治理与多维交叉筛选插件"
+  },
+  "readme": {
+    "default": "README.md",
+    "en": "README.md",
+    "zh-CN": "README_zh_CN.md"
+  },
+  "icon": "icon.webp",
+  "preview": "preview.webp",
+  "funding": {
+    "openCollective": "",
+    "patreon": "",
+    "github": "",
+    "custom": [],
+    "links": []
+  },
+  "keywords": [
+    "tag",
+    "tag-manager",
+    "filter",
+    "knowledge-base",
+    "siyuan"
+  ]
+}
