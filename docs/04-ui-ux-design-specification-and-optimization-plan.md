@@ -163,11 +163,24 @@ code, .tm-code-font {
 
   /* 功能语义色彩 */
   --tm-color-primary:   var(--b3-theme-primary);
-  --tm-color-primary-bg:var(--b3-theme-primary-light);
+  --tm-color-primary-bg:color-mix(in srgb, var(--b3-theme-primary) 10%, transparent);
   --tm-color-success:   #2ea043;
   --tm-color-warning:   #d97706;
   --tm-color-danger:    #e05252;
   --tm-color-info:      #0284c7;
+
+  /* 高对比度轻量徽章与芯片系统 (WCAG AA+ / AAA，解决浅底低对比发虚痛点) */
+  --tm-badge-primary-bg:     color-mix(in srgb, var(--b3-theme-primary) 10%, transparent);
+  --tm-badge-primary-border: color-mix(in srgb, var(--b3-theme-primary) 28%, transparent);
+  --tm-badge-primary-text:   color-mix(in srgb, var(--b3-theme-primary) 80%, black);
+
+  --tm-badge-danger-bg:      rgba(220, 53, 69, 0.10);
+  --tm-badge-danger-border:  rgba(197, 34, 31, 0.25);
+  --tm-badge-danger-text:    #b91c1c;
+
+  --tm-badge-success-bg:     rgba(16, 185, 129, 0.10);
+  --tm-badge-success-border: rgba(14, 110, 69, 0.25);
+  --tm-badge-success-text:   #0e6e45;
 
   /* 阴影层次 */
   --tm-shadow-floating: 0 8px 24px -4px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.08);
@@ -182,6 +195,19 @@ code, .tm-code-font {
   --tm-color-info:      #38bdf8;
   --tm-shadow-floating: 0 12px 32px -4px rgba(0, 0, 0, 0.45), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
   --tm-shadow-tooltip:  0 6px 16px rgba(0, 0, 0, 0.4);
+
+  /* 暗色徽章与芯片：背景沉浸微透避免眩光，文字明亮清透 (Contrast Ratio > 6:1) */
+  --tm-badge-primary-bg:     color-mix(in srgb, var(--b3-theme-primary) 22%, transparent);
+  --tm-badge-primary-border: color-mix(in srgb, var(--b3-theme-primary) 40%, transparent);
+  --tm-badge-primary-text:   color-mix(in srgb, var(--b3-theme-primary) 75%, white);
+
+  --tm-badge-danger-bg:      rgba(239, 68, 68, 0.22);
+  --tm-badge-danger-border:  rgba(252, 165, 165, 0.30);
+  --tm-badge-danger-text:    #fca5a5;
+
+  --tm-badge-success-bg:     rgba(16, 185, 129, 0.20);
+  --tm-badge-success-border: rgba(110, 231, 183, 0.30);
+  --tm-badge-success-text:   #6ee7b7;
 }
 ```
 

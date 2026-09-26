@@ -1,6 +1,64 @@
 // 思源标签管家全局样式系统 (Design System Stylesheet)
 // 遵循《04-ui-ux-design-specification-and-optimization-plan.md》规范
 
+/* 0. 高对比度双主题语义徽章与芯片系统 (High Contrast Badges & Chips, 满足 WCAG AA+ 标准) */
+:root {
+  /* 主色轻量徽章/芯片 (Primary Tint) - 8%~12% 柔和背景，深邃主色文字，防止在亮色模式下蓝底蓝字发虚 */
+  --tm-badge-primary-bg: #ebf3fe;
+  --tm-badge-primary-bg: color-mix(in srgb, var(--b3-theme-primary) 10%, transparent);
+  --tm-badge-primary-border: rgba(26, 86, 219, 0.22);
+  --tm-badge-primary-border: color-mix(in srgb, var(--b3-theme-primary) 28%, transparent);
+  --tm-badge-primary-text: #1a56db;
+  --tm-badge-primary-text: color-mix(in srgb, var(--b3-theme-primary) 80%, black);
+
+  /* 危险/排除轻量徽章 (Danger / NOT Chip) - 柔和浅红背景，沉稳高对比深红文字 */
+  --tm-badge-danger-bg: #feebeb;
+  --tm-badge-danger-bg: rgba(220, 53, 69, 0.10);
+  --tm-badge-danger-border: rgba(197, 34, 31, 0.25);
+  --tm-badge-danger-border: color-mix(in srgb, #dc3545 28%, transparent);
+  --tm-badge-danger-text: #b91c1c;
+
+  /* 成功/活跃轻量徽章 (Success / Rising Trend) - 柔和浅绿背景，深翠绿文字 */
+  --tm-badge-success-bg: #e8f7f0;
+  --tm-badge-success-bg: rgba(16, 185, 129, 0.10);
+  --tm-badge-success-border: rgba(14, 110, 69, 0.25);
+  --tm-badge-success-border: color-mix(in srgb, #10b981 28%, transparent);
+  --tm-badge-success-text: #0e6e45;
+
+  /* 中性/沉寂轻量徽章 (Neutral / Cooling Trend) */
+  --tm-badge-neutral-bg: #f1f3f5;
+  --tm-badge-neutral-bg: rgba(108, 117, 125, 0.10);
+  --tm-badge-neutral-border: rgba(73, 80, 87, 0.20);
+  --tm-badge-neutral-border: color-mix(in srgb, #6c757d 28%, transparent);
+  --tm-badge-neutral-text: #495057;
+}
+
+[data-theme-mode="dark"],
+body.theme--dark {
+  /* 暗色模式下：背景沉浸微透 (避免白炽光刺眼)，文字明亮清透 (确保 Contrast Ratio > 6:1) */
+  --tm-badge-primary-bg: rgba(26, 86, 219, 0.22);
+  --tm-badge-primary-bg: color-mix(in srgb, var(--b3-theme-primary) 22%, transparent);
+  --tm-badge-primary-border: rgba(142, 176, 253, 0.30);
+  --tm-badge-primary-border: color-mix(in srgb, var(--b3-theme-primary) 40%, transparent);
+  --tm-badge-primary-text: #8eb0fd;
+  --tm-badge-primary-text: color-mix(in srgb, var(--b3-theme-primary) 75%, white);
+
+  --tm-badge-danger-bg: rgba(239, 68, 68, 0.22);
+  --tm-badge-danger-border: rgba(252, 165, 165, 0.30);
+  --tm-badge-danger-border: color-mix(in srgb, #ef4444 40%, transparent);
+  --tm-badge-danger-text: #fca5a5;
+
+  --tm-badge-success-bg: rgba(16, 185, 129, 0.20);
+  --tm-badge-success-border: rgba(110, 231, 183, 0.30);
+  --tm-badge-success-border: color-mix(in srgb, #10b981 40%, transparent);
+  --tm-badge-success-text: #6ee7b7;
+
+  --tm-badge-neutral-bg: rgba(148, 163, 184, 0.20);
+  --tm-badge-neutral-border: rgba(203, 213, 225, 0.25);
+  --tm-badge-neutral-border: color-mix(in srgb, #94a3b8 35%, transparent);
+  --tm-badge-neutral-text: #cbd5e1;
+}
+
 /* 1. 显式线框图标防思源 CSS 污染防御规则 */
 .sy-line-icon svg,
 svg.tm-line-svg {
@@ -149,8 +207,9 @@ body.theme--dark .tm-tag-style--slate-grey {
   }
 
   &.is-active {
-    background: var(--b3-theme-primary-light);
-    color: var(--b3-theme-primary);
+    background: var(--tm-badge-primary-bg, #ebf3fe);
+    color: var(--tm-badge-primary-text, #1a56db);
+    border-color: var(--tm-badge-primary-border, rgba(26, 86, 219, 0.28));
   }
 
   &[disabled] {
