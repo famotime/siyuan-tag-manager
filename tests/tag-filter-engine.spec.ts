@@ -56,4 +56,61 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
     expect(sql).toContain("content = 'YouTube'");
     expect(sql).toContain("content = 'AIGC'");
   });
+
+  describe('resolveFilterSelection 标签点击筛选状态解析', () => {
+    it('默认模式（append=false）仅以点击标签进行筛选，清空历史包含与排除条件', () => {
+      const initial = {
+        includeTags: ['Vue', 'React'],
+        excludeTags: ['Angular'],
+      };
+
+      const result = TagFilterEngine.resolveFilterSelection(initial, 'TypeScript', false);
+      expect(result.includeTags).toEqual(['TypeScript']);
+      expect(result.excludeTags).toEqual([]);
+    });
+
+    it('追加模式（append=true）以 AND 加入多维筛选', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: [],
+      };
+
+      const result = TagFilterEngine.resolveFilterSelection(initial, 'TypeScript', true);
+      expect(result.includeTags).toEqual(['Vue', 'TypeScript']);
+      expect(result.excludeTags).toEqual([]);
+    });
+
+    it('追加模式下重复添加相同标签不会产生冗余', () => {
+      const initial = {
+        includeTags: ['Vue', 'TypeScript'],
+        excludeTags: [],
+      };
+
+      const result = TagFilterEngine.resolveFilterSelection(initial, 'TypeScript', true);
+      expect(result.includeTags).toEqual(['Vue', 'TypeScript']);
+    });
+
+    it('追加模式下若选中的标签处于排除列表中，自动从排除列表移除并加入包含列表', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: ['TypeScript', 'JavaScript'],
+      };
+
+      const result = TagFilterEngine.resolveFilterSelection(initial, 'TypeScript', true);
+      expect(result.includeTags).toEqual(['Vue', 'TypeScript']);
+      expect(result.excludeTags).toEqual(['JavaScript']);
+    });
+
+    it('当传入空标签时保持原状态不变', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: ['Legacy'],
+      };
+
+      const result = TagFilterEngine.resolveFilterSelection(initial, '   ', false);
+      expect(result.includeTags).toEqual(['Vue']);
+      expect(result.excludeTags).toEqual(['Legacy']);
+    });
+  });
 });
+

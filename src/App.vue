@@ -124,11 +124,11 @@
               </span>
 
               <!-- 节点主内容 -->
-              <div class="tm-node-content" @click="handleQuickFilter(node.label)">
+              <div class="tm-node-content" @click="handleTagClick(node.label, $event)">
                 <span
                   class="tm-node-name"
                   :style="getTagStyle(node.label)"
-                  :title="node.label"
+                  :title="`${node.label}（点击仅筛选此标签，按住 Ctrl/Shift 可追加组合）`"
                 >
                   <span v-if="getTagIcon(node.label)" class="tm-custom-icon">{{ getTagIcon(node.label) }}</span>
                   <SyLineIcon v-else name="hash" :size="12" class="tm-default-hash" />
@@ -141,8 +141,8 @@
               <div class="tm-node-actions">
                 <button
                   class="tm-icon-btn tm-action-btn"
-                  v-tooltip="'加入即时组合筛选'"
-                  @click.stop="handleQuickFilter(node.label)"
+                  v-tooltip="'加入即时组合筛选 (AND)'"
+                  @click.stop="handleQuickFilter(node.label, true)"
                 >
                   <SyLineIcon name="search-plus" :size="13" />
                 </button>
@@ -420,14 +420,14 @@
                 <SyLineIcon name="info" :size="14" />
                 <span>{{ healthResult.summary.lowFrequency }}</span>
               </div>
-              <div class="tm-stat-lbl">低频标签 (1次)</div>
+              <div class="tm-stat-lbl">低频标签</div>
             </div>
             <div class="tm-stat-card">
               <div class="tm-stat-val text-danger">
                 <SyLineIcon name="trash" :size="14" />
                 <span>{{ healthResult.summary.orphans }}</span>
               </div>
-              <div class="tm-stat-lbl">孤儿废弃标签</div>
+              <div class="tm-stat-lbl">孤儿标签</div>
             </div>
           </div>
         </div>
@@ -685,6 +685,7 @@ import { showMessage } from 'siyuan';
 import type { ITagHealthIssue, ITagItem, ITagMatchedBlock, ITagMetadata, ISmartTagView } from './types/tag';
 import { TagApiClient } from './services/TagApiClient';
 import { TagTreeService, type TagSortMode } from './services/TagTreeService';
+import { TagFilterEngine } from './services/TagFilterEngine';
 import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagPinyinAliasService } from './services/TagPinyinAliasService';
 import { TagBatchService } from './services/TagBatchService';
@@ -1137,11 +1138,15 @@ function combineFilterWithAssociated(tagA: string, tagB: string) {
   runQuery();
 }
 
-function handleQuickFilter(label: string) {
+function handleTagClick(label: string, event?: MouseEvent) {
+  const isAppend = Boolean(event && (event.ctrlKey || event.metaKey || event.shiftKey));
+  handleQuickFilter(label, isAppend);
+}
+
+function handleQuickFilter(label: string, append = false) {
   currentTab.value = 'filter';
-  if (!activeFilter.value.includeTags.includes(label)) {
-    activeFilter.value.includeTags.push(label);
-  }
+  selectedSmartViewId.value = '';
+  activeFilter.value = TagFilterEngine.resolveFilterSelection(activeFilter.value, label, append);
   runQuery();
 }
 

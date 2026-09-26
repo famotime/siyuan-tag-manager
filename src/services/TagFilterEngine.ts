@@ -88,4 +88,44 @@ export class TagFilterEngine {
       offset,
     });
   }
+
+  /**
+   * 计算选中标签后的筛选状态
+   * @param currentFilter 当前筛选状态
+   * @param label 选中的标签
+   * @param append 是否为追加模式（默认 false 为仅以点击标签进行单项筛选；true 为以 AND 形式组合筛选）
+   */
+  public static resolveFilterSelection(
+    currentFilter: { includeTags: string[]; excludeTags: string[] },
+    label: string,
+    append = false
+  ): { includeTags: string[]; excludeTags: string[] } {
+    const trimmed = label ? label.trim() : '';
+    if (!trimmed) {
+      return {
+        includeTags: [...currentFilter.includeTags],
+        excludeTags: [...currentFilter.excludeTags],
+      };
+    }
+
+    if (!append) {
+      // 默认仅以点击标签进行筛选，重置并清空历史包含与排除条件
+      return {
+        includeTags: [trimmed],
+        excludeTags: [],
+      };
+    }
+
+    // 追加模式：以 AND 加入多维筛选，若之前在排除列表中则自动移除
+    const nextIncludes = currentFilter.includeTags.includes(trimmed)
+      ? [...currentFilter.includeTags]
+      : [...currentFilter.includeTags, trimmed];
+    const nextExcludes = currentFilter.excludeTags.filter(t => t !== trimmed);
+
+    return {
+      includeTags: nextIncludes,
+      excludeTags: nextExcludes,
+    };
+  }
 }
+
