@@ -17,7 +17,9 @@ describe('TagVisualService 标签视觉与动态样式注入测试', () => {
 
     const css = TagVisualService.generateCssRules(mockMeta);
 
+    expect(css).toContain('data-tag="YouTube"');
     expect(css).toContain('data-content="YouTube"');
+    expect(css).not.toContain(':has-text(');
     expect(css).toContain('background-color: #FFE5E5 !important;');
     expect(css).toContain('color: #FF0000 !important;');
     expect(css).toContain('content: "🎬 "');
@@ -35,9 +37,11 @@ describe('TagVisualService 标签视觉与动态样式注入测试', () => {
 
     const css = TagVisualService.generateCssRules(mockMeta);
 
-    // 验证暗黑模式选择器存在
+    // 验证暗黑模式选择器存在且使用合法属性选择器
     expect(css).toContain('[data-theme-mode="dark"]');
     expect(css).toContain('body.theme--dark');
+    expect(css).toContain('data-tag="TechTag"');
+    expect(css).not.toContain(':has-text(');
     // 验证暗色模式下背景色使用了 rgba 微透，避免纯白炽光斑
     expect(css).toContain('rgba(');
   });

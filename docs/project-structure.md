@@ -42,6 +42,7 @@ siyuan-tag-manager/
 │   │   ├── TagBatchService.ts              # 批量文档打标解析与事务执行引擎
 │   │   ├── TagCooccurrenceService.ts       # 标签共现网络构建与 Jaccard 相似度计算
 │   │   ├── TagDocConverterService.ts       # 标签升格为主题聚合实体文档服务
+│   │   ├── TagDomDecorator.ts              # 正文文档标签 DOM 属性装饰与 MutationObserver 监听
 │   │   ├── TagFilterEngine.ts              # 多维布尔表达式 SQL 构建与选择解析
 │   │   ├── TagGovernanceService.ts         # 标签命名规范化、大小写冲突与体检引擎
 │   │   ├── TagPinyinAliasService.ts        # 拼音首字母模糊匹配与多别名索引

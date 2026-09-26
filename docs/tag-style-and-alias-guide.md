@@ -24,7 +24,7 @@
 
 ## 2. 标签样式（Tag Style）的使用场景与实战方案
 
-标签样式由 [TagVisualService.ts](file:///d:/MyCodingProjects/siyuan-tag-manager/src/services/TagVisualService.ts) 驱动，支持双主题自适应配色预设、Hex 自定义、前缀 Emoji 符号以及重置还原能力。它不仅在插件侧栏工作台生效，还会**以动态 CSS 方式实时穿透并渲染思源 Protyle 编辑器正文中的所有对应标签**。
+标签样式由 [TagVisualService.ts](file:///d:/MyCodingProjects/siyuan-tag-manager/src/services/TagVisualService.ts) 与正文 DOM 属性装饰器 [TagDomDecorator.ts](file:///d:/MyCodingProjects/siyuan-tag-manager/src/services/TagDomDecorator.ts) 共同驱动。通过 `MutationObserver` 与 Protyle 生命周期事件，自动为正文标签注入 `data-tag` 属性，并以合法的 W3C CSS 属性选择器实时穿透并渲染思源 Protyle 编辑器正文中的所有对应标签（含 Emoji 伪元素前缀）。
 
 ### 2.1 任务流与 GTD 状态可视化看板
 * **业务痛点**：在项目笔记、会议纪要或每日复盘中，任务状态变化频繁，纯文字标签无法直观传达紧迫性。

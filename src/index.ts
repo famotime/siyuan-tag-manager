@@ -16,6 +16,7 @@ import {
 } from '@/main';
 import '@/index.scss';
 import { TagVisualService } from '@/services/TagVisualService';
+import { TagDomDecorator } from '@/services/TagDomDecorator';
 import { batchTagBridge } from '@/utils/batchTagBridge';
 
 // 注册专属标签管家 SVG 图标
@@ -105,11 +106,24 @@ export default class TagManagerPlugin extends Plugin {
       },
     });
 
-    // 7. 监听思源原生文档树右键菜单事件，支持选中多篇文档一键批量打标
+    // 7. 启动正文文档标签 DOM 属性装饰器，实时为 span[data-type~="tag"] 注入 data-tag 与 data-content
+    TagDomDecorator.startObserving();
+
+    // 8. 监听思源 Protyle 渲染事件，确保切页与新文档即时生效
+    this.eventBus.on('loaded-protyle-static', this.handleProtyleLoaded);
+    this.eventBus.on('loaded-protyle-dynamic', this.handleProtyleLoaded);
+    this.eventBus.on('switch-protyle', this.handleProtyleLoaded);
+
+    // 9. 监听思源原生文档树右键菜单事件，支持选中多篇文档一键批量打标
     this.eventBus.on('open-menu-doctree', this.handleDocTreeMenu);
 
     showMessage('标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
   }
+
+  private handleProtyleLoaded = (e: CustomEvent<any>) => {
+    const protyleElem = e?.detail?.protyle?.element;
+    TagDomDecorator.decorateElement(protyleElem || document);
+  };
 
   private handleDocTreeMenu = (e: CustomEvent<{ menu: any; elements: HTMLElement[] }>) => {
     const elements = e.detail?.elements || [];
@@ -139,7 +153,13 @@ export default class TagManagerPlugin extends Plugin {
 
   async onunload() {
     this.eventBus.off('open-menu-doctree', this.handleDocTreeMenu);
-    // 清理动态注入样式（原生 dock 关闭或插件卸载时思源会自动触发 unmountPanel 回调）
+    this.eventBus.off('loaded-protyle-static', this.handleProtyleLoaded);
+    this.eventBus.off('loaded-protyle-dynamic', this.handleProtyleLoaded);
+    this.eventBus.off('switch-protyle', this.handleProtyleLoaded);
+
+    // 停止正文 DOM 监听并清理装饰属性与样式
+    TagDomDecorator.stopObserving();
+    TagDomDecorator.clearDecorations();
     TagVisualService.removeStyles();
   }
 
