@@ -16,6 +16,7 @@ import {
 } from '@/main';
 import '@/index.scss';
 import { TagVisualService } from '@/services/TagVisualService';
+import { batchTagBridge } from '@/utils/batchTagBridge';
 
 // 注册专属标签管家 SVG 图标
 const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024">
@@ -104,10 +105,40 @@ export default class TagManagerPlugin extends Plugin {
       },
     });
 
+    // 7. 监听思源原生文档树右键菜单事件，支持选中多篇文档一键批量打标
+    this.eventBus.on('open-menu-doctree', this.handleDocTreeMenu);
+
     showMessage('标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
   }
 
+  private handleDocTreeMenu = (e: CustomEvent<{ menu: any; elements: HTMLElement[] }>) => {
+    const elements = e.detail?.elements || [];
+    const docs: Array<{ id: string; title: string }> = [];
+
+    for (const el of elements) {
+      const id = el.getAttribute('data-node-id');
+      if (id) {
+        const titleEl = el.querySelector('.b3-list-item__text');
+        const title = titleEl?.textContent?.trim() || el.textContent?.trim() || id;
+        docs.push({ id, title });
+      }
+    }
+
+    if (docs.length > 0 && e.detail?.menu) {
+      e.detail.menu.addItem({
+        id: 'tm-batch-tag-doctree',
+        icon: 'iconTagManager',
+        label: `🏷️ 批量打标签 (${docs.length} 篇)`,
+        click: () => {
+          toggleTagManagerDock(DOCK_TYPE);
+          batchTagBridge.trigger(docs);
+        },
+      });
+    }
+  };
+
   async onunload() {
+    this.eventBus.off('open-menu-doctree', this.handleDocTreeMenu);
     // 清理动态注入样式（原生 dock 关闭或插件卸载时思源会自动触发 unmountPanel 回调）
     TagVisualService.removeStyles();
   }

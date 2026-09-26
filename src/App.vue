@@ -128,6 +128,7 @@
       :state="styleModal"
       @close="styleModal.visible = false"
       @save="saveTagStyle"
+      @reset="onResetTagStyle"
     />
 
     <!-- 保存智能视图弹窗 -->
@@ -142,6 +143,8 @@
     <!-- 批量打标弹窗 -->
     <TagBatchModal
       :state="batchModal"
+      :all-tags="allTags"
+      :tag-groups="tagGroups"
       @close="batchModal.visible = false"
       @execute="executeBatchTag"
     />
@@ -186,6 +189,7 @@ import { TagGroupService } from './services/TagGroupService';
 import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
+import { batchTagBridge } from './utils/batchTagBridge';
 
 // 状态 Composables
 import { useTagData } from './composables/useTagData';
@@ -408,7 +412,7 @@ function openStyleDialog(label: string) {
   styleModal.value = {
     visible: true,
     label,
-    presetId: meta?.groupId || '',
+    presetId: meta?.groupId || meta?.presetId || '',
     backgroundColor: meta?.backgroundColor || '',
     textColor: meta?.textColor || '',
     darkBackgroundColor: meta?.darkBackgroundColor || '',
@@ -418,18 +422,23 @@ function openStyleDialog(label: string) {
   };
 }
 
+function onResetTagStyle() {
+  showMessage('已重置标签色彩主题为最初状态（保留符号前缀和别名），点击“保存并即时生效”后生效', 2500, 'info');
+}
+
 async function saveTagStyle() {
   const { label, presetId, backgroundColor, textColor, darkBackgroundColor, darkTextColor, icon, aliasesText } = styleModal.value;
   const aliases = aliasesText.split(',').map(s => s.trim()).filter(Boolean);
 
   const meta: ITagMetadata = {
     label,
+    presetId: presetId || undefined,
     groupId: presetId || undefined,
-    backgroundColor,
-    textColor,
+    backgroundColor: backgroundColor || undefined,
+    textColor: textColor || undefined,
     darkBackgroundColor: darkBackgroundColor || undefined,
     darkTextColor: darkTextColor || undefined,
-    icon,
+    icon: icon || undefined,
     aliases,
     updatedAt: Date.now(),
   };
@@ -580,12 +589,12 @@ async function confirmMerge() {
   }
 }
 
-async function executeBatchTag() {
-  const docIds = batchModal.value.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
-  const tags = batchModal.value.tagsText.split(',').map(s => s.trim()).filter(Boolean);
+async function executeBatchTag(payload?: { docIds: string[]; tags: string[] }) {
+  const docIds = payload?.docIds || batchModal.value.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
+  const tags = payload?.tags || batchModal.value.tagsText.split(',').map(s => s.trim()).filter(Boolean);
 
   if (docIds.length === 0 || tags.length === 0) {
-    showMessage('文档 ID 与待添加标签均不能为空', 3000, 'error');
+    showMessage('目标文档与待添加标签均不能为空', 3000, 'error');
     return;
   }
 
@@ -595,6 +604,7 @@ async function executeBatchTag() {
     if (res.success) {
       showMessage(`成功为 ${res.updatedCount} 篇文档更新标签`, 3000, 'info');
       batchModal.value.visible = false;
+      batchModal.value.targetDocs = [];
       batchModal.value.docIdsText = '';
       batchModal.value.tagsText = '';
       await refreshAllData();
@@ -695,12 +705,24 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
+let unsubBridge: (() => void) | null = null;
+
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown);
+  unsubBridge = batchTagBridge.on((docs) => {
+    batchModal.value = {
+      visible: true,
+      targetDocs: [...docs],
+      docIdsText: docs.map(d => d.id).join('\n'),
+      tagsText: '',
+      executing: false,
+    };
+  });
   refreshAllData();
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
+  if (unsubBridge) unsubBridge();
 });
 </script>

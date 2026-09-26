@@ -107,4 +107,117 @@ export class TagBatchService {
       errors,
     };
   }
+
+  /**
+   * 模糊搜索文档候选列表
+   */
+  public static async searchDocs(
+    keyword: string,
+    limit = 20,
+    requestFn?: (url: string, data: any) => Promise<any>,
+  ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
+    const post = requestFn || (async (url, data) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
+        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
+      }
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+      return res.json();
+    });
+
+    const clean = keyword.replace(/'/g, "''").trim();
+    if (!clean) return [];
+
+    const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND content LIKE '%${clean}%' ORDER BY updated DESC LIMIT ${limit};`;
+    try {
+      const res = await post('/api/query/sql', { stmt: sql });
+      const rows = res?.data || (Array.isArray(res) ? res : []);
+      return (rows || []).map((r: any) => {
+        let tags: string[] = [];
+        if (r.ial) {
+          const match = String(r.ial).match(/tags="([^"]+)"/);
+          if (match && match[1]) {
+            tags = this.parseDocTags(match[1]);
+          }
+        }
+        return {
+          id: r.id,
+          title: r.content || '未命名文档',
+          tags,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 获取指定笔记本下的文档列表
+   */
+  public static async getNotebookDocs(
+    notebookId: string,
+    limit = 50,
+    requestFn?: (url: string, data: any) => Promise<any>,
+  ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
+    const post = requestFn || (async (url, data) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
+        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
+      }
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+      return res.json();
+    });
+
+    const clean = notebookId.replace(/'/g, "''").trim();
+    if (!clean) return [];
+
+    const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND box = '${clean}' ORDER BY updated DESC LIMIT ${limit};`;
+    try {
+      const res = await post('/api/query/sql', { stmt: sql });
+      const rows = res?.data || (Array.isArray(res) ? res : []);
+      return (rows || []).map((r: any) => {
+        let tags: string[] = [];
+        if (r.ial) {
+          const match = String(r.ial).match(/tags="([^"]+)"/);
+          if (match && match[1]) {
+            tags = this.parseDocTags(match[1]);
+          }
+        }
+        return {
+          id: r.id,
+          title: r.content || '未命名文档',
+          tags,
+        };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * 获取全量笔记本列表
+   */
+  public static async fetchNotebooks(
+    requestFn?: (url: string, data: any) => Promise<any>,
+  ): Promise<Array<{ id: string; name: string }>> {
+    const post = requestFn || (async (url, data) => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
+        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
+      }
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+      return res.json();
+    });
+
+    try {
+      const res = await post('/api/notebook/lsNotebooks', {});
+      const list = res?.data?.notebooks || [];
+      return list.map((nb: any) => ({
+        id: nb.id,
+        name: nb.name,
+      }));
+    } catch {
+      return [];
+    }
+  }
 }

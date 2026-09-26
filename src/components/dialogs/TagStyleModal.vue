@@ -58,6 +58,15 @@
         </div>
       </div>
       <div class="tm-modal-footer">
+        <button
+          type="button"
+          class="b3-button b3-button--cancel tm-button--reset"
+          title="将设置的标签主题还原为最初状态（不清空符号前缀和别名列表）"
+          @click="resetTheme"
+        >
+          重置
+        </button>
+        <div class="fn__flex-1"></div>
         <button class="b3-button b3-button--cancel" @click="emit('close')">取消</button>
         <button class="b3-button b3-button--primary" @click="emit('save')">保存并即时生效</button>
       </div>
@@ -77,6 +86,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'save'): void;
+  (e: 'reset'): void;
 }>();
 
 function applyDualThemePreset(preset: IColorPreset) {
@@ -86,4 +96,18 @@ function applyDualThemePreset(preset: IColorPreset) {
   props.state.darkBackgroundColor = preset.darkBg;
   props.state.darkTextColor = preset.darkText;
 }
+
+function resetTheme() {
+  props.state.presetId = '';
+  props.state.backgroundColor = '';
+  props.state.textColor = '';
+  props.state.darkBackgroundColor = '';
+  props.state.darkTextColor = '';
+  emit('reset');
+}
+
+defineExpose({
+  resetTheme,
+  applyDualThemePreset,
+});
 </script>

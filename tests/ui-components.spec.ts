@@ -169,5 +169,71 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('tm-selection-bar');
     expect(html).toContain('已多选');
   });
+
+  it('TagStyleModal 渲染时应包含重置按钮，且重置行为仅清空色彩主题并保留符号前缀和别名', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp, reactive } = await import('vue');
+
+    const state = reactive({
+      visible: true,
+      label: 'testTag',
+      presetId: 'ocean-blue',
+      backgroundColor: '#EBF3FE',
+      textColor: '#1A56DB',
+      darkBackgroundColor: '#1E293B',
+      darkTextColor: '#93C5FD',
+      icon: '🚀',
+      aliasesText: '别名1, 别名2',
+    });
+
+    const app = createSSRApp(TagStyleModal, { state });
+    const html = await renderToString(app);
+
+    // 1. 验证渲染包含重置按钮
+    expect(html).toContain('tm-button--reset');
+    expect(html).toContain('重置');
+
+    // 2. 验证 TagStyleModal 的 setup 暴露方法与重置逻辑
+    let resetHandler: (() => void) | undefined;
+    let emittedEvent = '';
+    const testApp = createSSRApp({
+      setup() {
+        let exposedMethods: any;
+        (TagStyleModal as any).setup(
+          { state },
+          {
+            emit: (e: string) => {
+              emittedEvent = e;
+            },
+            expose: (exp: any) => {
+              exposedMethods = exp;
+            },
+          },
+        );
+        resetHandler = exposedMethods?.resetTheme;
+        return () => null;
+      },
+    });
+
+    await renderToString(testApp, { modules: new Set() });
+
+    expect(typeof resetHandler).toBe('function');
+    // 执行重置
+    resetHandler!();
+
+    // 验证色彩主题相关属性被清空为最初未配置状态
+    expect(state.presetId).toBe('');
+    expect(state.backgroundColor).toBe('');
+    expect(state.textColor).toBe('');
+    expect(state.darkBackgroundColor).toBe('');
+    expect(state.darkTextColor).toBe('');
+
+    // 验证核心资产：符号前缀与别名列表完好保留
+    expect(state.icon).toBe('🚀');
+    expect(state.aliasesText).toBe('别名1, 别名2');
+
+    // 验证成功触发 reset 事件通知
+    expect(emittedEvent).toBe('reset');
+  });
 });
 

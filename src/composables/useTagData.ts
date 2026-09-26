@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagItem, ITagMetadata } from '../types/tag';
+import type { ITagGroup, ITagItem, ITagMetadata } from '../types/tag';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagVisualService } from '../services/TagVisualService';
 import { TagDocConverterService } from '../services/TagDocConverterService';
