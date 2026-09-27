@@ -167,6 +167,122 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       expect(result.includeTags).toEqual(['Vue']);
       expect(result.excludeTags).toEqual(['Legacy']);
     });
+
+    it('支持指定 mode="optional" 将标签加入可选列表 (OR)，并自动从包含和排除中剔除', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: ['React'],
+        optionalTags: ['Angular'],
+      };
+
+      const result = TagFilterEngine.toggleFilterSelection(initial, 'React', 'optional');
+      expect(result.optionalTags).toEqual(['Angular', 'React']);
+      expect(result.excludeTags).toEqual([]);
+      expect(result.includeTags).toEqual(['Vue']);
+
+      // 再次点击相同标签则实现反选移除
+      const toggledOff = TagFilterEngine.toggleFilterSelection(result, 'React', 'optional');
+      expect(toggledOff.optionalTags).toEqual(['Angular']);
+    });
+  });
+
+  describe('cycleFilterCondition 循环切换筛选状态测试 (AND -> OR -> NOT -> AND)', () => {
+    it('对 AND 标签循环切换变为 OR 标签', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: [],
+        optionalTags: [],
+      };
+
+      const res = TagFilterEngine.cycleFilterCondition(initial, 'Vue');
+      expect(res.includeTags).toEqual([]);
+      expect(res.optionalTags).toEqual(['Vue']);
+      expect(res.excludeTags).toEqual([]);
+    });
+
+    it('对 OR 标签循环切换变为 NOT 标签', () => {
+      const initial = {
+        includeTags: [],
+        excludeTags: [],
+        optionalTags: ['Vue'],
+      };
+
+      const res = TagFilterEngine.cycleFilterCondition(initial, 'Vue');
+      expect(res.includeTags).toEqual([]);
+      expect(res.optionalTags).toEqual([]);
+      expect(res.excludeTags).toEqual(['Vue']);
+    });
+
+    it('对 NOT 标签循环切换变为 AND 标签', () => {
+      const initial = {
+        includeTags: [],
+        excludeTags: ['Vue'],
+        optionalTags: [],
+      };
+
+      const res = TagFilterEngine.cycleFilterCondition(initial, 'Vue');
+      expect(res.includeTags).toEqual(['Vue']);
+      expect(res.optionalTags).toEqual([]);
+      expect(res.excludeTags).toEqual([]);
+    });
+
+    it('对未在任何列表中的新标签循环切换默认加入 AND', () => {
+      const initial = {
+        includeTags: [],
+        excludeTags: [],
+        optionalTags: [],
+      };
+
+      const res = TagFilterEngine.cycleFilterCondition(initial, 'Vue');
+      expect(res.includeTags).toEqual(['Vue']);
+    });
+  });
+
+  describe('setTagCondition 显式设置与移除状态测试', () => {
+    it('正确将标签设置为 optional (OR)，并清理其他状态', () => {
+      const initial = {
+        includeTags: ['Vue'],
+        excludeTags: [],
+        optionalTags: [],
+      };
+
+      const res = TagFilterEngine.setTagCondition(initial, 'Vue', 'optional');
+      expect(res.includeTags).toEqual([]);
+      expect(res.optionalTags).toEqual(['Vue']);
+      expect(res.excludeTags).toEqual([]);
+    });
+
+    it('使用 remove 状态时从所有列表中彻底移除标签', () => {
+      const initial = {
+        includeTags: [],
+        excludeTags: [],
+        optionalTags: ['Vue'],
+      };
+
+      const res = TagFilterEngine.setTagCondition(initial, 'Vue', 'remove');
+      expect(res.optionalTags).toEqual([]);
+      expect(res.includeTags).toEqual([]);
+      expect(res.excludeTags).toEqual([]);
+    });
+  });
+
+  describe('buildQuerySql OR 独立与混合查询生成测试', () => {
+    it('支持仅包含 OR 可选标签的独立查询 SQL', () => {
+      const sql = TagFilterEngine.buildQuerySql({
+        optionalTags: ['Vue', 'React'],
+      });
+
+      expect(sql).toContain("b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN ('Vue', 'React'))");
+      expect(sql).not.toContain('b.id NOT IN');
+      expect(sql).toContain('LIMIT 50 OFFSET 0');
+    });
+
+    it('resetFilterWithTags 支持 mode="optional" 生成 OR 组合', () => {
+      const res = TagFilterEngine.resetFilterWithTags(['Vue', 'React'], 'optional');
+      expect(res.includeTags).toEqual([]);
+      expect(res.optionalTags).toEqual(['Vue', 'React']);
+      expect(res.excludeTags).toEqual([]);
+    });
   });
 });
 
