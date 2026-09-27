@@ -507,5 +507,65 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     // 3. 验证存在可用候选总数提示
     expect(html).toContain('共 25 个可用候选');
   });
+
+  it('TagFilterView 正确渲染 OR (可选) 芯片、模式切换按钮以及候选标签 is-optional 激活态', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagFilterView, {
+      allTags: [
+        { name: 'Vue', label: 'Vue', count: 10, depth: 0 },
+        { name: 'React', label: 'React', count: 8, depth: 0 },
+        { name: 'Angular', label: 'Angular', count: 2, depth: 0 },
+      ],
+      activeFilter: {
+        includeTags: ['Vue'],
+        optionalTags: ['React'],
+        excludeTags: ['Angular'],
+      },
+      matchedBlocks: [],
+      queryLoading: false,
+      savedViews: [],
+      selectedSmartViewId: '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 1. 验证存在模式切换控制器
+    expect(html).toContain('tm-filter-mode-switch');
+    expect(html).toContain('AND 必含');
+    expect(html).toContain('OR 可选');
+    expect(html).toContain('NOT 排除');
+
+    // 2. 验证正确渲染三种芯片：AND, OR, NOT
+    expect(html).toContain('tm-chip--inc');
+    expect(html).toContain('tm-chip--opt');
+    expect(html).toContain('tm-chip--exc');
+    expect(html).toContain('#React');
+
+    // 3. 验证快速候选标签对应激活态类名
+    expect(html).toContain('is-included');
+    expect(html).toContain('is-optional');
+    expect(html).toContain('is-excluded');
+  });
+
+  it('TagSaveViewModal 正确渲染可选标签 (OR) 提示信息', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagSaveViewModal, {
+      state: { visible: true, title: '智能视图' },
+      includeTags: ['Vue'],
+      optionalTags: ['React', 'NextJS'],
+      excludeTags: ['Angular'],
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('包含 (AND): #Vue');
+    expect(html).toContain('可选 (OR): #React, #NextJS');
+    expect(html).toContain('排除 (NOT): #Angular');
+  });
 });
 
