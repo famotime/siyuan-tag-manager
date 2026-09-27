@@ -248,14 +248,21 @@ export class TagGovernanceService {
         continue;
       }
 
-      // 5. 纯数字或无语义符号
+      // 5. 纯数字或纯标点无语义符号
       const leafName = tag.name || raw.split('/').pop() || raw;
-      if (/^\d+$/.test(leafName) || /^[\W_]+$/.test(leafName)) {
+      const isPureDigits = /^\d+$/.test(leafName);
+      // \p{L} 包含汉字、拉丁字母等全语言文字字符；\p{Extended_Pictographic} 包含 Emoji 表情标记
+      const hasMeaningfulText = /[\p{L}\p{Extended_Pictographic}]/u.test(leafName);
+      const isPurePunctuation = !hasMeaningfulText && !isPureDigits && /^[\p{P}\p{S}\s]+$/u.test(leafName);
+
+      if (isPureDigits || isPurePunctuation) {
         issues.push({
           type: 'invalid_norm',
           primaryLabel: raw,
           severity: 'warning',
-          message: `标签 "${raw}" 为纯数字或纯符号，缺乏明确知识语义`,
+          message: isPureDigits
+            ? `标签 "${raw}" 为纯数字，缺乏明确知识语义`
+            : `标签 "${raw}" 仅包含标点符号，缺乏明确知识语义`,
           suggestedAction: 'rename',
           subType: 'digits',
         });

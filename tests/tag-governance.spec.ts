@@ -115,6 +115,31 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
 
       const digitIssue = issues.find(i => i.primaryLabel === '202403');
       expect(digitIssue?.suggestedAction).toBe('rename');
+      expect(digitIssue?.message).toContain('纯数字');
+    });
+
+    it('中文汉字标签（如 待查、已读、技术报告）与 Emoji 标签绝不会被误判为纯数字或无语义', () => {
+      const mockTags: ITagItem[] = [
+        { name: '待查', label: '待查', count: 10, depth: 0 },
+        { name: '已读', label: '已读', count: 5, depth: 0 },
+        { name: '标签', label: '标签', count: 12, depth: 0 },
+        { name: '技术报告', label: '技术报告', count: 8, depth: 0 },
+        { name: '🔍待查', label: '🔍待查', count: 3, depth: 0 },
+        { name: '⭐', label: '⭐', count: 4, depth: 0 },
+        { name: '---', label: '---', count: 1, depth: 0 }, // 纯标点无语义
+      ];
+
+      const issues = TagGovernanceService.detectInvalidNorms(mockTags);
+      // 只有 --- 应被识别为标点无语义
+      expect(issues.length).toBe(1);
+      expect(issues[0].primaryLabel).toBe('---');
+      expect(issues[0].message).toContain('仅包含标点符号');
+
+      // 验证待查、已读等绝不属于 issues
+      const chineseIssues = issues.filter(i =>
+        ['待查', '已读', '标签', '技术报告', '🔍待查', '⭐'].includes(i.primaryLabel)
+      );
+      expect(chineseIssues.length).toBe(0);
     });
   });
 
