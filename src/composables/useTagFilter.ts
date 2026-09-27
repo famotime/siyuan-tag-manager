@@ -64,13 +64,92 @@ export function useTagFilter() {
     runQuery();
   }
 
+  function switchFilterMode(targetMode: 'include' | 'optional') {
+    if (targetMode === 'optional') {
+      const allPositive = Array.from(new Set([
+        ...activeFilter.value.includeTags,
+        ...(activeFilter.value.optionalTags || []),
+      ])).filter(Boolean);
+      activeFilter.value = {
+        includeTags: [],
+        optionalTags: allPositive,
+        excludeTags: [...activeFilter.value.excludeTags],
+      };
+    } else {
+      const allPositive = Array.from(new Set([
+        ...activeFilter.value.includeTags,
+        ...(activeFilter.value.optionalTags || []),
+      ])).filter(Boolean);
+      activeFilter.value = {
+        includeTags: allPositive,
+        optionalTags: [],
+        excludeTags: [...activeFilter.value.excludeTags],
+      };
+    }
+    runQuery();
+  }
+
   function toggleTagFilter(label: string, mode?: TagFilterConditionMode) {
-    activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label, mode);
+    if (mode === 'optional') {
+      if (activeFilter.value.includeTags.length > 0) {
+        const merged = Array.from(new Set([
+          ...activeFilter.value.includeTags,
+          ...(activeFilter.value.optionalTags || []),
+        ]));
+        activeFilter.value = {
+          includeTags: [],
+          optionalTags: merged,
+          excludeTags: activeFilter.value.excludeTags,
+        };
+      }
+      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label, 'optional');
+    } else if (mode === 'include') {
+      if ((activeFilter.value.optionalTags || []).length > 0) {
+        const merged = Array.from(new Set([
+          ...activeFilter.value.includeTags,
+          ...(activeFilter.value.optionalTags || []),
+        ]));
+        activeFilter.value = {
+          includeTags: merged,
+          optionalTags: [],
+          excludeTags: activeFilter.value.excludeTags,
+        };
+      }
+      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label, 'include');
+    } else {
+      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label, mode);
+    }
     runQuery();
   }
 
   function toggleTagCondition(label: string, targetState: TagFilterConditionMode) {
-    activeFilter.value = TagFilterEngine.setTagCondition(activeFilter.value, label, targetState);
+    if (targetState === 'optional') {
+      // 切换至 OR 逻辑：将所有正向标签统一转为 optionalTags，形成真正的多标签 OR 筛选 (WHERE content IN (...))
+      const allPositive = Array.from(new Set([
+        ...activeFilter.value.includeTags,
+        ...(activeFilter.value.optionalTags || []),
+        label,
+      ])).filter(Boolean);
+      activeFilter.value = {
+        includeTags: [],
+        optionalTags: allPositive,
+        excludeTags: activeFilter.value.excludeTags.filter(t => t !== label),
+      };
+    } else if (targetState === 'include') {
+      // 切换至 AND 逻辑：将所有正向标签统一转为 includeTags，形成多标签 AND 筛选
+      const allPositive = Array.from(new Set([
+        ...activeFilter.value.includeTags,
+        ...(activeFilter.value.optionalTags || []),
+        label,
+      ])).filter(Boolean);
+      activeFilter.value = {
+        includeTags: allPositive,
+        optionalTags: [],
+        excludeTags: activeFilter.value.excludeTags.filter(t => t !== label),
+      };
+    } else if (targetState === 'exclude') {
+      activeFilter.value = TagFilterEngine.setTagCondition(activeFilter.value, label, 'exclude');
+    }
     runQuery();
   }
 
@@ -153,6 +232,7 @@ export function useTagFilter() {
     runQuery,
     handleQuickFilter,
     handleTagClick,
+    switchFilterMode,
     toggleTagFilter,
     toggleTagCondition,
     cycleTagCondition,

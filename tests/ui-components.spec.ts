@@ -551,6 +551,35 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('is-excluded');
   });
 
+  it('TagFilterView 当筛选条件仅包含 optionalTags 时，OR 可选模式按钮处于激活状态', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagFilterView, {
+      allTags: [
+        { name: 'Vue', label: 'Vue', count: 10, depth: 0 },
+        { name: 'React', label: 'React', count: 8, depth: 0 },
+      ],
+      activeFilter: {
+        includeTags: [],
+        optionalTags: ['Vue', 'React'],
+        excludeTags: [],
+      },
+      matchedBlocks: [],
+      queryLoading: false,
+      savedViews: [],
+      selectedSmartViewId: '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toMatch(/tm-mode-btn--opt[^>]*active/);
+    expect(html).toContain('tm-chip--opt');
+    expect(html).toContain('#Vue');
+    expect(html).toContain('#React');
+  });
+
   it('TagSaveViewModal 正确渲染可选标签 (OR) 提示信息', async () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');

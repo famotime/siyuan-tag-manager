@@ -45,7 +45,7 @@
               class="tm-mode-btn tm-mode-btn--inc"
               :class="{ active: currentMode === 'include' }"
               v-tooltip="'点击候选标签添加为 AND (必含)'"
-              @click="currentMode = 'include'"
+              @click="handleModeButtonClick('include')"
             >
               AND 必含
             </button>
@@ -54,7 +54,7 @@
               class="tm-mode-btn tm-mode-btn--opt"
               :class="{ active: currentMode === 'optional' }"
               v-tooltip="'点击候选标签添加为 OR (可选，命中任一标签即可)'"
-              @click="currentMode = 'optional'"
+              @click="handleModeButtonClick('optional')"
             >
               OR 可选
             </button>
@@ -63,7 +63,7 @@
               class="tm-mode-btn tm-mode-btn--exc"
               :class="{ active: currentMode === 'exclude' }"
               v-tooltip="'点击候选标签添加为 NOT (排除)'"
-              @click="currentMode = 'exclude'"
+              @click="handleModeButtonClick('exclude')"
             >
               NOT 排除
             </button>
@@ -253,7 +253,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
@@ -276,6 +276,7 @@ const emit = defineEmits<{
   (e: 'apply-smart-view'): void;
   (e: 'open-save-view'): void;
   (e: 'clear-filter'): void;
+  (e: 'switch-filter-mode', mode: 'include' | 'optional'): void;
   (e: 'toggle-condition', tag: string, targetState: TagFilterConditionMode): void;
   (e: 'cycle-condition', tag: string): void;
   (e: 'remove-tag', tag: string): void;
@@ -285,6 +286,26 @@ const emit = defineEmits<{
 
 const currentMode = ref<TagFilterConditionMode>('include');
 const searchKeyword = ref('');
+
+// 自动根据 activeFilter 中的正向标签分布同步当前激活模式
+watch(
+  [() => props.activeFilter.includeTags?.length || 0, () => (props.activeFilter.optionalTags || []).length || 0],
+  ([incLen, optLen]) => {
+    if (optLen > 0 && incLen === 0 && currentMode.value !== 'exclude') {
+      currentMode.value = 'optional';
+    } else if (incLen > 0 && optLen === 0 && currentMode.value !== 'exclude') {
+      currentMode.value = 'include';
+    }
+  },
+  { immediate: true }
+);
+
+function handleModeButtonClick(mode: TagFilterConditionMode) {
+  currentMode.value = mode;
+  if (mode === 'include' || mode === 'optional') {
+    emit('switch-filter-mode', mode);
+  }
+}
 
 const isFilterEmpty = computed(() => {
   return (

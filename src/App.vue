@@ -91,6 +91,7 @@
         @apply-smart-view="applySmartView"
         @open-save-view="openSaveViewDialog"
         @clear-filter="clearFilterTags"
+        @switch-filter-mode="switchFilterMode"
         @toggle-condition="toggleTagCondition"
         @cycle-condition="cycleTagCondition"
         @remove-tag="removeFilterTag"
@@ -242,6 +243,7 @@ const {
   runQuery,
   handleQuickFilter,
   handleTagClick,
+  switchFilterMode,
   toggleTagFilter,
   toggleTagCondition,
   cycleTagCondition,

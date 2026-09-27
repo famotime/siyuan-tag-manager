@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { ITagItem } from '../src/types/tag';
 import { TagFilterEngine } from '../src/services/TagFilterEngine';
 import { TagGovernanceService } from '../src/services/TagGovernanceService';
@@ -107,6 +107,134 @@ describe('UI Composables 与状态管理规范化测试', () => {
       const repeatRes = await addCustomTag('Frontend/NextJS');
       expect(repeatRes.success).toBe(false);
       expect(repeatRes.error).toContain('已存在');
+    });
+  });
+
+  describe('useTagFilter AND/OR 逻辑切换与即时刷新测试', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('toggleTagCondition 将 AND 标签转为 OR 时，所有正向标签统一转为 optionalTags 并触发 runQuery', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagFilter } = await import('../src/composables/useTagFilter');
+
+      const mockBlocks = [
+        { id: 'b1', docTitle: 'Doc1', content: '#Vue# #React#', markdown: '', type: 'p', rootId: 'r1', updated: '2026-09-27' },
+      ];
+      let queriedOptions: any = null;
+      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+        queriedOptions = opts;
+        return mockBlocks as any;
+      });
+
+      const { activeFilter, matchedBlocks, toggleTagCondition } = useTagFilter();
+      activeFilter.value = {
+        includeTags: ['Vue', 'React'],
+        optionalTags: [],
+        excludeTags: [],
+      };
+
+      // 用户点击 React 芯片切换为 optional (OR)
+      toggleTagCondition('React', 'optional');
+
+      // 验证正向标签已全部统一转为 optionalTags，形成纯粹的 OR 逻辑
+      expect(activeFilter.value.includeTags).toEqual([]);
+      expect(activeFilter.value.optionalTags).toContain('Vue');
+      expect(activeFilter.value.optionalTags).toContain('React');
+      expect(activeFilter.value.excludeTags).toEqual([]);
+
+      // 验证触发了 queryMatchedBlocks 刷新，且参数中 optionalTags 包含了两个标签
+      expect(queriedOptions).toBeDefined();
+      expect(queriedOptions.includeTags).toEqual([]);
+      expect(queriedOptions.optionalTags).toEqual(['Vue', 'React']);
+
+      // 验证下方的筛选结果即时更新
+      await new Promise(resolve => setTimeout(resolve, 10));
+      expect(matchedBlocks.value).toHaveLength(1);
+    });
+
+    it('toggleTagCondition 将 OR 标签转为 AND 时，所有正向标签统一转为 includeTags 并触发 runQuery', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagFilter } = await import('../src/composables/useTagFilter');
+
+      let queriedOptions: any = null;
+      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+        queriedOptions = opts;
+        return [] as any;
+      });
+
+      const { activeFilter, toggleTagCondition } = useTagFilter();
+      activeFilter.value = {
+        includeTags: [],
+        optionalTags: ['Vue', 'React'],
+        excludeTags: [],
+      };
+
+      toggleTagCondition('React', 'include');
+
+      expect(activeFilter.value.optionalTags).toEqual([]);
+      expect(activeFilter.value.includeTags).toContain('Vue');
+      expect(activeFilter.value.includeTags).toContain('React');
+      expect(queriedOptions.includeTags).toEqual(['Vue', 'React']);
+      expect(queriedOptions.optionalTags).toEqual([]);
+    });
+
+    it('switchFilterMode 在顶栏模式切换时能够直接双向转换已有标签并刷新结果', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagFilter } = await import('../src/composables/useTagFilter');
+
+      let queriedOptions: any = null;
+      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+        queriedOptions = opts;
+        return [] as any;
+      });
+
+      const { activeFilter, switchFilterMode } = useTagFilter();
+      activeFilter.value = {
+        includeTags: ['Vue', 'React'],
+        optionalTags: [],
+        excludeTags: ['Angular'],
+      };
+
+      // 点击 [OR 可选]
+      switchFilterMode('optional');
+      expect(activeFilter.value.includeTags).toEqual([]);
+      expect(activeFilter.value.optionalTags).toEqual(['Vue', 'React']);
+      expect(activeFilter.value.excludeTags).toEqual(['Angular']);
+      expect(queriedOptions.optionalTags).toEqual(['Vue', 'React']);
+      expect(queriedOptions.includeTags).toEqual([]);
+
+      // 点击 [AND 必含]
+      switchFilterMode('include');
+      expect(activeFilter.value.includeTags).toEqual(['Vue', 'React']);
+      expect(activeFilter.value.optionalTags).toEqual([]);
+      expect(activeFilter.value.excludeTags).toEqual(['Angular']);
+      expect(queriedOptions.includeTags).toEqual(['Vue', 'React']);
+    });
+
+    it('toggleTagFilter 在 optional 模式下添加标签时自动将既有包含标签升级为可选标签', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagFilter } = await import('../src/composables/useTagFilter');
+
+      let queriedOptions: any = null;
+      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+        queriedOptions = opts;
+        return [] as any;
+      });
+
+      const { activeFilter, toggleTagFilter } = useTagFilter();
+      activeFilter.value = {
+        includeTags: ['Vue'],
+        optionalTags: [],
+        excludeTags: [],
+      };
+
+      // 在 optional 模式下点击候选标签 React
+      toggleTagFilter('React', 'optional');
+      expect(activeFilter.value.includeTags).toEqual([]);
+      expect(activeFilter.value.optionalTags).toEqual(['Vue', 'React']);
+      expect(queriedOptions.optionalTags).toEqual(['Vue', 'React']);
     });
   });
 });
