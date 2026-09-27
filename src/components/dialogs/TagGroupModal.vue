@@ -1,6 +1,6 @@
 <template>
   <div v-if="state.visible" class="tm-modal-mask" @click.self="emit('close')">
-    <div class="tm-modal-card" style="width: 480px; max-width: 95vw;">
+    <div class="tm-modal-card" style="width: 500px; max-width: 95vw;">
       <div class="tm-modal-title">
         <SyLineIcon name="tag" :size="16" />
         <span>{{ state.isEdit ? '编辑标签组' : '新建标签组' }}</span>
@@ -18,36 +18,6 @@
           />
         </div>
 
-        <!-- 预设主题色选区 -->
-        <div class="tm-form-group">
-          <label>分组主题配色：</label>
-          <div class="tm-color-palette-grid">
-            <div
-              v-for="preset in DUAL_THEME_COLOR_PRESETS"
-              :key="preset.id"
-              class="tm-preset-card"
-              :class="{ 'is-selected': state.color === preset.lightText || state.color === preset.id }"
-              @click="selectPresetColor(preset)"
-            >
-              <div class="tm-preset-preview">
-                <span
-                  class="tm-preset-chip light-chip"
-                  :style="{ backgroundColor: preset.lightBg, color: preset.lightText, borderColor: preset.lightBorder }"
-                >
-                  Aa
-                </span>
-                <span
-                  class="tm-preset-chip dark-chip"
-                  :style="{ backgroundColor: preset.darkBg, color: preset.darkText, borderColor: preset.darkBorder }"
-                >
-                  Aa
-                </span>
-              </div>
-              <span class="tm-preset-name">{{ preset.name }}</span>
-            </div>
-          </div>
-        </div>
-
         <!-- 已绑定标签列表 -->
         <div class="tm-form-group">
           <label>组内标签 (共 {{ state.tags.length }} 个)：</label>
@@ -63,15 +33,21 @@
               </button>
             </span>
           </div>
-          <div v-else class="tm-section-hint" style="margin-bottom: 8px;">
-            当前组内暂无标签，请在下方搜索选择或输入新增。
+          <div v-else class="tm-section-hint">
+            当前组内暂无标签，请在下方点击候选标签或搜索添加。
           </div>
         </div>
 
-        <!-- 搜索添加已有标签或回车输入新标签 -->
-        <div class="tm-form-group">
-          <label>添加标签至该组（输入回车可创建新标签）：</label>
-          <div class="fn__flex">
+        <!-- 搜索与候选标签池 -->
+        <div class="tm-form-group tm-candidate-group">
+          <div class="tm-candidate-header">
+            <label>添加标签至该组（点击候选标签快速加入）：</label>
+            <span v-if="candidateTotalCount > 0" class="tm-candidate-count-hint">
+              共 {{ candidateTotalCount }} 个可用候选
+            </span>
+          </div>
+
+          <div class="fn__flex" style="margin-bottom: 8px;">
             <input
               v-model="searchTagText"
               class="b3-text-field fn__block fn__flex-1"
@@ -88,18 +64,26 @@
             </button>
           </div>
 
-          <!-- 快速候选候选池 -->
+          <!-- 快速候选候选池，留出更多充裕空间展示 -->
           <div v-if="filteredCandidateTags.length > 0" class="tm-quick-candidate-list">
             <button
               v-for="item in filteredCandidateTags"
               :key="item.label"
+              type="button"
               class="tm-candidate-tag-btn"
+              :title="`点击将 #${item.label}# 加入标签组`"
               @click="addTagToGroup(item.label)"
             >
               <SyLineIcon name="plus" :size="10" />
-              <span>#{{ item.label }}#</span>
+              <span class="candidate-text">#{{ item.label }}#</span>
               <span class="candidate-count">({{ item.count }})</span>
             </button>
+          </div>
+          <div v-else-if="searchTagText.trim()" class="tm-section-hint tm-candidate-empty">
+            未找到匹配的已有标签，按回车或点击【添加】可直接创建新标签 "#{{ searchTagText.trim() }}#"
+          </div>
+          <div v-else class="tm-section-hint tm-candidate-empty">
+            库内暂无更多可选候选标签或所有标签均已加入此组。
           </div>
         </div>
       </div>
@@ -121,7 +105,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
-import { DUAL_THEME_COLOR_PRESETS, type IColorPreset } from '../../styles/palette';
 import type { ITagItem } from '../../types/tag';
 import type { ITagGroupModalState } from '../../types/ui';
 
@@ -136,10 +119,6 @@ const emit = defineEmits<{
 }>();
 
 const searchTagText = ref('');
-
-function selectPresetColor(preset: IColorPreset) {
-  props.state.color = preset.lightText;
-}
 
 function removeTagFromGroup(tag: string) {
   props.state.tags = props.state.tags.filter(t => t !== tag);
@@ -160,12 +139,17 @@ function addTypedTag() {
   }
 }
 
+const candidateTotalCount = computed(() => {
+  const existingSet = new Set(props.state.tags);
+  return props.allTags.filter(t => !existingSet.has(t.label)).length;
+});
+
 const filteredCandidateTags = computed(() => {
   const q = searchTagText.value.trim().toLowerCase();
   const existingSet = new Set(props.state.tags);
   return props.allTags
     .filter(t => !existingSet.has(t.label) && (!q || t.label.toLowerCase().includes(q)))
-    .slice(0, 10);
+    .slice(0, 100);
 });
 
 function handleSave() {
@@ -184,7 +168,7 @@ function handleSave() {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 120px;
+  max-height: 96px;
   overflow-y: auto;
   padding: 6px;
   background-color: var(--b3-theme-background-light);
@@ -225,36 +209,78 @@ function handleSave() {
   }
 }
 
+.tm-candidate-group {
+  margin-top: 12px;
+}
+
+.tm-candidate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+
+  label {
+    margin-bottom: 0;
+  }
+
+  .tm-candidate-count-hint {
+    font-size: 12px;
+    color: var(--b3-theme-on-surface);
+    opacity: 0.65;
+  }
+}
+
 .tm-quick-candidate-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-  max-height: 80px;
+  align-content: flex-start;
+  gap: 6px;
+  max-height: 190px;
+  min-height: 80px;
   overflow-y: auto;
+  padding: 8px;
+  background-color: var(--b3-theme-background-light);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
 }
 
 .tm-candidate-tag-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  font-size: 11px;
-  border: 1px dashed var(--b3-border-color);
+  padding: 3px 8px;
+  font-size: 12px;
+  border: 1px solid var(--b3-border-color);
   background: var(--b3-theme-surface);
   color: var(--b3-theme-on-surface);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: none;
 
   &:hover {
     border-color: var(--b3-theme-primary);
     color: var(--b3-theme-primary);
+    background-color: var(--b3-theme-background);
+    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  .candidate-text {
+    line-height: 1.3;
   }
 
   .candidate-count {
-    opacity: 0.6;
-    font-size: 10px;
+    opacity: 0.65;
+    font-size: 11px;
   }
+}
+
+.tm-candidate-empty {
+  padding: 18px 12px;
+  text-align: center;
+  border: 1px dashed var(--b3-border-color);
+  border-radius: 6px;
+  background-color: var(--b3-theme-background-light);
 }
 </style>

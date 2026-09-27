@@ -8,6 +8,7 @@ import TagStyleModal from '../src/components/dialogs/TagStyleModal.vue';
 import TagSaveViewModal from '../src/components/dialogs/TagSaveViewModal.vue';
 import TagBatchModal from '../src/components/dialogs/TagBatchModal.vue';
 import TagMergeModal from '../src/components/dialogs/TagMergeModal.vue';
+import TagGroupModal from '../src/components/dialogs/TagGroupModal.vue';
 import { useTagData } from '../src/composables/useTagData';
 import { useTagFilter } from '../src/composables/useTagFilter';
 import { useTagHygiene } from '../src/composables/useTagHygiene';
@@ -466,6 +467,45 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).not.toContain('(少→多)');
     expect(html).not.toContain('(A→Z)');
     expect(html).not.toContain('(Z→A)');
+  });
+
+  it('TagGroupModal 去除分组主题配色选区，且为候选标签提供充足展示空间（突破原10个限制）', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    // 创建 25 个候选标签
+    const mockTags = Array.from({ length: 25 }, (_, i) => ({
+      name: `tag_${i + 1}`,
+      label: `tag_${i + 1}`,
+      count: i + 1,
+      depth: 0,
+    }));
+
+    const app = createSSRApp(TagGroupModal, {
+      state: {
+        visible: true,
+        isEdit: false,
+        name: '测试分组',
+        tags: [],
+      },
+      allTags: mockTags,
+    });
+
+    const html = await renderToString(app);
+
+    // 1. 验证彻底去除主题配色选项
+    expect(html).not.toContain('分组主题配色');
+    expect(html).not.toContain('tm-color-palette-grid');
+    expect(html).not.toContain('tm-preset-card');
+    expect(html).not.toContain('经典蓝');
+
+    // 2. 验证候选标签展示支持更多标签（全部 25 个均被渲染，不再被 .slice(0, 10) 截断）
+    for (let i = 1; i <= 25; i++) {
+      expect(html).toContain(`#tag_${i}#`);
+    }
+
+    // 3. 验证存在可用候选总数提示
+    expect(html).toContain('共 25 个可用候选');
   });
 });
 
