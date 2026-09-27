@@ -113,6 +113,32 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     // 验证包含对应的线性图标
     expect(html).toContain('sy-line-icon--git-merge');
     expect(html).toContain('sy-line-icon--trash');
+
+    // 验证三大核心治理卡片标题与过滤胶囊渲染
+    expect(html).toContain('相似冲突');
+    expect(html).toContain('不合规范');
+    expect(html).toContain('低频使用');
+    expect(html).toContain('tm-filter-pills');
+  });
+
+  it('TagRenameModal 渲染时，应展示原标签名、输入框与实时校验提示', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+    const TagRenameModal = (await import('../src/components/dialogs/TagRenameModal.vue')).default;
+
+    const app = createSSRApp(TagRenameModal, {
+      state: {
+        visible: true,
+        oldLabel: 'Prompt',
+        newLabel: 'Prompt',
+        executing: false,
+      },
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('标签重命名');
+    expect(html).toContain('#Prompt#');
+    expect(html).toContain('b3-button--primary');
   });
 
   it('TagFilterView 和 TagGraphView 中的仅图标按钮均统一使用无边框 tm-icon-btn 规范', async () => {

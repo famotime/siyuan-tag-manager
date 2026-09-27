@@ -142,10 +142,12 @@ export interface ITagMergePlan {
  * 标签健康度检查问题类型
  */
 export type TagHealthIssueType =
-  | 'case_conflict'  // 大小写冲突，如 Prompt 与 prompt
-  | 'low_frequency'   // 低频标签（Count = 1）
-  | 'orphan'          // 孤儿空标签（Count = 0）
-  | 'redundant_slash';// 命名格式异常（如以斜杠开头/结尾）
+  | 'similar_conflict' // 相似冲突（含大小写变体、分隔符风格、编辑距离）
+  | 'invalid_norm'     // 不合规范（含多余斜杠、非法字符、超长标签、超深层级、纯数字）
+  | 'low_frequency'    // 低频使用（引用数 <= 1，包含孤儿与单次引用）
+  | 'case_conflict'    // 大小写冲突（向后兼容）
+  | 'orphan'           // 孤儿空标签（向后兼容）
+  | 'redundant_slash'; // 命名格式异常（向后兼容）
 
 /**
  * 标签健康问题项
@@ -162,7 +164,33 @@ export interface ITagHealthIssue {
   /** 问题描述 */
   message: string;
   /** 建议解决动作 */
-  suggestedAction: 'merge' | 'clean' | 'rename';
+  suggestedAction: 'merge' | 'clean' | 'rename' | 'normalize';
+  /** 细分归类标识 */
+  subType?: 'case' | 'separator' | 'typo' | 'slash' | 'invalid_chars' | 'length' | 'depth' | 'digits' | 'zero_ref' | 'single_ref';
+  /** 建议规范化后的标签名（针对格式异常等） */
+  normalizedTarget?: string;
+}
+
+/**
+ * 标签健康度体检统计汇总
+ */
+export interface ITagHealthSummary {
+  totalTags: number;
+  similarConflicts: number;
+  invalidNorms: number;
+  lowFrequency: number;
+  healthyRate: number;
+  /** 兼容历史字段 */
+  caseConflicts?: number;
+  orphans?: number;
+}
+
+/**
+ * 标签健康度体检报告完整结构
+ */
+export interface ITagHealthReport {
+  issues: ITagHealthIssue[];
+  summary: ITagHealthSummary;
 }
 
 /**

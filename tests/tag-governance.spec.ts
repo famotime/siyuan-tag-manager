@@ -38,7 +38,7 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
     });
   });
 
-  describe('detectCaseConflicts 大小写冲突检测（复现截图痛点）', () => {
+  describe('detectSimilarConflicts 相似冲突检测（覆盖大小写、命名风格与短编辑距离）', () => {
     it('能够准确检测出 Prompt/prompt 与 Python/python 的大小写冲突，并推荐高频项为保留项', () => {
       const mockTags: ITagItem[] = [
         { name: 'Prompt', label: 'Prompt', count: 23, depth: 0 },
@@ -48,7 +48,7 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
         { name: 'YouTube', label: 'YouTube', count: 11, depth: 0 },
       ];
 
-      const issues = TagGovernanceService.detectCaseConflicts(mockTags);
+      const issues = TagGovernanceService.detectSimilarConflicts(mockTags);
       expect(issues.length).toBe(2);
 
       const promptIssue = issues.find(i => i.primaryLabel === 'Prompt');
@@ -60,10 +60,66 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
       expect(pythonIssue).toBeDefined();
       expect(pythonIssue?.relatedLabels).toEqual(['python']);
     });
+
+    it('能够识别命名风格差异（如 tag-manager 与 tag_manager）和短编辑距离拼写笔误（JavaScript 与 JavScript）', () => {
+      const mockTags: ITagItem[] = [
+        { name: 'tag-manager', label: 'tag-manager', count: 15, depth: 0 },
+        { name: 'tag_manager', label: 'tag_manager', count: 3, depth: 0 },
+        { name: 'JavaScript', label: 'JavaScript', count: 30, depth: 0 },
+        { name: 'JavScript', label: 'JavScript', count: 1, depth: 0 },
+        { name: 'AI', label: 'AI', count: 10, depth: 0 },
+        { name: 'UI', label: 'UI', count: 8, depth: 0 }, // 短词防误报
+      ];
+
+      const issues = TagGovernanceService.detectSimilarConflicts(mockTags);
+      expect(issues.length).toBe(2);
+
+      const tagManagerIssue = issues.find(i => i.primaryLabel === 'tag-manager');
+      expect(tagManagerIssue?.relatedLabels).toContain('tag_manager');
+
+      const jsIssue = issues.find(i => i.primaryLabel === 'JavaScript');
+      expect(jsIssue?.relatedLabels).toContain('JavScript');
+
+      // AI 和 UI 不应误报为冲突
+      const aiIssue = issues.find(i => i.primaryLabel === 'AI' || i.relatedLabels?.includes('AI'));
+      expect(aiIssue).toBeUndefined();
+    });
+  });
+
+  describe('detectInvalidNorms 不合规范检测（斜杠/非法字符/超长>15/超深>=3/纯数字）', () => {
+    it('能够准确检测出多余斜杠、超长标签、超深层级和纯数字无语义标签', () => {
+      const mockTags: ITagItem[] = [
+        { name: 'tech', label: '/tech//python/', count: 5, depth: 1 },
+        { name: 'invalid#tag', label: 'invalid#tag', count: 2, depth: 0 },
+        { name: 'veryLongSentenceTag', label: '这是一个超过十五个字符的超长标签', count: 1, depth: 0 },
+        { name: 'deep', label: 'level1/level2/level3/deep', count: 1, depth: 3 },
+        { name: '202403', label: '202403', count: 3, depth: 0 },
+        { name: 'normal', label: 'normalTag', count: 8, depth: 0 },
+      ];
+
+      const issues = TagGovernanceService.detectInvalidNorms(mockTags);
+      expect(issues.length).toBe(5);
+
+      const slashIssue = issues.find(i => i.primaryLabel === '/tech//python/');
+      expect(slashIssue?.suggestedAction).toBe('normalize');
+      expect(slashIssue?.normalizedTarget).toBe('tech/python');
+
+      const charIssue = issues.find(i => i.primaryLabel === 'invalid#tag');
+      expect(charIssue?.suggestedAction).toBe('rename');
+
+      const longIssue = issues.find(i => i.primaryLabel === '这是一个超过十五个字符的超长标签');
+      expect(longIssue?.suggestedAction).toBe('rename');
+
+      const depthIssue = issues.find(i => i.primaryLabel === 'level1/level2/level3/deep');
+      expect(depthIssue?.suggestedAction).toBe('rename');
+
+      const digitIssue = issues.find(i => i.primaryLabel === '202403');
+      expect(digitIssue?.suggestedAction).toBe('rename');
+    });
   });
 
   describe('runHealthInspection 全面健康体检', () => {
-    it('能够统计大小写冲突、低频标签（Count=1）与孤儿标签（Count=0），并给出健康评分', () => {
+    it('能够统计相似冲突、不合规范与低频使用（合并低频与孤儿），并给出健康评分', () => {
       const mockTags: ITagItem[] = [
         { name: 'Prompt', label: 'Prompt', count: 23, depth: 0 },
         { name: 'prompt', label: 'prompt', count: 2, depth: 0 },
@@ -75,9 +131,9 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
 
       const result = TagGovernanceService.runHealthInspection(mockTags);
       expect(result.summary.totalTags).toBe(6);
-      expect(result.summary.caseConflicts).toBe(1);
-      expect(result.summary.lowFrequency).toBe(2);
-      expect(result.summary.orphans).toBe(1);
+      expect(result.summary.similarConflicts).toBe(1);
+      // 低频使用合并孤儿(count=0)与单次引用(count=1)，总共 1 + 2 = 3
+      expect(result.summary.lowFrequency).toBe(3);
       expect(result.summary.healthyRate).toBeLessThan(100);
     });
   });

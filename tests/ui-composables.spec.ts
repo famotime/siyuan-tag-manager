@@ -53,14 +53,14 @@ describe('UI Composables 与状态管理规范化测试', () => {
   });
 
   describe('TagGovernanceService 诊断与治理交互', () => {
-    it('runHealthInspection 准确识别大小写冲突与孤立标签', () => {
+    it('runHealthInspection 准确识别相似冲突与孤立标签', () => {
       const report = TagGovernanceService.runHealthInspection(mockTags);
       expect(report.summary.healthyRate).toBeLessThan(100);
       expect(report.summary.orphans).toBe(1);
 
-      const caseConflict = report.issues.find(i => i.type === 'case_conflict');
-      expect(caseConflict).toBeDefined();
-      expect(caseConflict?.relatedLabels).toContain('Vue');
+      const conflict = report.issues.find(i => i.type === 'similar_conflict' || i.type === 'case_conflict');
+      expect(conflict).toBeDefined();
+      expect(conflict?.relatedLabels).toContain('Vue');
     });
 
     it('generateMergePlan 针对大小写冲突能正确生成合并计划', () => {

@@ -119,6 +119,8 @@
         :all-tags="allTags"
         @auto-resolve="onAutoResolveIssue"
         @remove-tag="handleRemoveTag"
+        @open-rename="openRenameDialog"
+        @auto-normalize="handleAutoNormalizeTag"
         @refresh-tags="refreshAllData"
       />
     </main>
@@ -171,6 +173,13 @@
       @close="mergeModal.visible = false"
       @confirm="confirmMerge"
     />
+
+    <!-- 重命名对话弹窗 -->
+    <TagRenameModal
+      :state="renameModal"
+      @close="renameModal.visible = false"
+      @confirm="confirmRenameTag"
+    />
   </div>
 </template>
 
@@ -185,6 +194,7 @@ import type {
   ISaveViewModalState,
   IBatchModalState,
   IMergeModalState,
+  IRenameModalState,
   ITagGroupModalState,
 } from './types/ui';
 
@@ -217,6 +227,7 @@ import TagSaveViewModal from './components/dialogs/TagSaveViewModal.vue';
 import TagBatchModal from './components/dialogs/TagBatchModal.vue';
 import TagGroupModal from './components/dialogs/TagGroupModal.vue';
 import TagMergeModal from './components/dialogs/TagMergeModal.vue';
+import TagRenameModal from './components/dialogs/TagRenameModal.vue';
 
 // 1. 数据状态与 Composables 初始化
 const {
@@ -295,6 +306,13 @@ const mergeModal = ref<IMergeModalState>({
   sourceLabel: '',
   targetLabel: '',
   setAsAlias: true,
+  executing: false,
+});
+
+const renameModal = ref<IRenameModalState>({
+  visible: false,
+  oldLabel: '',
+  newLabel: '',
   executing: false,
 });
 
@@ -662,6 +680,44 @@ function onAutoResolveIssue(issue: ITagHealthIssue) {
   autoResolveIssue(issue, allTags.value, () => {
     refreshAllData();
   });
+}
+
+function openRenameDialog(label: string) {
+  renameModal.value = {
+    visible: true,
+    oldLabel: label,
+    newLabel: label,
+    executing: false,
+  };
+}
+
+async function confirmRenameTag(newLabel: string) {
+  const oldLabel = renameModal.value.oldLabel;
+  if (!oldLabel || !newLabel || oldLabel === newLabel) return;
+
+  renameModal.value.executing = true;
+  try {
+    await TagApiClient.renameTag(oldLabel, newLabel);
+    showMessage(`已成功将标签 "#${oldLabel}#" 重命名为 "#${newLabel}#"`, 3000, 'info');
+    renameModal.value.visible = false;
+    await refreshAllData();
+  } catch (err: any) {
+    showMessage(`重命名失败: ${err.message || err}`, 4000, 'error');
+  } finally {
+    renameModal.value.executing = false;
+  }
+}
+
+async function handleAutoNormalizeTag(label: string, target?: string) {
+  const norm = target || TagGovernanceService.normalizeLabel(label);
+  if (!norm || norm === label) return;
+  try {
+    await TagApiClient.renameTag(label, norm);
+    showMessage(`已成功将标签 "#${label}#" 规范化为 "#${norm}#"`, 3000, 'info');
+    await refreshAllData();
+  } catch (err: any) {
+    showMessage(`规范化失败: ${err.message || err}`, 4000, 'error');
+  }
 }
 
 // 5. 认知图谱与生命周期

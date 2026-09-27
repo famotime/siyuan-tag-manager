@@ -64,3 +64,12 @@ export interface IMergeModalState {
   setAsAlias: boolean;
   executing: boolean;
 }
+
+export interface IRenameModalState {
+  visible: boolean;
+  oldLabel: string;
+  newLabel: string;
+  executing: boolean;
+  error?: string;
+}
+
