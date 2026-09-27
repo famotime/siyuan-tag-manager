@@ -570,6 +570,60 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   flex-shrink: 0;
 }
 
+.tm-filter-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-section-hint-label {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.tm-filter-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  background: var(--b3-theme-background);
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  padding: 1px;
+  gap: 2px;
+}
+
+.tm-mode-btn {
+  border: none;
+  background: transparent;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface-light);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 14px;
+
+  &:hover:not(.active) {
+    color: var(--b3-theme-on-surface);
+    background: var(--b3-theme-background-light);
+  }
+
+  &.active {
+    &.tm-mode-btn--inc {
+      background: var(--b3-theme-primary);
+      color: #fff;
+    }
+    &.tm-mode-btn--opt {
+      background: #d97706;
+      color: #fff;
+    }
+    &.tm-mode-btn--exc {
+      background: #dc3545;
+      color: #fff;
+    }
+  }
+}
+
 .tm-filter-header .tm-section-hint {
   margin-bottom: 0;
 }
@@ -662,6 +716,30 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   opacity: 1;
 }
 
+.tm-chip--opt {
+  background: var(--tm-badge-warning-bg, #fef3e6);
+  color: var(--tm-badge-warning-text, #b45309);
+  border: 1px solid var(--tm-badge-warning-border, rgba(217, 119, 6, 0.28));
+}
+.tm-chip--opt .tm-chip-indicator {
+  background: var(--tm-badge-warning-text, #b45309);
+}
+.tm-chip--opt .tm-chip-prefix {
+  color: var(--tm-badge-warning-text, #b45309);
+  font-weight: 700;
+}
+.tm-chip--opt .tm-chip-label {
+  color: var(--tm-badge-warning-text, #b45309);
+  font-weight: 600;
+}
+.tm-chip--opt .tm-chip-remove {
+  color: var(--tm-badge-warning-text, #b45309);
+  opacity: 0.75;
+}
+.tm-chip--opt .tm-chip-remove:hover {
+  opacity: 1;
+}
+
 .tm-chip--exc {
   background: var(--tm-badge-danger-bg, #feebeb);
   color: var(--tm-badge-danger-text, #b91c1c);
@@ -751,6 +829,12 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   background: var(--b3-theme-primary);
   color: #fff;
   border-color: var(--b3-theme-primary);
+}
+
+.tm-quick-tag.is-optional {
+  background: #d97706;
+  color: #fff;
+  border-color: #d97706;
 }
 
 .tm-quick-tag.is-excluded {

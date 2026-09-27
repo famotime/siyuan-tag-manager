@@ -106,6 +106,23 @@ export interface ISmartTagView {
 }
 
 /**
+ * 筛选条件模式：必含 (AND)、可选 (OR)、排除 (NOT)
+ */
+export type TagFilterConditionMode = 'include' | 'optional' | 'exclude';
+
+/**
+ * 多维布尔筛选交互状态接口
+ */
+export interface IFilterSelectionState {
+  /** 包含标签列表（AND 逻辑） */
+  includeTags: string[];
+  /** 可选标签列表（OR 逻辑） */
+  optionalTags: string[];
+  /** 排除标签列表（NOT 逻辑） */
+  excludeTags: string[];
+}
+
+/**
  * 标签合并与重构计划
  */
 export interface ITagMergePlan {

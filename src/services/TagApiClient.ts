@@ -190,7 +190,7 @@ export class TagApiClient {
         markdown: r.markdown || '',
         type: r.type,
         updated: r.updated || '',
-        matchedTags: options.includeTags || [],
+        matchedTags: [...(options.includeTags || []), ...(options.optionalTags || [])],
       };
     });
   }

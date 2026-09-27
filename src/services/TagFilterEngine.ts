@@ -1,4 +1,4 @@
-import type { ISmartTagView } from '../types/tag';
+import type { ISmartTagView, IFilterSelectionState, TagFilterConditionMode } from '../types/tag';
 
 /**
  * 标签布尔筛选与 SQL 查询组装引擎
@@ -93,90 +93,222 @@ export class TagFilterEngine {
    * 计算选中标签后的筛选状态
    * @param currentFilter 当前筛选状态
    * @param label 选中的标签
-   * @param append 是否为追加模式（默认 false 为仅以点击标签进行单项筛选；true 为以 AND 形式组合筛选）
+   * @param append 是否为追加模式（默认 false 为仅以点击标签进行单项筛选；true 为以组合形式筛选）
+   * @param mode 追加模式下采用的逻辑 ('include' | 'optional'，默认为 'include' 即 AND)
    */
   public static resolveFilterSelection(
-    currentFilter: { includeTags: string[]; excludeTags: string[] },
+    currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
     label: string,
-    append = false
-  ): { includeTags: string[]; excludeTags: string[] } {
+    append = false,
+    mode: 'include' | 'optional' = 'include'
+  ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
+    const currentOptionals = currentFilter.optionalTags || [];
+
     if (!trimmed) {
       return {
         includeTags: [...currentFilter.includeTags],
         excludeTags: [...currentFilter.excludeTags],
+        optionalTags: [...currentOptionals],
       };
     }
 
     if (!append) {
-      // 默认仅以点击标签进行筛选，重置并清空历史包含与排除条件
+      // 默认仅以点击标签进行单项筛选，重置并清空历史所有条件
       return {
-        includeTags: [trimmed],
+        includeTags: mode === 'include' ? [trimmed] : [],
+        optionalTags: mode === 'optional' ? [trimmed] : [],
         excludeTags: [],
       };
     }
 
-    // 追加模式：以 AND 加入多维筛选，若之前在排除列表中则自动移除
-    const nextIncludes = currentFilter.includeTags.includes(trimmed)
-      ? [...currentFilter.includeTags]
-      : [...currentFilter.includeTags, trimmed];
+    // 追加模式：加入多维筛选，若之前在其他列表中则自动移除
+    const nextIncludes = currentFilter.includeTags.filter(t => t !== trimmed);
     const nextExcludes = currentFilter.excludeTags.filter(t => t !== trimmed);
+    const nextOptionals = currentOptionals.filter(t => t !== trimmed);
+
+    if (mode === 'optional') {
+      nextOptionals.push(trimmed);
+    } else {
+      nextIncludes.push(trimmed);
+    }
 
     return {
       includeTags: nextIncludes,
       excludeTags: nextExcludes,
+      optionalTags: nextOptionals,
     };
   }
 
   /**
-   * 切换标签的组合筛选状态（用于多选场景：未包含则以 AND 追加，已包含则反选移除）
+   * 切换标签的组合筛选状态
    * @param currentFilter 当前筛选状态
    * @param label 选中的标签
+   * @param mode 指定的目标模式（'include' | 'optional' | 'exclude'，若未指定则遵循默认反选切换）
    */
   public static toggleFilterSelection(
-    currentFilter: { includeTags: string[]; excludeTags: string[] },
-    label: string
-  ): { includeTags: string[]; excludeTags: string[] } {
+    currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
+    label: string,
+    mode?: TagFilterConditionMode
+  ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
+    const currentOptionals = currentFilter.optionalTags || [];
+
     if (!trimmed) {
       return {
         includeTags: [...currentFilter.includeTags],
         excludeTags: [...currentFilter.excludeTags],
+        optionalTags: [...currentOptionals],
       };
     }
 
+    const nextIncludes = currentFilter.includeTags.filter(t => t !== trimmed);
+    const nextExcludes = currentFilter.excludeTags.filter(t => t !== trimmed);
+    const nextOptionals = currentOptionals.filter(t => t !== trimmed);
+
+    if (mode === 'include') {
+      if (!currentFilter.includeTags.includes(trimmed)) {
+        nextIncludes.push(trimmed);
+      }
+      return { includeTags: nextIncludes, excludeTags: nextExcludes, optionalTags: nextOptionals };
+    }
+
+    if (mode === 'optional') {
+      if (!currentOptionals.includes(trimmed)) {
+        nextOptionals.push(trimmed);
+      }
+      return { includeTags: nextIncludes, excludeTags: nextExcludes, optionalTags: nextOptionals };
+    }
+
+    if (mode === 'exclude') {
+      if (!currentFilter.excludeTags.includes(trimmed)) {
+        nextExcludes.push(trimmed);
+      }
+      return { includeTags: nextIncludes, excludeTags: nextExcludes, optionalTags: nextOptionals };
+    }
+
+    // 向后兼容默认逻辑：若已包含则反选移除，若未包含则作为 AND 追加
     if (currentFilter.includeTags.includes(trimmed)) {
       return {
-        includeTags: currentFilter.includeTags.filter(t => t !== trimmed),
-        excludeTags: currentFilter.excludeTags.filter(t => t !== trimmed),
+        includeTags: nextIncludes,
+        excludeTags: nextExcludes,
+        optionalTags: nextOptionals,
       };
     }
 
     return {
-      includeTags: [...currentFilter.includeTags, trimmed],
-      excludeTags: currentFilter.excludeTags.filter(t => t !== trimmed),
+      includeTags: [...nextIncludes, trimmed],
+      excludeTags: nextExcludes,
+      optionalTags: nextOptionals,
+    };
+  }
+
+  /**
+   * 循环切换指定标签的条件状态：AND (必含) -> OR (可选) -> NOT (排除) -> AND (必含)
+   */
+  public static cycleFilterCondition(
+    currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
+    label: string
+  ): IFilterSelectionState {
+    const trimmed = label ? label.trim() : '';
+    const currentOptionals = currentFilter.optionalTags || [];
+
+    if (!trimmed) {
+      return {
+        includeTags: [...currentFilter.includeTags],
+        excludeTags: [...currentFilter.excludeTags],
+        optionalTags: [...currentOptionals],
+      };
+    }
+
+    const nextIncludes = currentFilter.includeTags.filter(t => t !== trimmed);
+    const nextExcludes = currentFilter.excludeTags.filter(t => t !== trimmed);
+    const nextOptionals = currentOptionals.filter(t => t !== trimmed);
+
+    if (currentFilter.includeTags.includes(trimmed)) {
+      // AND -> OR
+      nextOptionals.push(trimmed);
+    } else if (currentOptionals.includes(trimmed)) {
+      // OR -> NOT
+      nextExcludes.push(trimmed);
+    } else if (currentFilter.excludeTags.includes(trimmed)) {
+      // NOT -> AND
+      nextIncludes.push(trimmed);
+    } else {
+      // 未命中任何集合时默认作为 AND 加入
+      nextIncludes.push(trimmed);
+    }
+
+    return {
+      includeTags: nextIncludes,
+      excludeTags: nextExcludes,
+      optionalTags: nextOptionals,
+    };
+  }
+
+  /**
+   * 设置指定标签为特定的布尔状态或直接移除
+   */
+  public static setTagCondition(
+    currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
+    label: string,
+    condition: TagFilterConditionMode | 'remove'
+  ): IFilterSelectionState {
+    const trimmed = label ? label.trim() : '';
+    const currentOptionals = currentFilter.optionalTags || [];
+
+    if (!trimmed) {
+      return {
+        includeTags: [...currentFilter.includeTags],
+        excludeTags: [...currentFilter.excludeTags],
+        optionalTags: [...currentOptionals],
+      };
+    }
+
+    const nextIncludes = currentFilter.includeTags.filter(t => t !== trimmed);
+    const nextExcludes = currentFilter.excludeTags.filter(t => t !== trimmed);
+    const nextOptionals = currentOptionals.filter(t => t !== trimmed);
+
+    if (condition === 'include') {
+      nextIncludes.push(trimmed);
+    } else if (condition === 'optional') {
+      nextOptionals.push(trimmed);
+    } else if (condition === 'exclude') {
+      nextExcludes.push(trimmed);
+    }
+
+    return {
+      includeTags: nextIncludes,
+      excludeTags: nextExcludes,
+      optionalTags: nextOptionals,
     };
   }
 
   /**
    * 清空所有筛选标签条件，重置为空筛选状态
    */
-  public static clearFilterSelection(): { includeTags: string[]; excludeTags: string[] } {
+  public static clearFilterSelection(): IFilterSelectionState {
     return {
       includeTags: [],
       excludeTags: [],
+      optionalTags: [],
     };
   }
 
   /**
    * 重置并以指定的标签列表建立新的组合筛选条件（清空原有的所有包含与排除筛选状态）
    * @param tags 新组合筛选的标签列表（如关联组合筛选或共现探查）
+   * @param mode 新条件的模式（默认 'include' 即 AND）
    */
-  public static resetFilterWithTags(tags: string[]): { includeTags: string[]; excludeTags: string[] } {
-    const validTags = tags.map(t => (t || '').trim()).filter(Boolean);
+  public static resetFilterWithTags(
+    tags: string[],
+    mode: 'include' | 'optional' = 'include'
+  ): IFilterSelectionState {
+    const validTags = Array.from(new Set(tags.map(t => (t || '').trim()).filter(Boolean)));
     return {
-      includeTags: Array.from(new Set(validTags)),
+      includeTags: mode === 'include' ? validTags : [],
       excludeTags: [],
+      optionalTags: mode === 'optional' ? validTags : [],
     };
   }
 }

@@ -16,7 +16,7 @@
         </select>
         <button
           class="tm-icon-btn tm-btn-sm"
-          :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
+          :disabled="isFilterEmpty"
           v-tooltip="'将当前组合保存为智能视图'"
           aria-label="保存为智能视图"
           @click="emit('open-save-view')"
@@ -37,15 +37,41 @@
       :style="filterBoxStyle"
     >
       <div class="tm-filter-header">
-        <div class="tm-section-hint">
-          <span>点击切换：</span>
-          <b class="text-primary">AND (必含)</b>
-          <span> | </span>
-          <b class="text-danger">NOT (排除)</b>
+        <div class="tm-filter-header-left">
+          <span class="tm-section-hint-label">筛选模式：</span>
+          <div class="tm-filter-mode-switch" role="group" aria-label="候选标签添加模式">
+            <button
+              type="button"
+              class="tm-mode-btn tm-mode-btn--inc"
+              :class="{ active: currentMode === 'include' }"
+              v-tooltip="'点击候选标签添加为 AND (必含)'"
+              @click="currentMode = 'include'"
+            >
+              AND 必含
+            </button>
+            <button
+              type="button"
+              class="tm-mode-btn tm-mode-btn--opt"
+              :class="{ active: currentMode === 'optional' }"
+              v-tooltip="'点击候选标签添加为 OR (可选，命中任一标签即可)'"
+              @click="currentMode = 'optional'"
+            >
+              OR 可选
+            </button>
+            <button
+              type="button"
+              class="tm-mode-btn tm-mode-btn--exc"
+              :class="{ active: currentMode === 'exclude' }"
+              v-tooltip="'点击候选标签添加为 NOT (排除)'"
+              @click="currentMode = 'exclude'"
+            >
+              NOT 排除
+            </button>
+          </div>
         </div>
         <button
           class="b3-button b3-button--text tm-clear-filter-btn"
-          :disabled="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0"
+          :disabled="isFilterEmpty"
           v-tooltip="'清空当前所有已选择的标签'"
           @click="emit('clear-filter')"
         >
@@ -54,12 +80,13 @@
         </button>
       </div>
       <div class="tm-active-chips">
+        <!-- 必含标签 (AND) -->
         <div
           v-for="tag in activeFilter.includeTags"
           :key="`inc-${tag}`"
           class="tm-chip tm-chip--inc"
-          v-tooltip="'点击切换为排除 (NOT)'"
-          @click="emit('toggle-condition', tag, 'exclude')"
+          v-tooltip="'点击切换为 OR (可选)'"
+          @click="emit('toggle-condition', tag, 'optional')"
         >
           <span class="tm-chip-indicator"></span>
           <span class="tm-chip-prefix">AND</span>
@@ -68,11 +95,29 @@
             <SyLineIcon name="close" :size="10" />
           </span>
         </div>
+
+        <!-- 可选标签 (OR) -->
+        <div
+          v-for="tag in activeFilter.optionalTags || []"
+          :key="`opt-${tag}`"
+          class="tm-chip tm-chip--opt"
+          v-tooltip="'点击切换为 NOT (排除)'"
+          @click="emit('toggle-condition', tag, 'exclude')"
+        >
+          <span class="tm-chip-indicator"></span>
+          <span class="tm-chip-prefix">OR</span>
+          <span class="tm-chip-label">#{{ tag }}</span>
+          <span class="tm-chip-remove" v-tooltip="'移除此条件'" @click.stop="emit('remove-tag', tag)">
+            <SyLineIcon name="close" :size="10" />
+          </span>
+        </div>
+
+        <!-- 排除标签 (NOT) -->
         <div
           v-for="tag in activeFilter.excludeTags"
           :key="`exc-${tag}`"
           class="tm-chip tm-chip--exc"
-          v-tooltip="'点击切换为包含 (AND)'"
+          v-tooltip="'点击切换为 AND (必含)'"
           @click="emit('toggle-condition', tag, 'include')"
         >
           <span class="tm-chip-indicator"></span>
@@ -82,9 +127,11 @@
             <SyLineIcon name="close" :size="10" />
           </span>
         </div>
-        <div v-if="activeFilter.includeTags.length === 0 && activeFilter.excludeTags.length === 0" class="tm-filter-placeholder">
+
+        <!-- 空占位指示 -->
+        <div v-if="isFilterEmpty" class="tm-filter-placeholder">
           <SyLineIcon name="filter-funnel" :size="12" style="margin-right: 5px; opacity: 0.7;" />
-          <span>点击下方候选标签，展开多维交叉组合检索</span>
+          <span>点击下方候选标签，展开多维交叉组合检索（支持 AND/OR/NOT）</span>
         </div>
       </div>
 
@@ -101,9 +148,10 @@
             class="tm-quick-tag"
             :class="{
               'is-included': activeFilter.includeTags.includes(tag.label),
+              'is-optional': (activeFilter.optionalTags || []).includes(tag.label),
               'is-excluded': activeFilter.excludeTags.includes(tag.label)
             }"
-            @click="emit('toggle-tag', tag.label)"
+            @click="onQuickTagClick(tag.label)"
           >
             #{{ tag.label }} <small>({{ tag.count }})</small>
           </span>
@@ -169,7 +217,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
-import type { ITagItem, ITagMatchedBlock, ISmartTagView } from '../../types/tag';
+import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = defineProps<{
@@ -177,6 +225,7 @@ const props = defineProps<{
   activeFilter: {
     includeTags: string[];
     excludeTags: string[];
+    optionalTags?: string[];
   };
   matchedBlocks: ITagMatchedBlock[];
   queryLoading: boolean;
@@ -189,11 +238,26 @@ const emit = defineEmits<{
   (e: 'apply-smart-view'): void;
   (e: 'open-save-view'): void;
   (e: 'clear-filter'): void;
-  (e: 'toggle-condition', tag: string, targetState: 'include' | 'exclude'): void;
+  (e: 'toggle-condition', tag: string, targetState: TagFilterConditionMode): void;
+  (e: 'cycle-condition', tag: string): void;
   (e: 'remove-tag', tag: string): void;
-  (e: 'toggle-tag', tag: string): void;
+  (e: 'toggle-tag', tag: string, mode?: TagFilterConditionMode): void;
   (e: 'jump-block', rootId: string, blockId: string): void;
 }>();
+
+const currentMode = ref<TagFilterConditionMode>('include');
+
+const isFilterEmpty = computed(() => {
+  return (
+    (props.activeFilter.includeTags?.length || 0) === 0 &&
+    (props.activeFilter.excludeTags?.length || 0) === 0 &&
+    (props.activeFilter.optionalTags?.length || 0) === 0
+  );
+});
+
+function onQuickTagClick(label: string) {
+  emit('toggle-tag', label, currentMode.value);
+}
 
 const filterBoxRef = ref<HTMLElement | null>(null);
 const quickTagsRef = ref<HTMLElement | null>(null);

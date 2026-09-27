@@ -20,6 +20,13 @@
   --tm-badge-danger-border: color-mix(in srgb, #dc3545 28%, transparent);
   --tm-badge-danger-text: #b91c1c;
 
+  /* 警告/可选轻量徽章 (Warning / OR Chip) - 柔和暖橙背景，深琥珀色文字 */
+  --tm-badge-warning-bg: #fef3e6;
+  --tm-badge-warning-bg: rgba(245, 158, 11, 0.12);
+  --tm-badge-warning-border: rgba(217, 119, 6, 0.28);
+  --tm-badge-warning-border: color-mix(in srgb, #d97706 28%, transparent);
+  --tm-badge-warning-text: #b45309;
+
   /* 成功/活跃轻量徽章 (Success / Rising Trend) - 柔和浅绿背景，深翠绿文字 */
   --tm-badge-success-bg: #e8f7f0;
   --tm-badge-success-bg: rgba(16, 185, 129, 0.10);
@@ -49,6 +56,11 @@ body.theme--dark {
   --tm-badge-danger-border: rgba(252, 165, 165, 0.30);
   --tm-badge-danger-border: color-mix(in srgb, #ef4444 40%, transparent);
   --tm-badge-danger-text: #fca5a5;
+
+  --tm-badge-warning-bg: rgba(245, 158, 11, 0.20);
+  --tm-badge-warning-border: rgba(252, 211, 77, 0.30);
+  --tm-badge-warning-border: color-mix(in srgb, #f59e0b 40%, transparent);
+  --tm-badge-warning-text: #fcd34d;
 
   --tm-badge-success-bg: rgba(16, 185, 129, 0.20);
   --tm-badge-success-border: rgba(110, 231, 183, 0.30);

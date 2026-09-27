@@ -16,8 +16,9 @@
           />
         </div>
         <div class="tm-section-hint">
-          包含: {{ includeTags.map(t => `#${t}`).join(', ') || '无' }}<br>
-          排除: {{ excludeTags.map(t => `#${t}`).join(', ') || '无' }}
+          包含 (AND): {{ includeTags.map(t => `#${t}`).join(', ') || '无' }}<br>
+          可选 (OR): {{ (optionalTags || []).map(t => `#${t}`).join(', ') || '无' }}<br>
+          排除 (NOT): {{ excludeTags.map(t => `#${t}`).join(', ') || '无' }}
         </div>
       </div>
       <div class="tm-modal-footer">
@@ -35,6 +36,7 @@ import type { ISaveViewModalState } from '../../types/ui';
 defineProps<{
   state: ISaveViewModalState;
   includeTags: string[];
+  optionalTags?: string[];
   excludeTags: string[];
 }>();
 

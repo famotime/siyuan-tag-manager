@@ -92,6 +92,7 @@
         @open-save-view="openSaveViewDialog"
         @clear-filter="clearFilterTags"
         @toggle-condition="toggleTagCondition"
+        @cycle-condition="cycleTagCondition"
         @remove-tag="removeFilterTag"
         @toggle-tag="toggleTagFilter"
         @jump-block="jumpToBlock"
@@ -140,6 +141,7 @@
     <TagSaveViewModal
       :state="saveViewModal"
       :include-tags="activeFilter.includeTags"
+      :optional-tags="activeFilter.optionalTags"
       :exclude-tags="activeFilter.excludeTags"
       @close="saveViewModal.visible = false"
       @confirm="confirmSaveSmartView"
@@ -242,6 +244,7 @@ const {
   handleTagClick,
   toggleTagFilter,
   toggleTagCondition,
+  cycleTagCondition,
   removeFilterTag,
   clearFilterTags,
   applySmartView,
@@ -467,9 +470,16 @@ async function saveTagStyle() {
 }
 
 function openSaveViewDialog() {
+  const parts: string[] = [];
+  if (activeFilter.value.includeTags.length > 0) {
+    parts.push(activeFilter.value.includeTags.join('+'));
+  }
+  if (activeFilter.value.optionalTags?.length > 0) {
+    parts.push(`(${activeFilter.value.optionalTags.join('|')})`);
+  }
   saveViewModal.value = {
     visible: true,
-    title: `${activeFilter.value.includeTags.join('+')} 视图`,
+    title: `${parts.join('+') || '自定义'} 视图`,
   };
 }
 

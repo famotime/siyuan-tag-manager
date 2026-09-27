@@ -1,17 +1,15 @@
 import { ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagMatchedBlock, ISmartTagView } from '../types/tag';
+import type { ITagMatchedBlock, ISmartTagView, IFilterSelectionState, TagFilterConditionMode } from '../types/tag';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagFilterEngine } from '../services/TagFilterEngine';
 import { usePlugin } from '../main';
 
 // 共享的筛选状态
-const activeFilter = ref<{
-  includeTags: string[];
-  excludeTags: string[];
-}>({
+const activeFilter = ref<IFilterSelectionState>({
   includeTags: [],
   excludeTags: [],
+  optionalTags: [],
 });
 
 const matchedBlocks = ref<ITagMatchedBlock[]>([]);
@@ -21,7 +19,11 @@ const selectedSmartViewId = ref('');
 
 export function useTagFilter() {
   async function runQuery() {
-    if (activeFilter.value.includeTags.length === 0 && activeFilter.value.excludeTags.length === 0) {
+    if (
+      activeFilter.value.includeTags.length === 0 &&
+      activeFilter.value.excludeTags.length === 0 &&
+      activeFilter.value.optionalTags.length === 0
+    ) {
       matchedBlocks.value = [];
       return;
     }
@@ -31,6 +33,7 @@ export function useTagFilter() {
       matchedBlocks.value = await TagApiClient.queryMatchedBlocks({
         includeTags: activeFilter.value.includeTags,
         excludeTags: activeFilter.value.excludeTags,
+        optionalTags: activeFilter.value.optionalTags,
         limit: 40,
       });
     } catch (err: any) {
@@ -61,41 +64,28 @@ export function useTagFilter() {
     runQuery();
   }
 
-  function toggleTagFilter(label: string) {
-    const incIndex = activeFilter.value.includeTags.indexOf(label);
-    const excIndex = activeFilter.value.excludeTags.indexOf(label);
-
-    if (incIndex > -1) {
-      activeFilter.value.includeTags.splice(incIndex, 1);
-      activeFilter.value.excludeTags.push(label);
-    } else if (excIndex > -1) {
-      activeFilter.value.excludeTags.splice(excIndex, 1);
-    } else {
-      activeFilter.value.includeTags.push(label);
-    }
+  function toggleTagFilter(label: string, mode?: TagFilterConditionMode) {
+    activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label, mode);
     runQuery();
   }
 
-  function toggleTagCondition(label: string, targetState: 'include' | 'exclude') {
-    removeFilterTag(label);
-    if (targetState === 'include') {
-      activeFilter.value.includeTags.push(label);
-    } else {
-      activeFilter.value.excludeTags.push(label);
-    }
+  function toggleTagCondition(label: string, targetState: TagFilterConditionMode) {
+    activeFilter.value = TagFilterEngine.setTagCondition(activeFilter.value, label, targetState);
+    runQuery();
+  }
+
+  function cycleTagCondition(label: string) {
+    activeFilter.value = TagFilterEngine.cycleFilterCondition(activeFilter.value, label);
     runQuery();
   }
 
   function removeFilterTag(label: string) {
-    activeFilter.value.includeTags = activeFilter.value.includeTags.filter(t => t !== label);
-    activeFilter.value.excludeTags = activeFilter.value.excludeTags.filter(t => t !== label);
+    activeFilter.value = TagFilterEngine.setTagCondition(activeFilter.value, label, 'remove');
     runQuery();
   }
 
   function clearFilterTags() {
-    const cleared = TagFilterEngine.clearFilterSelection();
-    activeFilter.value.includeTags = cleared.includeTags;
-    activeFilter.value.excludeTags = cleared.excludeTags;
+    activeFilter.value = TagFilterEngine.clearFilterSelection();
     selectedSmartViewId.value = '';
     runQuery();
   }
@@ -103,8 +93,9 @@ export function useTagFilter() {
   function applySmartView() {
     const v = savedViews.value.find(view => view.id === selectedSmartViewId.value);
     if (!v) return;
-    activeFilter.value.includeTags = [...v.includeTags];
-    activeFilter.value.excludeTags = [...v.excludeTags];
+    activeFilter.value.includeTags = [...(v.includeTags || [])];
+    activeFilter.value.excludeTags = [...(v.excludeTags || [])];
+    activeFilter.value.optionalTags = [...(v.optionalTags || [])];
     runQuery();
   }
 
@@ -119,7 +110,7 @@ export function useTagFilter() {
       title: title.trim(),
       includeTags: [...activeFilter.value.includeTags],
       excludeTags: [...activeFilter.value.excludeTags],
-      optionalTags: [],
+      optionalTags: [...activeFilter.value.optionalTags],
       displayMode: 'card',
       createdAt: Date.now(),
     };
@@ -164,6 +155,7 @@ export function useTagFilter() {
     handleTagClick,
     toggleTagFilter,
     toggleTagCondition,
+    cycleTagCondition,
     removeFilterTag,
     clearFilterTags,
     applySmartView,
