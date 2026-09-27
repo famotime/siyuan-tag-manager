@@ -37,24 +37,45 @@ export class TagFilterEngine {
     const optionals = (options.optionalTags || []).map(t => t.trim()).filter(Boolean);
     const notebookIds = (options.notebookIds || []).map(t => t.trim()).filter(Boolean);
 
-    const conditions: string[] = [];
+    const andConditions: string[] = [];
+    const notConditions: string[] = [];
+    let orCondition = '';
 
     // 1. 必含标签 (AND): 每个标签都必须作为子查询命中
     for (const tag of includes) {
       const safeTag = this.escapeSql(tag);
-      conditions.push(`b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
+      andConditions.push(`b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
     }
 
     // 2. 排除标签 (NOT): 任意一个命中即排除
     for (const tag of excludes) {
       const safeTag = this.escapeSql(tag);
-      conditions.push(`b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
+      notConditions.push(`b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '${safeTag}')`);
     }
 
-    // 3. 可选标签 (OR): 如果指定了可选标签，则至少命中一个
+    // 3. 可选标签 (OR): 如果指定了可选标签，则命中其中任一即可
     if (optionals.length > 0) {
       const safeList = optionals.map(t => `'${this.escapeSql(t)}'`).join(', ');
-      conditions.push(`b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN (${safeList}))`);
+      orCondition = `b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN (${safeList}))`;
+    }
+
+    const conditions: string[] = [];
+
+    // 正向条件组合：
+    // 若同时存在 AND 必含条件与 OR 可选条件，两组正向条件以 OR 关联，
+    // 确保单个标签切换为 OR 时即时生效并扩充结果集，避免 AND 组合导致结果不刷新的问题
+    if (andConditions.length > 0 && orCondition) {
+      const andPart = andConditions.length === 1 ? andConditions[0] : `(${andConditions.join(' AND ')})`;
+      conditions.push(`(${andPart} OR ${orCondition})`);
+    } else if (andConditions.length > 0) {
+      conditions.push(...andConditions);
+    } else if (orCondition) {
+      conditions.push(orCondition);
+    }
+
+    // 排除条件以 AND 追加
+    for (const notCond of notConditions) {
+      conditions.push(notCond);
     }
 
     // 4. 限定笔记本

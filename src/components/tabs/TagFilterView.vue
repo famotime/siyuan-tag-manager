@@ -302,9 +302,6 @@ watch(
 
 function handleModeButtonClick(mode: TagFilterConditionMode) {
   currentMode.value = mode;
-  if (mode === 'include' || mode === 'optional') {
-    emit('switch-filter-mode', mode);
-  }
 }
 
 const isFilterEmpty = computed(() => {

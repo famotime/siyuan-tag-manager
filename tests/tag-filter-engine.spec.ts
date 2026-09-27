@@ -277,6 +277,17 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       expect(sql).toContain('LIMIT 50 OFFSET 0');
     });
 
+    it('当同时包含 includeTags (AND) 与 optionalTags (OR) 时，两组正向条件以 OR 关联', () => {
+      const sql = TagFilterEngine.buildQuerySql({
+        includeTags: ['Vue'],
+        optionalTags: ['React'],
+        excludeTags: ['Angular'],
+      });
+
+      expect(sql).toContain("(b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'Vue') OR b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN ('React')))");
+      expect(sql).toContain("b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'Angular')");
+    });
+
     it('resetFilterWithTags 支持 mode="optional" 生成 OR 组合', () => {
       const res = TagFilterEngine.resetFilterWithTags(['Vue', 'React'], 'optional');
       expect(res.includeTags).toEqual([]);

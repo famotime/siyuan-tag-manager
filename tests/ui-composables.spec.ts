@@ -115,7 +115,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
       vi.restoreAllMocks();
     });
 
-    it('toggleTagCondition 将 AND 标签转为 OR 时，所有正向标签统一转为 optionalTags 并触发 runQuery', async () => {
+    it('toggleTagCondition 点击标签仅切换该标签状态，其余标签保持不变，并即时触发 runQuery', async () => {
       const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
@@ -138,23 +138,22 @@ describe('UI Composables 与状态管理规范化测试', () => {
       // 用户点击 React 芯片切换为 optional (OR)
       toggleTagCondition('React', 'optional');
 
-      // 验证正向标签已全部统一转为 optionalTags，形成纯粹的 OR 逻辑
-      expect(activeFilter.value.includeTags).toEqual([]);
-      expect(activeFilter.value.optionalTags).toContain('Vue');
-      expect(activeFilter.value.optionalTags).toContain('React');
+      // 验证仅切换了点击的 React，Vue 依然保持在 includeTags 中
+      expect(activeFilter.value.includeTags).toEqual(['Vue']);
+      expect(activeFilter.value.optionalTags).toEqual(['React']);
       expect(activeFilter.value.excludeTags).toEqual([]);
 
-      // 验证触发了 queryMatchedBlocks 刷新，且参数中 optionalTags 包含了两个标签
+      // 验证触发了 queryMatchedBlocks 刷新
       expect(queriedOptions).toBeDefined();
-      expect(queriedOptions.includeTags).toEqual([]);
-      expect(queriedOptions.optionalTags).toEqual(['Vue', 'React']);
+      expect(queriedOptions.includeTags).toEqual(['Vue']);
+      expect(queriedOptions.optionalTags).toEqual(['React']);
 
       // 验证下方的筛选结果即时更新
       await new Promise(resolve => setTimeout(resolve, 10));
       expect(matchedBlocks.value).toHaveLength(1);
     });
 
-    it('toggleTagCondition 将 OR 标签转为 AND 时，所有正向标签统一转为 includeTags 并触发 runQuery', async () => {
+    it('toggleTagCondition 将 OR 标签转为 NOT (exclude) 时仅影响该标签', async () => {
       const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
@@ -166,18 +165,18 @@ describe('UI Composables 与状态管理规范化测试', () => {
 
       const { activeFilter, toggleTagCondition } = useTagFilter();
       activeFilter.value = {
-        includeTags: [],
-        optionalTags: ['Vue', 'React'],
+        includeTags: ['Vue'],
+        optionalTags: ['React'],
         excludeTags: [],
       };
 
-      toggleTagCondition('React', 'include');
+      toggleTagCondition('React', 'exclude');
 
+      expect(activeFilter.value.includeTags).toEqual(['Vue']);
       expect(activeFilter.value.optionalTags).toEqual([]);
-      expect(activeFilter.value.includeTags).toContain('Vue');
-      expect(activeFilter.value.includeTags).toContain('React');
-      expect(queriedOptions.includeTags).toEqual(['Vue', 'React']);
-      expect(queriedOptions.optionalTags).toEqual([]);
+      expect(activeFilter.value.excludeTags).toEqual(['React']);
+      expect(queriedOptions.includeTags).toEqual(['Vue']);
+      expect(queriedOptions.excludeTags).toEqual(['React']);
     });
 
     it('switchFilterMode 在顶栏模式切换时能够直接双向转换已有标签并刷新结果', async () => {
@@ -213,7 +212,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(queriedOptions.includeTags).toEqual(['Vue', 'React']);
     });
 
-    it('toggleTagFilter 在 optional 模式下添加标签时自动将既有包含标签升级为可选标签', async () => {
+    it('toggleTagFilter 仅切换指定标签，不影响已有标签条件', async () => {
       const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
@@ -230,11 +229,12 @@ describe('UI Composables 与状态管理规范化测试', () => {
         excludeTags: [],
       };
 
-      // 在 optional 模式下点击候选标签 React
+      // 在 optional 模式下添加标签 React
       toggleTagFilter('React', 'optional');
-      expect(activeFilter.value.includeTags).toEqual([]);
-      expect(activeFilter.value.optionalTags).toEqual(['Vue', 'React']);
-      expect(queriedOptions.optionalTags).toEqual(['Vue', 'React']);
+      expect(activeFilter.value.includeTags).toEqual(['Vue']);
+      expect(activeFilter.value.optionalTags).toEqual(['React']);
+      expect(queriedOptions.includeTags).toEqual(['Vue']);
+      expect(queriedOptions.optionalTags).toEqual(['React']);
     });
   });
 });
