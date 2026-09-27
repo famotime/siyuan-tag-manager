@@ -249,6 +249,9 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
       expect(link.weight).toBe(2); // b1 和 b2 中共现 2 次
       const pythonNode = res.graph.nodes.find((n: any) => n.id === 'Python');
       expect(pythonNode?.count).toBe(3); // 出现在 b1, b2, b3 三个块中
+      expect(res.combinations).toHaveLength(1);
+      expect(res.combinations[0].tags).toEqual(['AI出海', 'Python']);
+      expect(res.combinations[0].count).toBe(2);
     });
   });
 });

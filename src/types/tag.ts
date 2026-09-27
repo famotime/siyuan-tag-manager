@@ -25,6 +25,16 @@ export interface ITagItem {
 }
 
 /**
+ * 标签多元共现组合（用于频繁项集与多标签关联分析）
+ */
+export interface ITagCombination {
+  /** 组合包含的标签名列表（规范按字母序排列） */
+  tags: string[];
+  /** 在同一内容块中共现的频次 */
+  count: number;
+}
+
+/**
  * 标签持久化扩展元数据接口
  */
 export interface ITagMetadata {

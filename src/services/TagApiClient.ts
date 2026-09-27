@@ -1,6 +1,6 @@
 import { TagFilterEngine } from './TagFilterEngine';
 import { TagCooccurrenceService } from './TagCooccurrenceService';
-import type { ITagItem, ITagMatchedBlock, ITagMergePlan } from '../types/tag';
+import type { ITagItem, ITagMatchedBlock, ITagMergePlan, ITagCombination } from '../types/tag';
 
 export interface IQueryBlockOptions {
   includeTags?: string[];
@@ -200,6 +200,7 @@ export class TagApiClient {
    */
   public static async fetchCooccurrenceGraph(): Promise<{
     graph: any;
+    combinations: ITagCombination[];
     spansCount: number;
   }> {
     const sql = `SELECT s.block_id, s.content `
@@ -221,9 +222,11 @@ export class TagApiClient {
     }
 
     const graph = TagCooccurrenceService.buildCooccurrenceGraph(blockMap, tagCounts, 1);
+    const combinations = TagCooccurrenceService.findTagCombinations(blockMap, 2, 5);
 
     return {
       graph,
+      combinations,
       spansCount: rows?.length || 0,
     };
   }

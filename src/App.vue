@@ -99,7 +99,7 @@
         @jump-block="jumpToBlock"
       />
 
-      <!-- TAB 3: 认知图谱与生命周期分析 -->
+      <!-- TAB 3: 关联洞察与生命周期分析 -->
       <TagGraphView
         v-if="currentTab === 'graph'"
         v-model:selected-graph-tag="selectedGraphTag"
@@ -108,8 +108,10 @@
         :timeline-stats="timelineStats"
         :associated-tags="associatedTags"
         :top-links="topLinks"
+        :tag-combinations="tagCombinations"
         @focus-tag-change="onFocusTagChange"
         @combine-filter="combineFilterWithAssociated"
+        @save-as-group="handleSaveAsGroup"
       />
 
       <!-- TAB 4: 标签治理与健康体检 -->
@@ -186,7 +188,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagHealthIssue, ITagMetadata, ITagGroup } from './types/tag';
+import type { ITagHealthIssue, ITagMetadata, ITagGroup, ITagCombination } from './types/tag';
 import type {
   TabType,
   IRowMenuState,
@@ -328,6 +330,7 @@ const groupModal = ref<ITagGroupModalState>({
 
 // 3. 图谱与时序状态
 const graphData = ref<ITagGraphData>({ nodes: [], links: [] });
+const tagCombinations = ref<ITagCombination[]>([]);
 const selectedGraphTag = ref('');
 const associatedTags = ref<Array<{ label: string; weight: number; jaccard: number }>>([]);
 const timelineStats = ref<ITagTimelineStats | null>(null);
@@ -340,7 +343,7 @@ const tabs = computed(() => [
     iconName: 'filter-funnel',
     badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length,
   },
-  { id: 'graph' as const, name: '认知图谱', iconName: 'git-fork-nodes' },
+  { id: 'graph' as const, name: '关联洞察', iconName: 'git-fork-nodes' },
   {
     id: 'hygiene' as const,
     name: '健康治理',
@@ -551,7 +554,7 @@ async function handleSaveGroup(payload: { name: string; tags: string[]; color?: 
       return;
     }
     await saveTagGroups(res.groups, savedViews.value);
-    showMessage(`已成功创建标签组「${payload.name}」`, 3000, 'info');
+    showMessage(`已成功创建标签组「${payload.name}」，可在“标签全景”的标签组中查看`, 3000, 'info');
   }
   groupModal.value.visible = false;
 }
@@ -720,15 +723,16 @@ async function handleAutoNormalizeTag(label: string, target?: string) {
   }
 }
 
-// 5. 认知图谱与生命周期
+// 5. 关联洞察与生命周期
 async function loadGraphData() {
   loading.value = true;
   try {
     const res = await TagApiClient.fetchCooccurrenceGraph();
     graphData.value = res.graph;
+    tagCombinations.value = res.combinations || [];
     updateAssociatedTags();
   } catch (err: any) {
-    showMessage(`加载共现网络失败: ${err.message || err}`, 4000, 'error');
+    showMessage(`加载共现关联失败: ${err.message || err}`, 4000, 'error');
   } finally {
     loading.value = false;
   }
@@ -764,11 +768,25 @@ function viewTagNetwork(label: string) {
   loadTimelineStats(label);
 }
 
-function combineFilterWithAssociated(tagA: string, tagB: string) {
+function combineFilterWithAssociated(tags: string[] | string, tagB?: string) {
+  const targetTags = Array.isArray(tags) ? tags : [tags, ...(tagB ? [tagB] : [])];
   currentTab.value = 'filter';
   selectedSmartViewId.value = '';
-  activeFilter.value = TagFilterEngine.resetFilterWithTags([tagA, tagB]);
+  activeFilter.value = TagFilterEngine.resetFilterWithTags(targetTags);
   runQuery();
+}
+
+function handleSaveAsGroup(tags: string[]) {
+  const cleanTags = Array.from(new Set(tags.filter(Boolean)));
+  groupModal.value = {
+    visible: true,
+    isEdit: false,
+    groupId: undefined,
+    name: cleanTags.join(' + '),
+    color: '#4285F4',
+    icon: '',
+    tags: cleanTags,
+  };
 }
 
 function closePanel() {

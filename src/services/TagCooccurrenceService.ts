@@ -1,4 +1,6 @@
-import type { ITagItem } from '../types/tag';
+import type { ITagItem, ITagCombination } from '../types/tag';
+
+export type { ITagCombination };
 
 export interface ITagGraphNode {
   id: string;
@@ -135,5 +137,82 @@ export class TagCooccurrenceService {
       map.set(row.block_id, list);
     }
     return map;
+  }
+
+  /**
+   * 统计全库在同一块中共同出现的多元标签组合（频繁项集挖掘）
+   * @param blockTagsMap Map<blockId, tagLabels[]> 包含各个块命中的所有标签
+   * @param minCount 最低共现频次阈值（默认 >= 2，过滤单次偶然共现噪声）
+   * @param maxCombinationSize 最大统计标签组合规模（默认 5，防止子集组合爆炸）
+   */
+  public static findTagCombinations(
+    blockTagsMap: Map<string, string[]>,
+    minCount = 2,
+    maxCombinationSize = 5,
+  ): ITagCombination[] {
+    const comboMap = new Map<string, { tags: string[]; count: number }>();
+
+    for (const tags of blockTagsMap.values()) {
+      if (!tags || tags.length < 2) continue;
+
+      // 块内标签清洗去重并按字典序排序（确保组合唯一性）
+      const uniqueTags = Array.from(new Set(tags.filter(Boolean))).sort();
+      if (uniqueTags.length < 2) continue;
+
+      // 为避免单个块内标签过多（例如批量套用了大量标签）产生组合爆炸，安全截断至前 12 个
+      const safeTags = uniqueTags.length > 12 ? uniqueTags.slice(0, 12) : uniqueTags;
+      const n = safeTags.length;
+      const maxK = Math.min(n, maxCombinationSize);
+
+      // 枚举从 2 到 maxK 规模的所有组合
+      for (let k = 2; k <= maxK; k++) {
+        TagCooccurrenceService.combineHelper(safeTags, k, 0, [], subset => {
+          const key = subset.join('\0');
+          const existing = comboMap.get(key);
+          if (existing) {
+            existing.count += 1;
+          } else {
+            comboMap.set(key, { tags: [...subset], count: 1 });
+          }
+        });
+      }
+    }
+
+    const results: ITagCombination[] = [];
+    for (const item of comboMap.values()) {
+      if (item.count >= minCount) {
+        results.push(item);
+      }
+    }
+
+    // 排序逻辑：
+    // 1. 优先按共现频次降序
+    // 2. 频次相同时，按组合包含的标签数降序（更高维度的聚合排在前面）
+    // 3. 标签数仍相同时，按标签字典序稳定排序
+    results.sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      if (b.tags.length !== a.tags.length) return b.tags.length - a.tags.length;
+      return a.tags.join(',').localeCompare(b.tags.join(','));
+    });
+
+    return results;
+  }
+
+  private static combineHelper(
+    arr: string[],
+    k: number,
+    start: number,
+    current: string[],
+    callback: (subset: string[]) => void,
+  ): void {
+    if (current.length === k) {
+      callback(current);
+      return;
+    }
+    for (let i = start; i < arr.length; i++) {
+      current.push(arr[i]);
+      TagCooccurrenceService.combineHelper(arr, k, i + 1, current, callback);
+      current.pop();
+    }
   }
 }

@@ -420,9 +420,9 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).not.toContain('sy-line-icon--palette');
     expect(html).not.toContain('sy-line-icon--trash');
 
-    // 验证仍保留升格为主题聚合文档、共现图谱与重构合并功能
+    // 验证仍保留升格为主题聚合文档、关联洞察与重构合并功能
     expect(html).toContain('升格为主题聚合文档');
-    expect(html).toContain('查看共现图谱与时序');
+    expect(html).toContain('查看关联洞察与时序');
     expect(html).toContain('重构合并到其他标签');
   });
 
@@ -654,6 +654,57 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
 
     // 2. 验证包含搜索图标
     expect(html).toContain('sy-line-icon--search');
+  });
+
+  it('TagGraphView 关联洞察正确渲染多标签频繁组合、维度筛选胶囊与纯图标操作按钮', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagGraphView, {
+      allTags: [
+        { name: 'Vue', label: 'Vue', count: 10, depth: 0 },
+        { name: 'Vite', label: 'Vite', count: 8, depth: 0 },
+        { name: 'TS', label: 'TS', count: 6, depth: 0 },
+      ],
+      selectedGraphTag: 'Vue',
+      graphData: { nodes: [{ id: 'Vue', label: 'Vue', count: 10 }], links: [] },
+      timelineStats: null,
+      associatedTags: [
+        { label: 'Vite', weight: 4, jaccard: 0.6 },
+      ],
+      tagCombinations: [
+        { tags: ['TS', 'Vite', 'Vue'], count: 3 },
+        { tags: ['Vite', 'Vue'], count: 5 },
+      ],
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 1. 验证文案更新为关联洞察
+    expect(html).toContain('探索知识关联拓扑与多维共现洞察');
+    expect(html).toContain('高频关联组合 (Top Associations)');
+
+    // 2. 验证包含标签数量维度筛选胶囊
+    expect(html).toContain('全部');
+    expect(html).toContain('2 标');
+    expect(html).toContain('3 标');
+    expect(html).toContain('4+ 标');
+
+    // 3. 验证正确渲染 3 标多元组合
+    expect(html).toContain('#TS#');
+    expect(html).toContain('#Vite#');
+    expect(html).toContain('#Vue#');
+    expect(html).toContain('3 次');
+    expect(html).toContain('5 次');
+
+    // 4. 验证操作按钮统一采用纯图标无边框 tm-icon-btn，包含 search-plus 与 layers-plus 图标
+    expect(html).toContain('sy-line-icon--search-plus');
+    expect(html).toContain('sy-line-icon--layers-plus');
+    // 列表项中不应出现文字形式的“探查”或“保存为标签组”按钮文字（严格纯图标化）
+    expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>探查<\/span>/);
+    expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>保存为标签组<\/span>/);
   });
 });
 

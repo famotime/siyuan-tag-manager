@@ -71,4 +71,47 @@ describe('TagCooccurrenceService 标签共现网络算法测试', () => {
     expect(associated[1].label).toBe('AI');
     expect(associated[1].weight).toBe(1);
   });
+
+  it('能够准确挖掘多元标签共现组合（含 2 标、3 标及 N 标，按频次与维度降序排列）', () => {
+    // 模拟数据：
+    // b1: Vue, Vite, TS, Pinia
+    // b2: Vue, Vite, TS
+    // b3: Vue, Vite
+    // b4: React, Redux (仅 1 次)
+    const blockMap = new Map<string, string[]>([
+      ['b1', ['Vue', 'Vite', 'TS', 'Pinia']],
+      ['b2', ['Vue', 'Vite', 'TS']],
+      ['b3', ['Vue', 'Vite']],
+      ['b4', ['React', 'Redux']],
+    ]);
+
+    // 默认 minCount = 2
+    const combos = TagCooccurrenceService.findTagCombinations(blockMap, 2, 5);
+
+    // React, Redux 仅出现 1 次，应被过滤
+    expect(combos.some(c => c.tags.includes('React'))).toBe(false);
+
+    // 最高频的应该是 Vue + Vite (出现在 b1, b2, b3 共 3 次)
+    expect(combos[0].tags).toEqual(['Vite', 'Vue']);
+    expect(combos[0].count).toBe(3);
+    const vueVite = combos.find(c => c.tags.length === 2 && c.tags.includes('Vue') && c.tags.includes('Vite'));
+    expect(vueVite).toBeDefined();
+    expect(vueVite?.count).toBe(3);
+
+    // 3 标组合：Vue + Vite + TS (出现在 b1, b2 共 2 次)
+    const triplet = combos.find(c => c.tags.length === 3 && c.tags.includes('Vue') && c.tags.includes('Vite') && c.tags.includes('TS'));
+    expect(triplet).toBeDefined();
+    expect(triplet?.count).toBe(2);
+
+    // 4 标组合：Vue + Vite + TS + Pinia 仅出现在 b1 (count=1)，由于 minCount=2 应不存在
+    const quad = combos.find(c => c.tags.length === 4);
+    expect(quad).toBeUndefined();
+
+    // 如果设置 minCount = 1，则 4 标组合与 React+Redux 都应能被检出
+    const allCombos = TagCooccurrenceService.findTagCombinations(blockMap, 1, 5);
+    const quadWithMin1 = allCombos.find(c => c.tags.length === 4);
+    expect(quadWithMin1).toBeDefined();
+    expect(quadWithMin1?.count).toBe(1);
+    expect(quadWithMin1?.tags).toEqual(['Pinia', 'TS', 'Vite', 'Vue']);
+  });
 });

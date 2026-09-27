@@ -15,7 +15,7 @@
     </div>
     <div class="tm-row-menu-item" @click="emitAction('graph')">
       <SyLineIcon name="git-fork-nodes" :size="13" />
-      <span>查看共现图谱与时序</span>
+      <span>查看关联洞察与时序</span>
     </div>
     <div class="tm-row-menu-item" @click="emitAction('merge')">
       <SyLineIcon name="git-merge" :size="13" />

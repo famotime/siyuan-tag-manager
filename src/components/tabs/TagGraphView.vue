@@ -3,9 +3,9 @@
     <div class="tm-graph-summary">
       <div class="tm-graph-stat">
         <span>活跃节点: <b>{{ graphData.nodes.length }}</b></span>
-        <span>共现连接: <b>{{ graphData.links.length }}</b></span>
+        <span>关联组合: <b>{{ allCombinations.length }}</b></span>
       </div>
-      <div class="tm-graph-hint">探索知识共现拓扑与生命周期演变</div>
+      <div class="tm-graph-hint">探索知识关联拓扑与多维共现洞察</div>
     </div>
 
     <!-- 聚焦标签选择与时序分析 -->
@@ -68,37 +68,87 @@
               共现 {{ item.weight }} 次 · 亲密相似度 {{ (item.jaccard * 100).toFixed(1) }}%
             </span>
           </div>
-          <button
-            class="tm-icon-btn tm-btn-sm"
-            v-tooltip="'与聚焦标签联合筛选'"
-            aria-label="组合筛选"
-            @click="emit('combine-filter', selectedGraphTag, item.label)"
-          >
-            <SyLineIcon name="search-plus" :size="12" />
-          </button>
+          <div class="tm-assoc-actions">
+            <button
+              class="tm-icon-btn tm-btn-sm"
+              v-tooltip="'与聚焦标签联合筛选探查'"
+              aria-label="组合探查"
+              @click="emit('combine-filter', [selectedGraphTag, item.label])"
+            >
+              <SyLineIcon name="search-plus" :size="12" />
+            </button>
+            <button
+              class="tm-icon-btn tm-btn-sm"
+              v-tooltip="'保存为标签组'"
+              aria-label="保存为标签组"
+              @click="emit('save-as-group', [selectedGraphTag, item.label])"
+            >
+              <SyLineIcon name="layers-plus" :size="12" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 图谱连接流 -->
+    <!-- 高频关联组合面板（多元共现洞察） -->
     <div class="tm-graph-links-panel">
-      <div class="tm-section-hint">核心强共现连线 (Top Connections)：</div>
+      <div class="tm-associations-header">
+        <div class="tm-section-hint">高频关联组合 (Top Associations)：</div>
+        <div class="tm-combo-tabs">
+          <button
+            v-for="opt in sizeFilterTabs"
+            :key="opt.value"
+            type="button"
+            class="tm-combo-tab-btn"
+            :class="{ active: activeSizeFilter === opt.value }"
+            @click="activeSizeFilter = opt.value"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
       <div class="tm-links-scroller">
+        <div v-if="filteredCombinations.length === 0" class="tm-empty-hint">
+          暂无匹配的关联组合记录（共现频次 &ge; 2）
+        </div>
         <div
-          v-for="link in topLinks"
-          :key="`${link.source}-${link.target}`"
-          class="tm-link-row"
-          @click="emit('combine-filter', link.source, link.target)"
+          v-for="item in filteredCombinations"
+          :key="item.tags.join('|')"
+          class="tm-assoc-row"
         >
-          <span class="tm-link-badge">
+          <span class="tm-assoc-badge" v-tooltip="`共同出现在 ${item.count} 个内容块中`">
             <SyLineIcon name="link" :size="11" />
-            <span>{{ link.weight }} 次</span>
+            <span>{{ item.count }} 次</span>
           </span>
-          <span class="tm-link-pair">#{{ link.source }} ⟷ #{{ link.target }}</span>
-          <span class="tm-link-btn">
-            <span>探查</span>
-            <SyLineIcon name="external-link" :size="10" />
-          </span>
+          <div class="tm-assoc-tags-flow">
+            <span
+              v-for="t in item.tags"
+              :key="t"
+              class="tm-assoc-tag-chip"
+              :title="`#${t}#`"
+            >
+              #{{ t }}#
+            </span>
+          </div>
+          <div class="tm-assoc-row-actions">
+            <button
+              class="tm-icon-btn tm-btn-sm"
+              v-tooltip="`在多维筛选中联合探查这 ${item.tags.length} 个标签`"
+              :aria-label="`探查组合 ${item.tags.join(' + ')}`"
+              @click.stop="emit('combine-filter', item.tags)"
+            >
+              <SyLineIcon name="search-plus" :size="12" />
+            </button>
+            <button
+              class="tm-icon-btn tm-btn-sm"
+              v-tooltip="'将此关联组合保存为常用标签组'"
+              :aria-label="`保存为标签组 ${item.tags.join(' + ')}`"
+              @click.stop="emit('save-as-group', item.tags)"
+            >
+              <SyLineIcon name="layers-plus" :size="12" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -106,25 +156,70 @@
 </template>
 
 <script setup lang="ts">
-import type { ITagItem } from '../../types/tag';
+import { computed, ref } from 'vue';
+import type { ITagItem, ITagCombination } from '../../types/tag';
 import type { ITagGraphData } from '../../services/TagCooccurrenceService';
 import type { ITagTimelineStats } from '../../services/TagTimelineService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
-defineProps<{
-  allTags: ITagItem[];
-  graphData: ITagGraphData;
-  selectedGraphTag: string;
-  timelineStats: ITagTimelineStats | null;
-  associatedTags: Array<{ label: string; weight: number; jaccard: number }>;
-  topLinks: Array<{ source: string; target: string; weight: number }>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    allTags: ITagItem[];
+    graphData: ITagGraphData;
+    selectedGraphTag: string;
+    timelineStats: ITagTimelineStats | null;
+    associatedTags: Array<{ label: string; weight: number; jaccard: number }>;
+    topLinks?: Array<{ source: string; target: string; weight: number }>;
+    tagCombinations?: ITagCombination[];
+  }>(),
+  {
+    topLinks: () => [],
+    tagCombinations: () => [],
+  },
+);
 
 const emit = defineEmits<{
   (e: 'update:selectedGraphTag', label: string): void;
   (e: 'focus-tag-change'): void;
-  (e: 'combine-filter', tagA: string, tagB: string): void;
+  (e: 'combine-filter', tags: string[] | string, tagB?: string): void;
+  (e: 'save-as-group', tags: string[]): void;
 }>();
+
+const activeSizeFilter = ref<'all' | '2' | '3' | '4+'>('all');
+
+const sizeFilterTabs = [
+  { label: '全部', value: 'all' as const },
+  { label: '2 标', value: '2' as const },
+  { label: '3 标', value: '3' as const },
+  { label: '4+ 标', value: '4+' as const },
+];
+
+const allCombinations = computed<ITagCombination[]>(() => {
+  if (props.tagCombinations && props.tagCombinations.length > 0) {
+    return props.tagCombinations;
+  }
+  if (props.topLinks && props.topLinks.length > 0) {
+    return props.topLinks.map(l => ({
+      tags: [l.source, l.target].sort(),
+      count: l.weight,
+    }));
+  }
+  return [];
+});
+
+const filteredCombinations = computed(() => {
+  const list = allCombinations.value;
+  if (activeSizeFilter.value === '2') {
+    return list.filter(c => c.tags.length === 2);
+  }
+  if (activeSizeFilter.value === '3') {
+    return list.filter(c => c.tags.length === 3);
+  }
+  if (activeSizeFilter.value === '4+') {
+    return list.filter(c => c.tags.length >= 4);
+  }
+  return list;
+});
 
 function onTagChange(e: Event) {
   const target = e.target as HTMLSelectElement;
