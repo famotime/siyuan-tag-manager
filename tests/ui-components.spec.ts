@@ -738,5 +738,41 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     // 确保不再包含给当前块打标签的旧提示
     expect(html).not.toContain('焦点块');
   });
+
+  it('TagBatchModal 弹窗目标文档区域渲染“包含子文档”复选框及统计徽章', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagBatchModal, {
+      state: {
+        visible: true,
+        docIdsText: 'doc-1',
+        tagsText: 'AI,Vue',
+        targetDocs: [{ id: 'doc-1', title: '父项目说明书' }],
+        executing: false,
+        includeSubDocs: true,
+      },
+      allTags: [{ label: 'AI', count: 5 }],
+      tagGroups: [],
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    // 1. 验证目标文档区域包含“包含子文档”复选框
+    expect(html).toContain('包含子文档');
+    expect(html).toContain('tm-checkbox-label');
+    expect(html).toContain('type="checkbox"');
+
+    // 2. 验证已选目标文档标题与胶囊渲染
+    expect(html).toContain('父项目说明书');
+    expect(html).toContain('tm-selected-doc-chip');
+
+    // 3. 验证操作底栏与待添加标签
+    expect(html).toContain('开始批量打标');
+    expect(html).toContain('将为');
+    expect(html).toContain('#AI#');
+    expect(html).toContain('#Vue#');
+  });
 });
+
 

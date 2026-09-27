@@ -93,5 +93,69 @@ describe('TagBatchService 批量打标与属性更新测试', () => {
     expect(list.length).toBe(2);
     expect(list[0]).toEqual({ id: 'nb_a', name: '工作笔记' });
   });
+
+  describe('子文档递归检索与查询语句构建 (SubDocs)', () => {
+    it('buildSubDocsQuery 能为多个父文档生成准确的前缀匹配 SQL 语句', () => {
+      const parentRows = [
+        { id: 'p1', box: 'box_main', path: '/20260901-doc1.sy' },
+        { id: 'p2', box: 'box_work', path: '/folder/20260902-doc2.sy' },
+      ];
+
+      const sql = TagBatchService.buildSubDocsQuery(parentRows);
+      expect(sql).toContain("type = 'd'");
+      expect(sql).toContain("(box = 'box_main' AND path LIKE '/20260901-doc1/%')");
+      expect(sql).toContain("(box = 'box_work' AND path LIKE '/folder/20260902-doc2/%')");
+    });
+
+    it('buildSubDocsQuery 在没有有效父文档路径时返回空字符串', () => {
+      expect(TagBatchService.buildSubDocsQuery([])).toBe('');
+      expect(TagBatchService.buildSubDocsQuery([{ id: 'no-box' } as any])).toBe('');
+    });
+
+    it('getSubDocs 能成功递归查出指定文档名下的所有子文档，并自动排除父文档本身与重复项', async () => {
+      const mockRequest = async (url: string, data: any) => {
+        if (url === '/api/query/sql') {
+          // 第一步：查父文档
+          if (data.stmt.includes("id IN ('root_doc')")) {
+            return {
+              code: 0,
+              data: [
+                { id: 'root_doc', box: 'box_1', path: '/20260927-root.sy', content: '根文档' },
+              ],
+            };
+          }
+          // 第二步：查子文档
+          if (data.stmt.includes("path LIKE '/20260927-root/%'")) {
+            return {
+              code: 0,
+              data: [
+                // 模拟内核可能返回包含父文档或重复记录的情况
+                { id: 'root_doc', content: '根文档', path: '/20260927-root.sy' },
+                { id: 'sub_doc_1', content: '一级子文档A', path: '/20260927-root/20260927-sub1.sy' },
+                { id: 'sub_doc_2', content: '二级孙文档B', path: '/20260927-root/20260927-sub1/20260927-sub2.sy' },
+                { id: 'sub_doc_1', content: '一级子文档A', path: '/20260927-root/20260927-sub1.sy' }, // 重复项
+              ],
+            };
+          }
+        }
+        return { code: 0, data: [] };
+      };
+
+      const subDocs = await TagBatchService.getSubDocs(['root_doc'], mockRequest);
+      expect(subDocs.length).toBe(2);
+      expect(subDocs.map(d => d.id)).toEqual(['sub_doc_1', 'sub_doc_2']);
+      expect(subDocs.map(d => d.title)).toEqual(['一级子文档A', '二级孙文档B']);
+    });
+
+    it('getSubDocs 传入空数组或未查询到父文档时安全返回空数组', async () => {
+      const resEmpty = await TagBatchService.getSubDocs([]);
+      expect(resEmpty).toEqual([]);
+
+      const mockRequest = async () => ({ code: 0, data: [] });
+      const resNotFound = await TagBatchService.getSubDocs(['not_exist_doc'], mockRequest);
+      expect(resNotFound).toEqual([]);
+    });
+  });
 });
+
 

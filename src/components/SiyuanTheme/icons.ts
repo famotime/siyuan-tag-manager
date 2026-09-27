@@ -289,4 +289,11 @@ export const LINE_ICONS: Record<string, IconPathData> = {
       { type: 'path', d: 'M20 4v7a4 4 0 0 1-4 4H4' },
     ],
   },
+  // 子级引导转折图标
+  'corner-down-right': {
+    paths: [
+      { type: 'polyline', points: '15 10 20 15 15 20' },
+      { type: 'path', d: 'M4 4v7a4 4 0 0 0 4 4h12' },
+    ],
+  },
 };

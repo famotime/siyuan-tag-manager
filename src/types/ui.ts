@@ -46,6 +46,7 @@ export interface ITagGroupModalState {
 export interface IBatchDocItem {
   id: string;
   title: string;
+  isSubDoc?: boolean;
 }
 
 export interface IBatchModalState {
@@ -55,6 +56,7 @@ export interface IBatchModalState {
   targetDocs?: IBatchDocItem[];
   selectedGroupIds?: string[];
   executing: boolean;
+  includeSubDocs?: boolean;
 }
 
 export interface IMergeModalState {

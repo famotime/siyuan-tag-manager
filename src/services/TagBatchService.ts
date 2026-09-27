@@ -220,4 +220,81 @@ export class TagBatchService {
       return [];
     }
   }
+
+  /**
+   * 构造获取后代子文档的 SQL 语句
+   */
+  public static buildSubDocsQuery(parentRows: Array<{ id?: string; box?: string; path?: string }>): string {
+    const conditions: string[] = [];
+    for (const row of parentRows) {
+      if (!row || !row.box || !row.path) continue;
+      const prefix = row.path.replace(/\.sy$/i, '') + '/';
+      const cleanBox = String(row.box).replace(/'/g, "''");
+      const cleanPrefix = prefix.replace(/'/g, "''");
+      conditions.push(`(box = '${cleanBox}' AND path LIKE '${cleanPrefix}%')`);
+    }
+
+    if (conditions.length === 0) return '';
+    return `SELECT id, content, path FROM blocks WHERE type = 'd' AND (${conditions.join(' OR ')}) ORDER BY path ASC LIMIT 9999;`;
+  }
+
+  /**
+   * 递归检索指定文档名下的所有层级子文档
+   */
+  public static async getSubDocs(
+    parentDocIds: string[],
+    requestFn?: (url: string, data: any) => Promise<any>,
+  ): Promise<Array<{ id: string; title: string }>> {
+    const post = requestFn || (async (url, data) => {
+      if (typeof window === 'undefined' && !url.startsWith('http')) {
+        return { code: 0, data: [] };
+      }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
+        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
+      }
+      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
+      return res.json();
+    });
+
+    const validIds = Array.from(new Set(parentDocIds.map(id => id?.trim()).filter(Boolean)));
+    if (validIds.length === 0) return [];
+
+    try {
+      // 1. 查询父文档的物理路径与所属笔记本
+      const inClause = validIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+      const parentSql = `SELECT id, box, path, content FROM blocks WHERE type = 'd' AND id IN (${inClause});`;
+      const parentRes = await post('/api/query/sql', { stmt: parentSql });
+      const parentRows = parentRes?.data || (Array.isArray(parentRes) ? parentRes : []);
+      if (!parentRows || parentRows.length === 0) return [];
+
+      // 2. 构造后代子文档 SQL 检索语句
+      const subSql = this.buildSubDocsQuery(parentRows);
+      if (!subSql) return [];
+
+      // 3. 执行子文档检索
+      const subRes = await post('/api/query/sql', { stmt: subSql });
+      const subRows = subRes?.data || (Array.isArray(subRes) ? subRes : []);
+
+      // 4. 排除已选中的父文档自身，并去重
+      const parentIdSet = new Set(validIds);
+      const seenIds = new Set<string>();
+      const result: Array<{ id: string; title: string }> = [];
+
+      for (const r of subRows) {
+        if (!r.id || parentIdSet.has(r.id) || seenIds.has(r.id)) continue;
+        seenIds.add(r.id);
+        result.push({
+          id: r.id,
+          title: r.content || '未命名文档',
+        });
+      }
+
+      return result;
+    } catch (e) {
+      console.warn('[siyuan-tag-manager] getSubDocs failed:', e);
+      return [];
+    }
+  }
 }
+

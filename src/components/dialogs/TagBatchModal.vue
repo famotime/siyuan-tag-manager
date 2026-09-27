@@ -10,9 +10,20 @@
         <!-- 1. 目标文档区域 -->
         <div class="tm-form-group">
           <div class="tm-section-title-row">
-            <label class="tm-bold-label">
-              目标文档 (已选 <strong>{{ allTargetDocs.length }}</strong> 篇)：
-            </label>
+            <div class="tm-section-title-left">
+              <label class="tm-bold-label">
+                目标文档 (已选 <strong>{{ allTargetDocs.length }}</strong> 篇<span v-if="includeSubDocs && activeSubDocs.length > 0" class="tm-subdocs-badge">含 {{ activeSubDocs.length }} 篇子文档</span>)：
+              </label>
+              <label class="tm-checkbox-label" title="勾选后将已选中文档中的子文档都纳入打标范围">
+                <input
+                  v-model="includeSubDocs"
+                  type="checkbox"
+                  class="b3-checkbox"
+                />
+                <span>包含子文档</span>
+                <span v-if="loadingSubDocs" class="tm-subdocs-loading">(扫描中...)</span>
+              </label>
+            </div>
             <div class="tm-doc-source-tabs">
               <button
                 class="tm-source-tab-btn"
@@ -44,11 +55,19 @@
               v-for="doc in allTargetDocs"
               :key="doc.id"
               class="tm-selected-doc-chip"
-              :title="`ID: ${doc.id}`"
+              :class="{ 'is-sub-doc': isSubDoc(doc.id) }"
+              :title="`ID: ${doc.id}${isSubDoc(doc.id) ? ' (子文档)' : ''}`"
             >
-              <SyLineIcon name="file-text" :size="11" />
-              <span class="doc-chip-title">{{ doc.title || doc.id }}</span>
-              <button class="doc-chip-del" title="移除该文档" @click="removeDoc(doc.id)">
+              <SyLineIcon :name="isSubDoc(doc.id) ? 'corner-down-right' : 'file-text'" :size="11" />
+              <span class="doc-chip-title">
+                <span v-if="isSubDoc(doc.id)" class="sub-doc-tag">[子]</span>
+                {{ doc.title || doc.id }}
+              </span>
+              <button
+                class="doc-chip-del"
+                :title="isSubDoc(doc.id) ? '排除此子文档' : '移除该文档'"
+                @click="removeDoc(doc.id)"
+              >
                 <SyLineIcon name="close" :size="10" />
               </button>
             </span>
@@ -207,7 +226,7 @@
 
       <div class="tm-modal-footer">
         <div class="tm-footer-summary">
-          将为 <strong>{{ allTargetDocs.length }}</strong> 篇文档添加 <strong>{{ selectedTags.length }}</strong> 个标签
+          将为 <strong>{{ allTargetDocs.length }}</strong> 篇文档<template v-if="includeSubDocs && activeSubDocs.length > 0"> (含 {{ activeSubDocs.length }} 篇子文档)</template> 添加 <strong>{{ selectedTags.length }}</strong> 个标签
         </div>
         <button class="b3-button b3-button--cancel" @click="emit('close')">取消</button>
         <button
@@ -249,8 +268,17 @@ const emit = defineEmits<{
 // 文档添加模式：search | notebook | manual
 const docAddMode = ref<'search' | 'notebook' | 'manual'>('search');
 
-// 已选文档集合
+// 已选文档集合（根文档）
 const selectedDocs = ref<IBatchDocItem[]>([]);
+
+// 是否包含子文档
+const includeSubDocs = ref(false);
+// 扫描出的子文档列表
+const subDocs = ref<IBatchDocItem[]>([]);
+// 正在扫描子文档状态
+const loadingSubDocs = ref(false);
+// 临时排除的子文档 ID 集合
+const excludedSubDocIds = ref<Set<string>>(new Set());
 
 // 搜索文档状态
 const docSearchKeyword = ref('');
@@ -267,11 +295,73 @@ const loadingNotebookDocs = ref(false);
 const selectedTags = ref<string[]>([]);
 const newTagInput = ref('');
 
+// 实际生效的子文档列表（排除被单独移除的）
+const activeSubDocs = computed(() => {
+  if (!includeSubDocs.value) return [];
+  return subDocs.value.filter(d => !excludedSubDocIds.value.has(d.id));
+});
+
+// 全部打标目标文档（根文档 + 纳入的有效子文档，去重）
+const allTargetDocs = computed(() => {
+  if (!includeSubDocs.value) {
+    return selectedDocs.value;
+  }
+  const rootIds = new Set(selectedDocs.value.map(d => d.id));
+  const uniqueSubDocs = activeSubDocs.value.filter(d => !rootIds.has(d.id));
+  return [...selectedDocs.value, ...uniqueSubDocs];
+});
+
+function isSubDoc(id: string): boolean {
+  return activeSubDocs.value.some(d => d.id === id);
+}
+
+async function loadSubDocs() {
+  if (!includeSubDocs.value || selectedDocs.value.length === 0) {
+    subDocs.value = [];
+    return;
+  }
+  loadingSubDocs.value = true;
+  try {
+    const parentIds = selectedDocs.value.map(d => d.id);
+    const res = await TagBatchService.getSubDocs(parentIds);
+    subDocs.value = res.map(r => ({ id: r.id, title: r.title, isSubDoc: true }));
+  } catch (err) {
+    console.warn('[siyuan-tag-manager] loadSubDocs error:', err);
+    subDocs.value = [];
+  } finally {
+    loadingSubDocs.value = false;
+  }
+}
+
+watch(includeSubDocs, (val) => {
+  if (val) {
+    excludedSubDocIds.value = new Set();
+    loadSubDocs();
+  } else {
+    subDocs.value = [];
+    excludedSubDocIds.value = new Set();
+  }
+});
+
+// 当选中文档发生变动且已勾选包含子文档时，自动重新扫描子文档
+watch(
+  () => selectedDocs.value.map(d => d.id).sort().join(','),
+  () => {
+    if (includeSubDocs.value) {
+      loadSubDocs();
+    }
+  }
+);
+
 // 初始化监听外部传入的 targetDocs 或 docIdsText
 watch(
   [() => props.state.visible, () => props.state.targetDocs],
   ([vis]) => {
     if (vis) {
+      includeSubDocs.value = Boolean(props.state.includeSubDocs);
+      excludedSubDocIds.value = new Set();
+      subDocs.value = [];
+
       if (props.state.targetDocs && props.state.targetDocs.length > 0) {
         selectedDocs.value = [...props.state.targetDocs];
       } else if (props.state.docIdsText) {
@@ -289,15 +379,23 @@ watch(
       } else {
         selectedTags.value = [];
       }
+
+      if (includeSubDocs.value) {
+        loadSubDocs();
+      }
     }
   },
   { immediate: true, deep: true }
 );
 
-const allTargetDocs = computed(() => selectedDocs.value);
-
 function removeDoc(id: string) {
-  selectedDocs.value = selectedDocs.value.filter(d => d.id !== id);
+  if (isSubDoc(id)) {
+    const next = new Set(excludedSubDocIds.value);
+    next.add(id);
+    excludedSubDocIds.value = next;
+  } else {
+    selectedDocs.value = selectedDocs.value.filter(d => d.id !== id);
+  }
 }
 
 function isDocSelected(id: string): boolean {
@@ -404,13 +502,14 @@ const candidateTags = computed(() => {
 });
 
 function handleExecute() {
-  const docIds = selectedDocs.value.map(d => d.id);
+  const docIds = allTargetDocs.value.map(d => d.id);
   const tags = [...selectedTags.value];
   if (docIds.length === 0 || tags.length === 0) return;
 
   // 同步回文本兼容字段
   props.state.docIdsText = docIds.join('\n');
   props.state.tagsText = tags.join(', ');
+  props.state.includeSubDocs = includeSubDocs.value;
 
   emit('execute', { docIds, tags });
 }
@@ -422,6 +521,49 @@ function handleExecute() {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tm-section-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tm-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--b3-theme-on-surface);
+  user-select: none;
+
+  input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--b3-theme-primary);
+  }
+}
+
+.tm-subdocs-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 4px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: var(--tm-badge-primary-bg);
+  color: var(--tm-badge-primary-text);
+  border: 1px solid var(--tm-badge-primary-border);
+}
+
+.tm-subdocs-loading {
+  font-size: 10px;
+  color: var(--b3-theme-primary);
+  margin-left: 2px;
 }
 
 .tm-bold-label {
@@ -496,6 +638,19 @@ function handleExecute() {
     &:hover {
       opacity: 1;
       color: var(--b3-theme-error);
+    }
+  }
+
+  &.is-sub-doc {
+    background: var(--b3-theme-background-light);
+    border-style: dashed;
+    opacity: 0.92;
+
+    .sub-doc-tag {
+      font-size: 10px;
+      color: var(--b3-theme-primary);
+      margin-right: 2px;
+      font-weight: 600;
     }
   }
 }
