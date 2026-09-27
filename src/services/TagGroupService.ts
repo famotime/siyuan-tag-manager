@@ -155,12 +155,25 @@ export class TagGroupService {
     }
 
     // 3. 检查光标选区是否有焦点落在具体块上
-    const selection = window.getSelection();
+    const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
     if (selection && selection.rangeCount > 0) {
       const node = selection.anchorNode;
       const el = node instanceof Element ? node : node?.parentElement;
       const blockEl = el?.closest('[data-node-id]');
       if (blockEl) {
+        if (!docId) {
+          const protyle = blockEl.closest('.protyle');
+          const titleInProtyle = protyle?.querySelector('.protyle-title[data-node-id]');
+          if (titleInProtyle) {
+            docId = titleInProtyle.getAttribute('data-node-id') || undefined;
+            const titleInput = titleInProtyle.querySelector('.protyle-title__input');
+            docTitle = titleInput?.textContent?.trim() || titleInProtyle.textContent?.trim() || undefined;
+          } else {
+            const wysiwyg = protyle?.querySelector('.protyle-wysiwyg');
+            docId = wysiwyg?.getAttribute('data-doc-id') || wysiwyg?.getAttribute('data-node-id') || undefined;
+          }
+        }
+
         const id = blockEl.getAttribute('data-node-id');
         // 如果不是整篇文档的根块，则记录为当前块 ID
         if (id && id !== docId) {

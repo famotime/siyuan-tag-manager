@@ -576,31 +576,19 @@ async function handleApplyGroup(group: ITagGroup) {
   }
 
   const active = TagGroupService.getActiveContext();
-  if (!active.docId && !active.blockId) {
-    showMessage('未检测到当前打开的文档或聚焦块，请先在思源中打开文档或光标置于正文中', 4000, 'error');
+  if (!active.docId) {
+    showMessage('未检测到当前打开的文档，请先在思源中打开文档', 4000, 'error');
     return;
   }
 
-  // 1. 若光标焦点位于非根块的具体内容块上，直接在该块末尾追加 #tag#
-  if (active.blockId) {
-    const res = await TagGroupService.applyGroupToBlock(active.blockId, group.tags);
-    if (res.success) {
-      showMessage(`已将标签组「${group.name}」(${group.tags.length}个标签) 追加至当前块`, 3000, 'info');
-      await refreshAllData();
-      return;
-    }
-  }
-
-  // 2. 否则默认以思源原生 IAL tags 属性方式注入当前活动文档根块
-  if (active.docId) {
-    const res = await TagGroupService.applyGroupToDoc(active.docId, group.tags);
-    if (res.success) {
-      const docName = active.docTitle ? `《${active.docTitle}》` : '当前文档';
-      showMessage(`已为 ${docName} 套用标签组「${group.name}」(${group.tags.length} 个标签)`, 3000, 'info');
-      await refreshAllData();
-    } else {
-      showMessage(`套用失败: ${res.error}`, 4000, 'error');
-    }
+  // 仅以思源原生 IAL tags 属性方式注入当前活动文档根块，去除对具体内容块的打标
+  const res = await TagGroupService.applyGroupToDoc(active.docId, group.tags);
+  if (res.success) {
+    const docName = active.docTitle ? `《${active.docTitle}》` : '当前文档';
+    showMessage(`已为 ${docName} 套用标签组「${group.name}」(${group.tags.length} 个标签)`, 3000, 'info');
+    await refreshAllData();
+  } else {
+    showMessage(`套用失败: ${res.error}`, 4000, 'error');
   }
 }
 

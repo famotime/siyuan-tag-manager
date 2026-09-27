@@ -86,7 +86,7 @@
               <div class="tm-group-card-actions">
                 <button
                   class="tm-group-apply-btn"
-                  v-tooltip="'套用此组到当前打开的文档/焦点块'"
+                  v-tooltip="'套用此组到当前打开的文档'"
                   @click="emit('apply-group', group)"
                 >
                   <SyLineIcon name="tag" :size="10" />

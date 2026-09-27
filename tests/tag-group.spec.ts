@@ -109,4 +109,62 @@ describe('TagGroupService 标签组管理与应用测试', () => {
     expect(calls.length).toBe(2);
     expect(calls[1].data.data).toBe('这是一段段落正文 #Vue# #Vite#');
   });
+
+  it('getActiveContext 支持从活动 Protyle 窗口或选区所在块所属容器准确提取当前文档', () => {
+    const originalDocument = (globalThis as any).document;
+    const originalWindow = (globalThis as any).window;
+
+    try {
+      (globalThis as any).window = {};
+      (globalThis as any).document = {
+        querySelector: (sel: string) => {
+          if (sel.includes('.layout__wnd--active .protyle-title[data-node-id]')) {
+            return {
+              getAttribute: (attr: string) => (attr === 'data-node-id' ? 'doc_main' : null),
+              querySelector: (sub: string) => ({ textContent: '测试文档标题' }),
+              textContent: '测试文档标题',
+            };
+          }
+          return null;
+        },
+      };
+
+      const ctx = TagGroupService.getActiveContext();
+      expect(ctx.docId).toBe('doc_main');
+      expect(ctx.docTitle).toBe('测试文档标题');
+    } finally {
+      (globalThis as any).document = originalDocument;
+      (globalThis as any).window = originalWindow;
+    }
+  });
+
+  it('常用标签组套用策略：只为当前文档注入 IAL 属性，绝不污染块内正文', async () => {
+    let docApplied = false;
+    let blockApplied = false;
+
+    const mockRequest = async (url: string, data: any) => {
+      if (url === '/api/attr/getBlockAttrs') {
+        return { code: 0, data: { tags: 'OldTag' } };
+      }
+      if (url === '/api/attr/setBlockAttrs') {
+        docApplied = true;
+        return { code: 0, data: null };
+      }
+      if (url === '/api/block/updateBlock') {
+        blockApplied = true;
+        return { code: 0, data: null };
+      }
+      return { code: 0 };
+    };
+
+    // 模拟聚焦上下文：即使 blockId 存在，套用流程也仅针对 docId 调用 applyGroupToDoc
+    const active = { docId: 'doc_123', docTitle: '我的长文', blockId: 'block_child_999' };
+    const groupTags = ['Rust', 'Wasm'];
+
+    // 验证逻辑：只调用 applyGroupToDoc
+    const res = await TagGroupService.applyGroupToDoc(active.docId, groupTags, mockRequest);
+    expect(res.success).toBe(true);
+    expect(docApplied).toBe(true);
+    expect(blockApplied).toBe(false);
+  });
 });

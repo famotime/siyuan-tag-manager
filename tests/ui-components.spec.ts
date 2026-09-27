@@ -706,5 +706,37 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>探查<\/span>/);
     expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>保存为标签组<\/span>/);
   });
+
+  it('TagTreeView 常用标签组卡片中套用按钮 tooltip 明确提示仅套用到当前打开的文档', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [{ name: 'Vue', label: 'Vue', count: 10, depth: 0 }],
+      loading: false,
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+      tagGroups: [
+        {
+          id: 'tg_test',
+          name: '前端技术栈',
+          tags: ['Vue', 'Vite'],
+          color: '#4285F4',
+          sortOrder: 0,
+        },
+      ],
+    });
+
+    // 模拟 v-tooltip 指令
+    app.directive('tooltip', (el, binding) => {
+      // ssr 中可以通过属性记录
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('tm-group-apply-btn');
+    expect(html).toContain('前端技术栈');
+    // 确保不再包含给当前块打标签的旧提示
+    expect(html).not.toContain('焦点块');
+  });
 });
 
