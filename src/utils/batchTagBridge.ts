@@ -11,7 +11,14 @@ type BatchDocListener = (docs: IBatchBridgeDoc[]) => void;
 class BatchTagBridge {
   private listeners: BatchDocListener[] = [];
 
-  public trigger(docs: IBatchBridgeDoc[]): void {
+  public hasListeners(): boolean {
+    return this.listeners.length > 0;
+  }
+
+  public trigger(docs: IBatchBridgeDoc[]): boolean {
+    if (this.listeners.length === 0) {
+      return false;
+    }
     for (const listener of this.listeners) {
       try {
         listener(docs);
@@ -19,6 +26,7 @@ class BatchTagBridge {
         console.error('[siyuan-tag-manager] batchTagBridge listener error:', err);
       }
     }
+    return true;
   }
 
   public on(fn: BatchDocListener): () => void {
@@ -29,6 +37,10 @@ class BatchTagBridge {
         this.listeners.splice(idx, 1);
       }
     };
+  }
+
+  public clear(): void {
+    this.listeners = [];
   }
 }
 

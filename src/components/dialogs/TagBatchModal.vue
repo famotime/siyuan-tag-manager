@@ -269,8 +269,8 @@ const newTagInput = ref('');
 
 // 初始化监听外部传入的 targetDocs 或 docIdsText
 watch(
-  () => props.state.visible,
-  (vis) => {
+  [() => props.state.visible, () => props.state.targetDocs],
+  ([vis]) => {
     if (vis) {
       if (props.state.targetDocs && props.state.targetDocs.length > 0) {
         selectedDocs.value = [...props.state.targetDocs];
@@ -291,7 +291,7 @@ watch(
       }
     }
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 );
 
 const allTargetDocs = computed(() => selectedDocs.value);

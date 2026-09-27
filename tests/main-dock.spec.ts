@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { DOCK_TYPE, toggleTagManagerDock, usePlugin } from '../src/main';
+import { DOCK_TYPE, toggleTagManagerDock, isTagManagerDockActive, openTagManagerDock, usePlugin } from '../src/main';
 
 describe('Dock 与插件实例管理 (main.ts) 测试', () => {
   it('DOCK_TYPE 常量应为 tag-manager-dock', () => {
@@ -78,4 +78,90 @@ describe('Dock 与插件实例管理 (main.ts) 测试', () => {
       expect(clickSpy).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('isTagManagerDockActive 状态检测能力', () => {
+    const originalDocument = globalThis.document;
+
+    afterEach(() => {
+      globalThis.document = originalDocument;
+    });
+
+    it('在非浏览器环境或未找到按钮时返回 false', () => {
+      (globalThis as any).document = undefined;
+      expect(isTagManagerDockActive()).toBe(false);
+
+      (globalThis as any).document = { querySelector: () => null };
+      expect(isTagManagerDockActive()).toBe(false);
+    });
+
+    it('当 Dock 按钮含有 dock__item--active 类时返回 true，否则返回 false', () => {
+      const activeEl = {
+        classList: {
+          contains: (cls: string) => cls === 'dock__item--active',
+        },
+      };
+      (globalThis as any).document = {
+        querySelector: () => activeEl,
+      };
+      expect(isTagManagerDockActive()).toBe(true);
+
+      const inactiveEl = {
+        classList: {
+          contains: () => false,
+        },
+      };
+      (globalThis as any).document = {
+        querySelector: () => inactiveEl,
+      };
+      expect(isTagManagerDockActive()).toBe(false);
+    });
+  });
+
+  describe('openTagManagerDock 防缩回安全展开能力', () => {
+    const originalDocument = globalThis.document;
+
+    afterEach(() => {
+      globalThis.document = originalDocument;
+    });
+
+    it('在非浏览器环境或未找到按钮时返回 false', () => {
+      (globalThis as any).document = undefined;
+      expect(openTagManagerDock()).toBe(false);
+    });
+
+    it('当 Dock 已经处于 active 状态时，绝不触发 click 避免缩回，且返回 true', () => {
+      const clickSpy = vi.fn();
+      const activeEl = {
+        click: clickSpy,
+        classList: {
+          contains: (cls: string) => cls === 'dock__item--active',
+        },
+      };
+      (globalThis as any).document = {
+        querySelector: () => activeEl,
+      };
+
+      const res = openTagManagerDock();
+      expect(res).toBe(true);
+      expect(clickSpy).not.toHaveBeenCalled();
+    });
+
+    it('当 Dock 未激活时，触发 click 展开并返回 true', () => {
+      const clickSpy = vi.fn();
+      const inactiveEl = {
+        click: clickSpy,
+        classList: {
+          contains: () => false,
+        },
+      };
+      (globalThis as any).document = {
+        querySelector: () => inactiveEl,
+      };
+
+      const res = openTagManagerDock();
+      expect(res).toBe(true);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+

@@ -18,6 +18,10 @@ import '@/index.scss';
 import { TagVisualService } from '@/services/TagVisualService';
 import { TagDomDecorator } from '@/services/TagDomDecorator';
 import { batchTagBridge } from '@/utils/batchTagBridge';
+import {
+  openStandaloneBatchModal,
+  closeStandaloneBatchModal,
+} from '@/utils/batchTagModalManager';
 
 // 注册专属标签管家 SVG 图标
 const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024">
@@ -144,8 +148,12 @@ export default class TagManagerPlugin extends Plugin {
         icon: 'iconTagManager',
         label: `批量打标签 (${docs.length} 篇)`,
         click: () => {
-          toggleTagManagerDock(DOCK_TYPE);
-          batchTagBridge.trigger(docs);
+          // 严禁调用 toggleTagManagerDock，避免把已展开的侧栏折叠缩回
+          const dispatched = batchTagBridge.trigger(docs);
+          if (!dispatched) {
+            // 侧栏未挂载或未激活时，通过全局独立模态窗直接唤起，不强行展开侧栏干扰用户
+            openStandaloneBatchModal(docs);
+          }
         },
       });
     }
@@ -156,6 +164,9 @@ export default class TagManagerPlugin extends Plugin {
     this.eventBus.off('loaded-protyle-static', this.handleProtyleLoaded);
     this.eventBus.off('loaded-protyle-dynamic', this.handleProtyleLoaded);
     this.eventBus.off('switch-protyle', this.handleProtyleLoaded);
+
+    // 清理可能的独立批量打标弹窗
+    closeStandaloneBatchModal();
 
     // 停止正文 DOM 监听并清理装饰属性与样式
     TagDomDecorator.stopObserving();
