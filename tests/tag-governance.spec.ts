@@ -84,6 +84,75 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
       const aiIssue = issues.find(i => i.primaryLabel === 'AI' || i.relatedLabels?.includes('AI'));
       expect(aiIssue).toBeUndefined();
     });
+
+    it('能够将“测试”和“测-试”及其中文间隔号“测·试”、全角连字符“测－试”识别为相似冲突，并推选规范形式为保留项', () => {
+      const mockTags: ITagItem[] = [
+        { name: '测试', label: '测试', count: 1, depth: 0 },
+        { name: '测-试', label: '测-试', count: 1, depth: 0 },
+        { name: '测·试', label: '测·试', count: 1, depth: 0 },
+        { name: '测－试', label: '测－试', count: 1, depth: 0 },
+      ];
+
+      const issues = TagGovernanceService.detectSimilarConflicts(mockTags);
+      expect(issues.length).toBe(1);
+
+      const issue = issues[0];
+      // 频次相同时，规范度优先：无标点的“测试”作为 primaryLabel
+      expect(issue.primaryLabel).toBe('测试');
+      expect(issue.relatedLabels).toContain('测-试');
+      expect(issue.relatedLabels).toContain('测·试');
+      expect(issue.relatedLabels).toContain('测－试');
+      expect(issue.subType).toBe('separator');
+    });
+
+    it('严格遵循层级边界：同层级内检测标点变体，跨层级扁平标签互不干扰', () => {
+      const mockTags: ITagItem[] = [
+        // 同层级冲突组
+        { name: '测试', label: '技术/测试', count: 5, depth: 1 },
+        { name: '测-试', label: '技术/测-试', count: 1, depth: 1 },
+        // 跨层级扁平标签（不应与技术/前端冲突）
+        { name: '前端', label: '技术/前端', count: 10, depth: 1 },
+        { name: '技术-前端', label: '技术-前端', count: 2, depth: 0 },
+        // 不同父路径同名标签（不应发生冲突）
+        { name: '测试', label: '管理/测试', count: 3, depth: 1 },
+      ];
+
+      const issues = TagGovernanceService.detectSimilarConflicts(mockTags);
+      // 仅有 技术/测试 与 技术/测-试 这 1 组冲突
+      expect(issues.length).toBe(1);
+      expect(issues[0].primaryLabel).toBe('技术/测试');
+      expect(issues[0].relatedLabels).toEqual(['技术/测-试']);
+    });
+
+    it('防误报机制：数字版本号与中文短词绝不误判为 typo 笔误，长词笔误能正常命中', () => {
+      const mockTags: ITagItem[] = [
+        // 数字版本号（不应被识别为冲突）
+        { name: 'Vue2', label: 'Vue2', count: 10, depth: 0 },
+        { name: 'Vue3', label: 'Vue3', count: 15, depth: 0 },
+        { name: 'v1', label: 'v1', count: 4, depth: 0 },
+        { name: 'v2', label: 'v2', count: 5, depth: 0 },
+        { name: '第1版', label: '第1版', count: 2, depth: 0 },
+        { name: '第2版', label: '第2版', count: 3, depth: 0 },
+
+        // 中文短词（编辑距离为 1 但词义不同，绝不应误报）
+        { name: '测试', label: '测试', count: 8, depth: 0 },
+        { name: '考试', label: '考试', count: 6, depth: 0 },
+        { name: '开发', label: '开发', count: 12, depth: 0 },
+        { name: '开会', label: '开会', count: 4, depth: 0 },
+
+        // 中文长词笔误（长度 >= 4 且编辑距离 1，应能正确命中）
+        { name: '敏捷开发流程', label: '敏捷开发流程', count: 10, depth: 0 },
+        { name: '敏捷开发历程', label: '敏捷开发历程', count: 1, depth: 0 },
+      ];
+
+      const issues = TagGovernanceService.detectSimilarConflicts(mockTags);
+      expect(issues.length).toBe(1);
+
+      const typoIssue = issues[0];
+      expect(typoIssue.primaryLabel).toBe('敏捷开发流程');
+      expect(typoIssue.relatedLabels).toEqual(['敏捷开发历程']);
+      expect(typoIssue.subType).toBe('typo');
+    });
   });
 
   describe('detectInvalidNorms 不合规范检测（斜杠/非法字符/超长>15/超深>=3/纯数字）', () => {

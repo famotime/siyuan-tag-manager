@@ -69,23 +69,94 @@ export class TagGovernanceService {
   }
 
   /**
-   * 判断两个标签是否相似（覆盖大小写、命名风格与分隔符、短编辑距离笔误）
+   * 标签分隔符正则集合：
+   * 涵盖连字符、下划线、中文间隔号、破折号、波浪号、标点点号、全半角空格与全角连字符
+   * 注意：层级斜杠 / 已在外层拆分，此处专用于平级节点内部字符排版归一化
+   */
+  private static readonly SEPARATOR_REGEX = /[-_.\s·•—–~～－\u3000]/g;
+
+  /**
+   * 拆分标签路径与叶子节点
+   */
+  public static splitTagPath(label: string): { parentPath: string; leaf: string } {
+    const clean = this.normalizeLabel(label);
+    const lastSlash = clean.lastIndexOf('/');
+    if (lastSlash === -1) {
+      return { parentPath: '', leaf: clean };
+    }
+    return {
+      parentPath: clean.substring(0, lastSlash),
+      leaf: clean.substring(lastSlash + 1),
+    };
+  }
+
+  /**
+   * 计算标签规范度惩罚分（分数越低表示规范度越高，越优先推荐作为保留主标签）
+   */
+  public static calcCanonicalPenalty(label: string): number {
+    let penalty = 0;
+    const path = this.splitTagPath(label);
+    const leaf = path.leaf;
+    const nfkcLeaf = leaf.normalize('NFKC');
+
+    // 1. 包含连字符、下划线、间隔号等分隔符扣分（无符号标准词优先，如 "测试" 优于 "测-试"）
+    const separatorMatches = nfkcLeaf.match(this.SEPARATOR_REGEX);
+    if (separatorMatches) {
+      penalty += separatorMatches.length * 10;
+    }
+
+    // 2. 如果原始文本中包含全角符号或非常规字符，额外扣分（鼓励标准形式）
+    if (leaf !== nfkcLeaf) {
+      penalty += 15;
+    }
+
+    // 3. 首尾含有非标准字符扣分
+    if (/^[-_.\s·•—–~～－\u3000]|[-_.\s·•—–~～－\u3000]$/.test(nfkcLeaf)) {
+      penalty += 20;
+    }
+
+    // 4. 乱序混排大小写微扣分
+    if (/[a-z]/.test(leaf) && /[A-Z]/.test(leaf)) {
+      penalty += 2;
+    }
+
+    return penalty;
+  }
+
+  /**
+   * 判断两个标签是否相似（覆盖大小写、全维度标点风格与排版变体、短编辑距离笔误）
    */
   public static checkSimilarity(labelA: string, labelB: string): { similar: boolean; reason?: 'case' | 'separator' | 'typo' } {
     if (labelA === labelB) return { similar: false };
 
-    const lowerA = labelA.toLowerCase();
-    const lowerB = labelB.toLowerCase();
+    // 0. 严格层级结构边界：仅在同层级（相同父路径）下检测叶子节点的相似冲突
+    const pathA = this.splitTagPath(labelA);
+    const pathB = this.splitTagPath(labelB);
+    if (pathA.parentPath !== pathB.parentPath) {
+      return { similar: false };
+    }
+
+    const leafA = pathA.leaf;
+    const leafB = pathB.leaf;
+    if (leafA === leafB) return { similar: false };
 
     // 1. 大小写冲突 (如 Prompt 与 prompt)
+    const lowerA = leafA.toLowerCase();
+    const lowerB = leafB.toLowerCase();
     if (lowerA === lowerB) {
       return { similar: true, reason: 'case' };
     }
 
-    // 2. 命名风格与分隔符差异 (如 tag-manager, tag_manager, tagManager)
-    const normA = lowerA.replace(/[-_.\s/]/g, '');
-    const normB = lowerB.replace(/[-_.\s/]/g, '');
-    if (normA === normB && normA.length >= 3) {
+    // 2. 命名风格与全维度标点分隔符差异（举一反三：支持“测试”与“测-试”、“测·试”、“测－试”、“wi-fi”与“wifi”）
+    // 使用 Unicode NFKC 归一化（将全角符号 － 转换为半角 -，全角空格等规整）
+    const nfkcA = leafA.normalize('NFKC').toLowerCase();
+    const nfkcB = leafB.normalize('NFKC').toLowerCase();
+
+    const normA = nfkcA.replace(this.SEPARATOR_REGEX, '');
+    const normB = nfkcB.replace(this.SEPARATOR_REGEX, '');
+
+    // 长度门槛开放至双字（normA.length >= 2），完美覆盖双字中文与短英文变体
+    if (normA === normB && normA.length >= 2) {
       return { similar: true, reason: 'separator' };
     }
 
@@ -95,7 +166,30 @@ export class TagGovernanceService {
     const minLen = Math.min(lenA, lenB);
     const maxLen = Math.max(lenA, lenB);
 
-    // 长度差异大于 2，或短词 (<= 3 字符)，跳过编辑距离以避免 AI/UI 等误报
+    // 3.1 防误报保护一：纯数字/版本号后缀保护（如 Vue2 与 Vue3、第1版 与 第2版、v1 与 v2）
+    const nonDigitsA = lowerA.replace(/\d+/g, '');
+    const nonDigitsB = lowerB.replace(/\d+/g, '');
+    if (nonDigitsA === nonDigitsB) {
+      return { similar: false };
+    }
+
+    // 3.2 防误报保护二：中文/CJK 短词保护（避免“测试”与“考试”、“开发”与“开会”被误判）
+    const hasCJK = /[\p{Unified_Ideograph}]/u.test(lowerA) || /[\p{Unified_Ideograph}]/u.test(lowerB);
+    if (hasCJK) {
+      // 包含中文且长度 < 4（单字、双字、三字词），跳过编辑距离检测
+      if (minLen < 4) {
+        return { similar: false };
+      }
+      // 长中文词（>= 4字）严格仅允许编辑距离为 1 且相似度 >= 0.8（例如“敏捷开发流程”与“敏捷开发历程”）
+      const dist = this.calcLevenshtein(lowerA, lowerB);
+      const similarity = 1 - dist / maxLen;
+      if (dist === 1 && similarity >= 0.8) {
+        return { similar: true, reason: 'typo' };
+      }
+      return { similar: false };
+    }
+
+    // 3.3 西文字符编辑距离检测（避免短词误报，如 AI 与 UI、git 与 gut）
     if (maxLen - minLen > 2 || minLen <= 3) {
       return { similar: false };
     }
@@ -154,13 +248,26 @@ export class TagGovernanceService {
 
     for (const [, tagList] of clusters.entries()) {
       if (tagList.length > 1) {
-        // 按引用数从大到小排序，最多的作为建议目标保留主标签
+        // 按引用数从大到小排序，频次相同时按规范度优先推选主标签
         const sorted = [...tagList].sort((a, b) => {
           if (b.count !== a.count) return b.count - a.count;
+          const penaltyA = this.calcCanonicalPenalty(a.label);
+          const penaltyB = this.calcCanonicalPenalty(b.label);
+          if (penaltyA !== penaltyB) return penaltyA - penaltyB;
           return a.label.localeCompare(b.label);
         });
         const primary = sorted[0];
         const variants = sorted.slice(1).map(t => t.label);
+
+        // 识别主要冲突类型原因（subType）
+        let detectedReason: 'case' | 'separator' | 'typo' = 'separator';
+        for (const variant of variants) {
+          const sim = this.checkSimilarity(primary.label, variant);
+          if (sim.reason) {
+            detectedReason = sim.reason;
+            break;
+          }
+        }
 
         issues.push({
           type: 'similar_conflict',
@@ -169,6 +276,7 @@ export class TagGovernanceService {
           severity: 'warning',
           message: `发现相似冲突：${tagList.map(t => `"${t.label}" (${t.count})`).join(', ')}，建议合并到 "${primary.label}"`,
           suggestedAction: 'merge',
+          subType: detectedReason,
         });
       }
     }
