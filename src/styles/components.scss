@@ -204,7 +204,9 @@
 .tm-sort-select {
   font-size: 11px;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 20px 0 8px;
+  cursor: pointer;
+  border-radius: 4px;
 }
 
 /* 树节点列表 */
@@ -400,7 +402,8 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   flex-shrink: 0;
 }
 
-.tm-tree-node:hover .tm-node-actions {
+.tm-tree-node:hover .tm-node-actions,
+.tm-tree-node:focus-within .tm-node-actions {
   display: flex;
 }
 
@@ -410,6 +413,21 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   padding: 0;
   border: none !important;
   outline: none;
+
+  &.tm-btn-danger {
+    color: var(--b3-theme-on-surface-light);
+
+    &:hover {
+      color: var(--b3-theme-error, #e74c3c);
+      background-color: var(--tm-badge-danger-bg, rgba(220, 53, 69, 0.12));
+
+      .sy-line-icon,
+      svg {
+        color: var(--b3-theme-error, #e74c3c);
+        stroke: var(--b3-theme-error, #e74c3c);
+      }
+    }
+  }
 }
 
 /* 浮动右键/更多菜单 */

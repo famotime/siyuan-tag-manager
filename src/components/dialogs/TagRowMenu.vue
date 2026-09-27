@@ -9,10 +9,6 @@
       <SyLineIcon name="tag" :size="12" />
       <span class="tm-row-menu-title">#{{ state.label }}</span>
     </div>
-    <div class="tm-row-menu-item" @click="emitAction('style')">
-      <SyLineIcon name="palette" :size="13" />
-      <span>定制色彩与别名</span>
-    </div>
     <div class="tm-row-menu-item" @click="emitAction('doc')">
       <SyLineIcon name="file-up" :size="13" />
       <span>升格为主题聚合文档</span>
@@ -24,11 +20,6 @@
     <div class="tm-row-menu-item" @click="emitAction('merge')">
       <SyLineIcon name="git-merge" :size="13" />
       <span>重构合并到其他标签...</span>
-    </div>
-    <div class="tm-row-menu-divider"></div>
-    <div class="tm-row-menu-item is-danger" @click="emitAction('remove')">
-      <SyLineIcon name="trash" :size="13" />
-      <span>从全库安全删除标签</span>
     </div>
   </div>
 </template>

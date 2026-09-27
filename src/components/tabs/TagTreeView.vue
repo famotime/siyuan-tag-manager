@@ -39,11 +39,11 @@
         >
           <SyLineIcon :name="allCollapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
         </button>
-        <select v-model="sortMode" class="b3-select tm-sort-select">
-          <option value="count_desc">引用数 (多→少)</option>
-          <option value="count_asc">引用数 (少→多)</option>
-          <option value="name_asc">拼音 (A→Z)</option>
-          <option value="name_desc">拼音 (Z→A)</option>
+        <select v-model="sortMode" class="b3-select tm-sort-select" v-tooltip="'切换标签全景排序方式'">
+          <option value="count_desc">引用数 ↓</option>
+          <option value="count_asc">引用数 ↑</option>
+          <option value="name_asc">拼音 A→Z</option>
+          <option value="name_desc">拼音 Z→A</option>
         </select>
       </div>
     </div>
@@ -243,14 +243,29 @@
             <span class="tm-node-count" v-tooltip="formatNodeTooltip(node)">{{ node.count }}</span>
           </div>
 
-          <!-- 渐进式暴露操作区：仅暴露高频筛选 + 更多菜单 -->
+          <!-- 操作区：即时筛选 + 定制色彩与别名 + 删除标签 + 更多菜单 -->
           <div class="tm-node-actions">
             <button
               class="tm-icon-btn tm-action-btn"
-              v-tooltip="'加入即时组合筛选 (AND)'"
+              :class="{ 'is-active': isTagSelected(node.label) }"
+              v-tooltip="isTagSelected(node.label) ? '从组合筛选中移除' : '加入即时组合筛选 (AND)'"
               @click.stop="emit('quick-filter', node.label, true)"
             >
               <SyLineIcon name="search-plus" :size="13" />
+            </button>
+            <button
+              class="tm-icon-btn tm-action-btn"
+              v-tooltip="'定制色彩与别名'"
+              @click.stop="emit('edit-style', node.label)"
+            >
+              <SyLineIcon name="palette" :size="13" />
+            </button>
+            <button
+              class="tm-icon-btn tm-action-btn tm-btn-danger"
+              v-tooltip="'删除标签'"
+              @click.stop="emit('remove-tag', node.label)"
+            >
+              <SyLineIcon name="trash" :size="13" />
             </button>
             <button
               class="tm-icon-btn tm-action-btn"
@@ -301,6 +316,8 @@ const emit = defineEmits<{
   (e: 'delete-group', groupId: string): void;
   (e: 'apply-group', group: ITagGroup): void;
   (e: 'create-tag', label: string): void;
+  (e: 'edit-style', label: string): void;
+  (e: 'remove-tag', label: string): void;
 }>();
 
 const searchKeyword = ref('');

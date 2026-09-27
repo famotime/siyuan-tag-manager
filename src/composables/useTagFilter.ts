@@ -42,7 +42,11 @@ export function useTagFilter() {
 
   function handleQuickFilter(label: string, append = false) {
     selectedSmartViewId.value = '';
-    activeFilter.value = TagFilterEngine.resolveFilterSelection(activeFilter.value, label, append);
+    if (append) {
+      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label);
+    } else {
+      activeFilter.value = TagFilterEngine.resolveFilterSelection(activeFilter.value, label, false);
+    }
     runQuery();
   }
 

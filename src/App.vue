@@ -75,6 +75,8 @@
         @delete-group="handleDeleteGroup"
         @apply-group="handleApplyGroup"
         @create-tag="handleCreateTag"
+        @edit-style="openStyleDialog"
+        @remove-tag="handleTreeRemoveTag"
       />
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
@@ -372,8 +374,8 @@ function onTagClick(label: string, event: MouseEvent) {
 }
 
 function onQuickFilter(label: string, append: boolean) {
-  currentTab.value = 'filter';
-  handleQuickFilter(label, append);
+  // 不立即跳转多维筛选，而是在后台增加/切换筛选项，跟按住 Ctrl 点击操作保持一致
+  handleTagClick(label, { ctrlKey: true } as MouseEvent);
 }
 
 function openRowMenu(label: string, event: MouseEvent) {
@@ -383,8 +385,9 @@ function openRowMenu(label: string, event: MouseEvent) {
   let left = rect.left - menuWidth + 24;
   if (left < 10) left = 10;
   let top = rect.bottom + 4;
-  if (top + 200 > window.innerHeight) {
-    top = rect.top - 200;
+  const menuHeight = 130;
+  if (top + menuHeight > window.innerHeight) {
+    top = rect.top - menuHeight;
   }
 
   rowMenu.value = {
@@ -401,6 +404,12 @@ function closeRowMenu() {
   }
 }
 
+function handleTreeRemoveTag(label: string) {
+  handleRemoveTag(label).then(success => {
+    if (success) refreshAllData();
+  });
+}
+
 function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove', label: string) {
   closeRowMenu();
   if (action === 'style') {
@@ -412,9 +421,7 @@ function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove',
   } else if (action === 'merge') {
     openMergeDialog(label);
   } else if (action === 'remove') {
-    handleRemoveTag(label).then(success => {
-      if (success) refreshAllData();
-    });
+    handleTreeRemoveTag(label);
   }
 }
 

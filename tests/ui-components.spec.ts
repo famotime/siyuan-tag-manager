@@ -324,7 +324,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const defaultHtml = await renderToString(app);
     expect(defaultHtml).not.toContain('tm-empty-create-guide');
 
-    // 挂载带有关键词无结果的组件
     const searchApp = createSSRApp({
       setup() {
         let treeInstance: any;
@@ -344,6 +343,129 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     searchApp.directive('tooltip', {});
     const rendered = await renderToString(searchApp);
     expect(rendered).toContain('tm-tree-scroller');
+  });
+
+  it('TagTreeView 渲染时，外层操作栏直接展示定制色彩与别名(palette)、删除标签(trash)按钮并具备危险样式', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { name: 'typescript', label: 'typescript', count: 8, depth: 0 },
+      ],
+      loading: false,
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 验证外层操作栏包含快捷筛选、定制色彩与别名、删除标签与更多操作按钮
+    expect(html).toContain('sy-line-icon--search-plus');
+    expect(html).toContain('sy-line-icon--palette');
+    expect(html).toContain('sy-line-icon--trash');
+    expect(html).toContain('sy-line-icon--more-horizontal');
+
+    // 验证外层删除标签按钮具备 tm-btn-danger 危险操作类
+    expect(html).toContain('tm-action-btn tm-btn-danger');
+  });
+
+  it('TagRowMenu 更多操作菜单中不再包含已移到外层的定制色彩与删除标签选项', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagRowMenu, {
+      state: {
+        visible: true,
+        label: 'testTag',
+        top: 100,
+        left: 200,
+      },
+    });
+
+    const html = await renderToString(app);
+
+    // 验证不再包含“定制色彩与别名”和“删除标签”
+    expect(html).not.toContain('定制色彩与别名');
+    expect(html).not.toContain('从全库安全删除标签');
+    expect(html).not.toContain('sy-line-icon--palette');
+    expect(html).not.toContain('sy-line-icon--trash');
+
+    // 验证仍保留升格为主题聚合文档、共现图谱与重构合并功能
+    expect(html).toContain('升格为主题聚合文档');
+    expect(html).toContain('查看共现图谱与时序');
+    expect(html).toContain('重构合并到其他标签');
+  });
+
+  it('useTagFilter 的 handleQuickFilter 在追加模式下具备与 Ctrl 点击一致的反选与后台添加能力', () => {
+    const { activeFilter, handleQuickFilter, handleTagClick } = useTagFilter();
+    activeFilter.value = { includeTags: [], excludeTags: [] };
+
+    // 第一次调用加入组合筛选
+    handleQuickFilter('TypeScript', true);
+    expect(activeFilter.value.includeTags).toContain('TypeScript');
+
+    // 第二次调用切换反选移除（与 Ctrl+点击保持一致）
+    handleQuickFilter('TypeScript', true);
+    expect(activeFilter.value.includeTags).not.toContain('TypeScript');
+
+    // 验证与 handleTagClick 传入 ctrlKey 效果完全相同
+    handleTagClick('Rust', { ctrlKey: true } as MouseEvent);
+    expect(activeFilter.value.includeTags).toContain('Rust');
+    handleQuickFilter('Vue', true);
+    expect(activeFilter.value.includeTags).toEqual(['Rust', 'Vue']);
+  });
+
+  it('TagTreeView 中已加入组合筛选的标签，其快捷筛选按钮应具备 is-active 样式', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { name: 'typescript', label: 'typescript', count: 8, depth: 0 },
+      ],
+      loading: false,
+      selectedTags: ['typescript'],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 选中的标签对应的 search-plus 按钮具备 is-active 类
+    expect(html).toContain('is-active');
+  });
+
+  it('TagTreeView 顶部右侧排序选项应使用简洁图标示意，避免超长折叠', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [],
+      loading: false,
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 验证包含简洁图标示意
+    expect(html).toContain('引用数 ↓');
+    expect(html).toContain('引用数 ↑');
+    expect(html).toContain('拼音 A→Z');
+    expect(html).toContain('拼音 Z→A');
+
+    // 验证不再包含引起折叠的冗长中文括号文本
+    expect(html).not.toContain('(多→少)');
+    expect(html).not.toContain('(少→多)');
+    expect(html).not.toContain('(A→Z)');
+    expect(html).not.toContain('(Z→A)');
   });
 });
 
