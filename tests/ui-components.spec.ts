@@ -114,11 +114,11 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('sy-line-icon--git-merge');
     expect(html).toContain('sy-line-icon--trash');
 
-    // 验证三大核心治理卡片标题与过滤胶囊渲染
+    // 验证三大核心治理统计卡片标题渲染
     expect(html).toContain('相似冲突');
     expect(html).toContain('不合规范');
     expect(html).toContain('低频使用');
-    expect(html).toContain('tm-filter-pills');
+    expect(html).not.toContain('tm-filter-pills');
   });
 
   it('TagRenameModal 渲染时，应展示原标签名、输入框与实时校验提示', async () => {

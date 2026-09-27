@@ -62,36 +62,6 @@
           <span>标签规范与冲突治理</span>
           <span class="tm-section-badge">{{ filteredIssues.length }}</span>
         </div>
-        <div class="tm-filter-pills">
-          <button
-            class="tm-pill-btn"
-            :class="{ active: activeFilterCategory === 'all' }"
-            @click="activeFilterCategory = 'all'"
-          >
-            全部 ({{ healthResult.issues.length }})
-          </button>
-          <button
-            class="tm-pill-btn"
-            :class="{ active: activeFilterCategory === 'low_frequency' }"
-            @click="activeFilterCategory = 'low_frequency'"
-          >
-            低频使用
-          </button>
-          <button
-            class="tm-pill-btn"
-            :class="{ active: activeFilterCategory === 'similar_conflict' }"
-            @click="activeFilterCategory = 'similar_conflict'"
-          >
-            相似冲突
-          </button>
-          <button
-            class="tm-pill-btn"
-            :class="{ active: activeFilterCategory === 'invalid_norm' }"
-            @click="activeFilterCategory = 'invalid_norm'"
-          >
-            不合规范
-          </button>
-        </div>
       </div>
 
       <div v-if="filteredIssues.length === 0" class="tm-empty-success">
@@ -525,34 +495,6 @@ async function promoteSelectedCandidates() {
   gap: 6px;
 }
 
-.tm-filter-pills {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.tm-pill-btn {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  border: 1px solid var(--b3-border-color);
-  background: transparent;
-  color: var(--b3-theme-on-surface-light);
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    color: var(--b3-theme-on-surface);
-    border-color: var(--b3-theme-primary);
-  }
-
-  &.active {
-    background: var(--b3-theme-primary);
-    color: #fff;
-    border-color: var(--b3-theme-primary);
-    font-weight: 500;
-  }
-}
 
 .tm-issue-tag-sub {
   font-size: 10px;
