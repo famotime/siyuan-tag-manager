@@ -142,7 +142,7 @@ export default class TagManagerPlugin extends Plugin {
       e.detail.menu.addItem({
         id: 'tm-batch-tag-doctree',
         icon: 'iconTagManager',
-        label: `🏷️ 批量打标签 (${docs.length} 篇)`,
+        label: `批量打标签 (${docs.length} 篇)`,
         click: () => {
           toggleTagManagerDock(DOCK_TYPE);
           batchTagBridge.trigger(docs);

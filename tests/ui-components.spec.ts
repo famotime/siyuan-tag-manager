@@ -567,5 +567,38 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('可选 (OR): #React, #NextJS');
     expect(html).toContain('排除 (NOT): #Angular');
   });
+
+  it('TagFilterView 包含搜索输入框，支持根据拼音或关键词搜索后添加标签', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagFilterView, {
+      allTags: [
+        { name: 'YouTube', label: 'YouTube', count: 10, depth: 0 },
+        { name: 'Prompt', label: 'Prompt', count: 5, depth: 0 },
+      ],
+      activeFilter: {
+        includeTags: [],
+        optionalTags: [],
+        excludeTags: [],
+      },
+      matchedBlocks: [],
+      queryLoading: false,
+      savedViews: [],
+      selectedSmartViewId: '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 1. 验证存在搜索控件
+    expect(html).toContain('tm-filter-search-row');
+    expect(html).toContain('tm-search-box');
+    expect(html).toContain('placeholder="搜索标签并回车添加（支持拼音首字母如 ytb）..."');
+
+    // 2. 验证包含搜索图标
+    expect(html).toContain('sy-line-icon--search');
+  });
 });
 

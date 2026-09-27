@@ -135,15 +135,48 @@
         </div>
       </div>
 
-      <!-- 快速候选标签流 (可折叠 / 可拖拽拉伸高度消除滚动条) -->
+      <!-- 快速候选标签与搜索添加流 (可折叠 / 可拖拽拉伸高度消除滚动条) -->
       <div class="tm-quick-tags-wrapper">
+        <!-- 搜索添加输入框 -->
+        <div class="tm-filter-search-row">
+          <div class="tm-search-box fn__flex-1">
+            <SyLineIcon name="search" :size="13" class="tm-search-icon" />
+            <input
+              v-model="searchKeyword"
+              class="b3-text-field tm-search-input"
+              :class="{ 'has-create-hint': Boolean(searchKeyword.trim()) }"
+              placeholder="搜索标签并回车添加（支持拼音首字母如 ytb）..."
+              @keydown.enter.prevent="handleSearchEnter"
+              @keydown.esc="searchKeyword = ''"
+            />
+            <span
+              v-if="searchKeyword.trim()"
+              class="tm-search-enter-badge"
+              :class="`tm-search-enter-badge--${currentMode}`"
+              v-tooltip="`按 Enter 回车添加为 ${modeText} 条件`"
+              @click="handleSearchEnter"
+            >
+              <SyLineIcon name="corner-down-left" :size="9" />
+              <span>+ {{ currentMode.toUpperCase() }}</span>
+            </span>
+            <button
+              v-if="searchKeyword"
+              class="tm-icon-btn tm-clear-btn"
+              v-tooltip="'清空搜索'"
+              @click="searchKeyword = ''"
+            >
+              <SyLineIcon name="close" :size="12" />
+            </button>
+          </div>
+        </div>
+
         <div
           ref="quickTagsRef"
           class="tm-quick-tags"
-          :class="{ 'is-expanded': expandQuickTags || filterBoxHeight !== null }"
+          :class="{ 'is-expanded': isExpandedTags }"
         >
           <span
-            v-for="tag in topQuickTags"
+            v-for="tag in displayCandidateTags"
             :key="tag.label"
             class="tm-quick-tag"
             :class="{
@@ -155,9 +188,13 @@
           >
             #{{ tag.label }} <small>({{ tag.count }})</small>
           </span>
+
+          <div v-if="searchKeyword.trim() && displayCandidateTags.length === 0" class="tm-search-no-match">
+            <span>未找到匹配标签，按回车直接将「#{{ searchKeyword.trim().replace(/^#+|#+$/g, '') }}#」加入 {{ modeText }}</span>
+          </div>
         </div>
         <button
-          v-if="allTags.length > 12"
+          v-if="!searchKeyword.trim() && allTags.length > 12"
           class="tm-quick-expand-btn"
           @click="expandQuickTags = !expandQuickTags"
         >
@@ -218,6 +255,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue';
 import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
+import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = defineProps<{
@@ -246,6 +284,7 @@ const emit = defineEmits<{
 }>();
 
 const currentMode = ref<TagFilterConditionMode>('include');
+const searchKeyword = ref('');
 
 const isFilterEmpty = computed(() => {
   return (
@@ -253,6 +292,12 @@ const isFilterEmpty = computed(() => {
     (props.activeFilter.excludeTags?.length || 0) === 0 &&
     (props.activeFilter.optionalTags?.length || 0) === 0
   );
+});
+
+const modeText = computed(() => {
+  if (currentMode.value === 'include') return 'AND (必含)';
+  if (currentMode.value === 'optional') return 'OR (可选)';
+  return 'NOT (排除)';
 });
 
 function onQuickTagClick(label: string) {
@@ -286,12 +331,37 @@ const filterBoxStyle = computed(() => {
   return {};
 });
 
-const topQuickTags = computed(() => {
-  if (expandQuickTags.value || filterBoxHeight.value !== null) {
-    return props.allTags;
+const displayCandidateTags = computed<ITagItem[]>(() => {
+  const kw = searchKeyword.value.trim();
+  if (!kw) {
+    if (expandQuickTags.value || filterBoxHeight.value !== null) {
+      return props.allTags;
+    }
+    return props.allTags.slice(0, 12);
   }
-  return props.allTags.slice(0, 12);
+  const matches = TagPinyinAliasService.matchTags(props.allTags, kw, 50);
+  return matches.map(m => m.tag);
 });
+
+const isExpandedTags = computed(() => {
+  return Boolean(searchKeyword.value.trim()) || expandQuickTags.value || filterBoxHeight.value !== null;
+});
+
+function handleSearchEnter() {
+  const raw = searchKeyword.value.trim();
+  const kw = raw.replace(/^#+|#+$/g, '').trim();
+  if (!kw) return;
+
+  if (displayCandidateTags.value.length > 0) {
+    const targetTag = displayCandidateTags.value[0];
+    emit('toggle-tag', targetTag.label, currentMode.value);
+    searchKeyword.value = '';
+    return;
+  }
+
+  emit('toggle-tag', kw, currentMode.value);
+  searchKeyword.value = '';
+}
 
 function onSmartViewChange(e: Event) {
   const target = e.target as HTMLSelectElement;
