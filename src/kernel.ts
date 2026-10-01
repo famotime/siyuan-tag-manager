@@ -131,7 +131,7 @@ class KernelPlugin {
       await rpc.unbind("echo")
       await rpc.unbind("echo-notify")
     } catch (e) {
-      console.error("Error during kernel plugin teardown:", e)
+      await logger.error("Error during kernel plugin teardown:", e)
     }
     await logger.info("onunload: kernel plugin cleanup completed")
   }

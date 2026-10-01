@@ -4,7 +4,6 @@ import type {
 } from 'siyuan';
 import {
   Plugin,
-  showMessage,
 } from 'siyuan';
 import PluginInfoString from '@/../plugin.json';
 import {
@@ -31,7 +30,7 @@ const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024
 const STORAGE_NAME = 'tag-manager-config.json';
 
 let PluginInfo = {
-  version: '0.1.0',
+  version: '0.9.0',
 };
 try {
   PluginInfo = PluginInfoString;
@@ -78,12 +77,11 @@ export default class TagManagerPlugin extends Plugin {
       },
     });
 
-    // 5. 注册快捷命令 (Alt+Shift+T 快速展开/切换标签管家原生侧栏)
+    // 5. 注册快捷命令 (⌥⇧T 快速展开/切换标签管家原生侧栏)
     this.addCommand({
       langKey: 'openTagManager',
       langText: (this.i18n.openTagManager as string) ?? '打开标签管家工作台',
       hotkey: '⌥⇧T',
-      hotkeys: ['⌥⇧T', 'Alt+Shift+T'],
       enabled: () => true,
       execute: (_context: ICommandContext) => {
         toggleTagManagerDock(DOCK_TYPE);
@@ -120,8 +118,6 @@ export default class TagManagerPlugin extends Plugin {
 
     // 9. 监听思源原生文档树右键菜单事件，支持选中多篇文档一键批量打标
     this.eventBus.on('open-menu-doctree', this.handleDocTreeMenu);
-
-    showMessage('标签管家侧栏已就绪！可点击侧栏/顶栏图标或按 Alt+Shift+T 打开', 4000, 'info');
   }
 
   private handleProtyleLoaded = (e: CustomEvent<any>) => {
@@ -174,7 +170,15 @@ export default class TagManagerPlugin extends Plugin {
     TagVisualService.removeStyles();
   }
 
-  async onDataChanged(reason?: TPluginDataChangeReason): Promise<void> {
-    console.log(`[${this.name}] onDataChanged:`, reason);
+  async onDataChanged(_reason?: TPluginDataChangeReason): Promise<void> {
+    try {
+      const localData = await this.loadData(STORAGE_NAME).catch(() => null);
+      if (localData && Array.isArray(localData.metadataList)) {
+        const css = TagVisualService.generateCssRules(localData.metadataList);
+        TagVisualService.applyStyles(css);
+      }
+    } catch {
+      // 容错保护，遵循 5 秒拆除预算
+    }
   }
 }
