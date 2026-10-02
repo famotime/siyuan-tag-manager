@@ -5,7 +5,6 @@
         <span>活跃节点: <b>{{ graphData.nodes.length }}</b></span>
         <span>关联组合: <b>{{ allCombinations.length }}</b></span>
       </div>
-      <div class="tm-graph-hint">探索知识关联拓扑与多维共现洞察</div>
     </div>
 
     <!-- 聚焦标签选择与时序分析 -->

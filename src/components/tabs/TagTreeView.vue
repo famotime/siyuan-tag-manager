@@ -144,7 +144,7 @@
         </div>
       </div>
 
-      <div v-show="panoramaExpanded" class="fn__flex-1 fn__flex-column" style="display: flex; min-height: 0; overflow: hidden;">
+      <div v-show="panoramaExpanded" class="tm-panorama-body fn__flex-1 fn__flex-column" style="display: flex; min-height: 0; overflow: hidden; background: var(--b3-theme-background);">
         <!-- 待保存变动操作条 -->
         <div v-if="stagedMoves.length > 0" class="tm-staged-banner">
           <div class="tm-staged-info">

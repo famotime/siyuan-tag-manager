@@ -216,9 +216,14 @@
 }
 
 /* 树节点列表 */
+.tm-panorama-body {
+  background: var(--b3-theme-background);
+}
+
 .tm-tree-scroller {
   flex: 1;
   overflow-y: auto;
+  background: var(--b3-theme-background);
 }
 
 .tm-tree-nodes {
@@ -2430,8 +2435,9 @@ body.theme--dark .tm-guide-kbd {
 .tm-panorama-section {
   &.is-expanded {
     flex: 1;
-    min-height: 160px;
+    min-height: 140px;
     overflow: hidden;
+    background: var(--b3-theme-background);
   }
   &.is-collapsed {
     flex: 0 0 auto !important;
@@ -2452,7 +2458,7 @@ body.theme--dark .tm-guide-kbd {
     flex: 0 0 auto;
     height: 48%;
     max-height: 48%;
-    min-height: 180px;
+    min-height: 140px;
     overflow: hidden;
   }
   &.is-collapsed {
@@ -2707,14 +2713,15 @@ body.theme--dark .tm-guide-kbd {
 .tm-cloud-container {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 8px 10px;
   align-items: baseline;
   padding: 10px 12px;
   background: var(--b3-theme-background);
   flex: 1 1 0;
   min-height: 0;
-  height: 100%;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .tm-cloud-bubble {
@@ -2827,8 +2834,8 @@ body.theme--dark .tm-cloud-bubble {
   background: var(--b3-theme-background);
   flex: 1 1 0;
   min-height: 0;
-  height: 100%;
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .tm-rank-item {
@@ -2836,7 +2843,10 @@ body.theme--dark .tm-cloud-bubble {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 8px;
+  height: 30px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 4px 8px;
   border-radius: 4px;
   background: var(--b3-theme-surface);
   border: 1px solid var(--b3-border-color);

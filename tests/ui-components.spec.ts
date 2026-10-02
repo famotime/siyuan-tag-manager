@@ -739,7 +739,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const html = await renderToString(app);
 
     // 1. 验证文案更新为关联洞察
-    expect(html).toContain('探索知识关联拓扑与多维共现洞察');
     expect(html).toContain('高频关联组合 (Top Associations)');
 
     // 2. 验证包含标签数量维度筛选胶囊
@@ -974,6 +973,8 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('tm-tree-node');
     expect(html).toContain('tm-cloud-container');
     expect(html).toContain('tm-panorama-section');
+    expect(html).toContain('tm-panorama-body');
+    expect(html).toContain('tm-tree-scroller');
     expect(html).not.toContain('is-tree-dragging');
   });
 });

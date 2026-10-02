@@ -131,7 +131,7 @@
         <!-- 空占位指示 -->
         <div v-if="isFilterEmpty" class="tm-filter-placeholder">
           <SyLineIcon name="filter-funnel" :size="12" style="margin-right: 5px; opacity: 0.7;" />
-          <span>点击下方候选标签，展开多维交叉组合检索（支持 AND/OR/NOT）</span>
+          <span>点击标签，展开多维交叉组合检索</span>
         </div>
       </div>
 
