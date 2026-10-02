@@ -21,6 +21,14 @@
       <SyLineIcon name="corner-down-right" :size="13" />
       <span>配置子标签与层级...</span>
     </div>
+    <div
+      v-if="state.label && state.label.includes('/')"
+      class="tm-row-menu-item"
+      @click="emitAction('promote-root')"
+    >
+      <SyLineIcon name="corner-up-left" :size="13" />
+      <span>移出父级，恢复为独立标签</span>
+    </div>
     <div class="tm-row-menu-item" @click="emitAction('merge')">
       <SyLineIcon name="git-merge" :size="13" />
       <span>重构合并到其他标签...</span>
@@ -37,11 +45,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'action', action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent', label: string): void;
+  (e: 'action', action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent' | 'promote-root', label: string): void;
   (e: 'close'): void;
 }>();
 
-function emitAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent') {
+function emitAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent' | 'promote-root') {
   const label = props.state.label;
   emit('close');
   emit('action', action, label);

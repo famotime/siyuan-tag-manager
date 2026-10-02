@@ -460,7 +460,7 @@ function handleTreeRemoveTag(label: string) {
   });
 }
 
-function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent', label: string) {
+function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent' | 'promote-root', label: string) {
   closeRowMenu();
   if (action === 'style') {
     openStyleDialog(label);
@@ -474,6 +474,11 @@ function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' 
     handleTreeRemoveTag(label);
   } else if (action === 'reparent') {
     reparentModal.value = { visible: true, label };
+  } else if (action === 'promote-root') {
+    const moves = TagTreeService.calculateReparentMoves(label, null, allTags.value);
+    if (moves.length > 0) {
+      handleBatchReparent(moves);
+    }
   }
 }
 

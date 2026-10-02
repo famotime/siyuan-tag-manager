@@ -2546,28 +2546,93 @@ body.theme--dark .tm-guide-kbd {
   font-weight: 600;
 }
 
-/* 顶级根节点拖拽释放区 */
-.tm-root-dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 6px 10px;
-  padding: 6px 10px;
-  border: 1px dashed var(--b3-theme-primary);
-  border-radius: 4px;
-  background: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.08));
-  color: var(--b3-theme-primary);
-  font-size: 11px;
-  font-weight: 500;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
+/* 树节点拖拽放置指示线 (VSCode / Obsidian 级精准层级反馈) */
+.tm-drop-indicator-line {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--b3-theme-primary);
+  border-radius: 1px;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(53, 116, 240, 0.4);
+  animation: tm-line-fade-in 0.1s ease-out;
 
-  &.is-drag-over {
-    background: var(--b3-theme-primary);
-    color: #fff;
-    border-style: solid;
+  &.is-before {
+    top: -1px;
   }
+
+  &.is-after {
+    bottom: -1px;
+  }
+
+  &.is-scroller-bottom {
+    position: relative;
+    margin: 8px 12px;
+    top: 0;
+  }
+
+  .tm-indicator-dot {
+    position: absolute;
+    left: -3px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--b3-theme-primary);
+    border: 2px solid var(--b3-theme-background);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .tm-indicator-badge {
+    position: absolute;
+    left: 8px;
+    top: -22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    border-radius: 4px;
+    background: var(--b3-theme-primary);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 21;
+
+    .sy-line-icon {
+      color: #ffffff !important;
+      stroke: #ffffff !important;
+    }
+  }
+
+  &.is-root {
+    left: 4px !important;
+    right: 4px !important;
+  }
+}
+
+@keyframes tm-line-fade-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+/* 树容器空白区域拖拽高亮 */
+.tm-tree-scroller.is-scroller-drag-over {
+  background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.04)) !important;
+  outline: 1.5px dashed var(--b3-theme-primary) !important;
+  outline-offset: -3px;
+  transition: all 0.15s ease;
 }
 
 .tm-tree-node {
@@ -2578,8 +2643,9 @@ body.theme--dark .tm-guide-kbd {
     opacity: 0.45;
   }
 
-  &.is-drag-over {
-    background: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.22)) !important;
+  &.is-drag-over,
+  &.is-drag-over-inside {
+    background: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.2)) !important;
     box-shadow: inset 0 0 0 2px var(--b3-theme-primary) !important;
     border-radius: 4px;
   }

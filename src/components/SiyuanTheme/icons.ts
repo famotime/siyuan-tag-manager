@@ -296,6 +296,13 @@ export const LINE_ICONS: Record<string, IconPathData> = {
       { type: 'path', d: 'M4 4v7a4 4 0 0 0 4 4h12' },
     ],
   },
+  // 提升转折为顶级图标
+  'corner-up-left': {
+    paths: [
+      { type: 'polyline', points: '9 14 4 9 9 4' },
+      { type: 'path', d: 'M20 20v-7a4 4 0 0 0-4-4H4' },
+    ],
+  },
   // 热度 / 火焰
   'flame': {
     paths: [

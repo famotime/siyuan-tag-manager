@@ -201,8 +201,15 @@
           </div>
         </div>
 
-        <!-- 标签树滚动列表 -->
-        <div class="tm-tree-scroller fn__flex-1">
+        <!-- 标签树滚动列表 (通过拖拽指示线直观显示归为子标签还是拖出为独立标签) -->
+        <div
+          class="tm-tree-scroller fn__flex-1"
+          :class="{ 'is-scroller-drag-over': isDraggingOverScrollerBlank && isDraggingSubTag }"
+          @dragover="handleScrollerDragOver"
+          @dragleave="handleScrollerDragLeave"
+          @drop="handleScrollerDrop"
+        >
+
           <div v-if="displayTreeNodes.length === 0" class="tm-tree-empty-wrapper">
             <!-- 场景 A：无匹配项时的极简添加引导指示 -->
             <div v-if="searchKeyword.trim()" class="tm-empty-state tm-empty-state--create">
@@ -256,7 +263,7 @@
               class="tm-tree-node"
               :class="{
                 'is-selected': isTagSelected(node.label),
-                'is-drag-over': dragOverTagLabel === node.label,
+                'is-drag-over-inside': dragIndicator?.nodeLabel === node.label && dragIndicator.position === 'inside',
                 'tm-node-highlight': highlightedTagLabel === node.label,
               }"
               :style="{ paddingLeft: `${node.depth * 14 + 6}px` }"
@@ -267,6 +274,32 @@
               @dragleave="handleDragLeaveNode(node, $event)"
               @drop="handleDropOnNode(node, $event)"
             >
+              <!-- 拖拽放置指示线：上边缘（拖出为独立根标签或同级） -->
+              <div
+                v-if="dragIndicator?.nodeLabel === node.label && dragIndicator.position === 'before'"
+                class="tm-drop-indicator-line is-before"
+                :class="dragIndicator.mode === 'root' ? 'is-root' : 'is-child'"
+              >
+                <span class="tm-indicator-dot"></span>
+                <span class="tm-indicator-badge">
+                  <SyLineIcon :name="dragIndicator.mode === 'root' ? 'corner-up-left' : 'corner-down-right'" :size="10" />
+                  <span>{{ dragIndicator.mode === 'root' ? `拖出为独立标签 #${draggingLeafName}#` : `归入 #${node.name}# 为子标签` }}</span>
+                </span>
+              </div>
+
+              <!-- 拖拽放置指示线：下边缘（拖出为独立根标签或同级） -->
+              <div
+                v-if="dragIndicator?.nodeLabel === node.label && dragIndicator.position === 'after'"
+                class="tm-drop-indicator-line is-after"
+                :class="dragIndicator.mode === 'root' ? 'is-root' : 'is-child'"
+              >
+                <span class="tm-indicator-dot"></span>
+                <span class="tm-indicator-badge">
+                  <SyLineIcon :name="dragIndicator.mode === 'root' ? 'corner-up-left' : 'corner-down-right'" :size="10" />
+                  <span>{{ dragIndicator.mode === 'root' ? `拖出为独立标签 #${draggingLeafName}#` : `归入 #${node.name}# 为子标签` }}</span>
+                </span>
+              </div>
+
               <!-- 展开/折叠箭头指示 -->
               <span
                 class="tm-node-expander"
@@ -303,8 +336,8 @@
                 <span class="tm-node-count" v-tooltip="formatNodeTooltip(node)">{{ node.count }}</span>
               </div>
 
-              <!-- 悬停放置子标签落位指示胶囊 -->
-              <span v-if="dragOverTagLabel === node.label" class="tm-drag-target-indicator">
+              <!-- 悬停放置子标签落位指示胶囊（中间区域，归为子标签） -->
+              <span v-if="dragIndicator?.nodeLabel === node.label && dragIndicator.position === 'inside'" class="tm-drag-target-indicator">
                 <SyLineIcon name="corner-down-right" :size="11" />
                 <span>归入 #{{ node.name }}# 下作为子标签</span>
               </span>
@@ -343,17 +376,16 @@
               </div>
             </div>
 
-            <!-- 拖拽至顶级根标签释放提示区 (位于列表末尾，绝不推挤上方任何树节点) -->
+            <!-- 当拖拽到树底部留白区域时的指示线提示 -->
             <div
-              v-show="draggingTagLabel"
-              class="tm-root-dropzone"
-              :class="{ 'is-drag-over': isDraggingOverRoot }"
-              @dragover.prevent="isDraggingOverRoot = true"
-              @dragleave="isDraggingOverRoot = false"
-              @drop="handleDropToRoot"
+              v-if="isDraggingOverScrollerBlank && isDraggingSubTag"
+              class="tm-drop-indicator-line is-scroller-bottom is-root"
             >
-              <SyLineIcon name="corner-down-right" :size="12" />
-              <span>释放至此处恢复为顶级根标签 (一级标签)</span>
+              <span class="tm-indicator-dot"></span>
+              <span class="tm-indicator-badge">
+                <SyLineIcon name="corner-up-left" :size="10" />
+                <span>拖出为独立标签 #{{ draggingLeafName }}#</span>
+              </span>
             </div>
           </div>
         </div>
@@ -527,8 +559,8 @@
     <div v-if="reparentConfirmState.visible" class="tm-modal-mask" @click.self="reparentConfirmState.visible = false">
       <div class="tm-modal-card" style="max-width: 380px;">
         <div class="tm-modal-title">
-          <SyLineIcon name="corner-down-right" :size="16" />
-          <span>确认配置子标签</span>
+          <SyLineIcon :name="reparentConfirmState.targetParentLabel ? 'corner-down-right' : 'corner-up-left'" :size="16" />
+          <span>{{ reparentConfirmState.targetParentLabel ? '确认配置子标签' : '确认移出父级恢复为独立标签' }}</span>
         </div>
         <div class="tm-modal-body" style="font-size: 12px; line-height: 1.6;">
           <div v-if="reparentConfirmState.targetParentLabel">
@@ -623,12 +655,18 @@ const heatScope = ref<'top20' | 'top50' | 'all'>('all');
 
 const activeContext = ref<{ docId?: string; docTitle?: string; blockId?: string }>({});
 
-// 拖拽层级重构与暂存状态
+// 拖拽层级重构与指示线状态
+export interface ITreeDragIndicator {
+  nodeLabel: string;
+  position: 'before' | 'inside' | 'after';
+  mode: 'root' | 'child'; // root: 拖出为独立根标签; child: 归为子标签
+}
+
 const stagedRenames = ref<Map<string, string>>(new Map());
 const isSavingStaged = ref(false);
 const draggingTagLabel = ref<string | null>(null);
 const dragOverTagLabel = ref<string | null>(null);
-const isDraggingOverRoot = ref(false);
+const dragIndicator = ref<ITreeDragIndicator | null>(null);
 const highlightedTagLabel = ref<string | null>(null);
 
 // 拖拽落位即时确认对话框状态
@@ -810,11 +848,61 @@ function handleDragStart(node: ITagItem, e: DragEvent) {
   }, 0);
 }
 
+const isDraggingSubTag = computed(() => {
+  const current = draggingTagLabel.value || TagDropService.getDraggingTag();
+  return Boolean(current && current.includes('/'));
+});
+
+const draggingLeafName = computed(() => {
+  const current = draggingTagLabel.value || TagDropService.getDraggingTag();
+  if (!current) return '';
+  return current.split('/').pop() || current;
+});
+
+const isDraggingOverScrollerBlank = ref(false);
+
 function handleDragEnd() {
   draggingTagLabel.value = null;
   dragOverTagLabel.value = null;
-  isDraggingOverRoot.value = false;
+  dragIndicator.value = null;
+  isDraggingOverScrollerBlank.value = false;
   TagDropService.setDraggingTag(null);
+}
+
+function handleScrollerDragOver(e: DragEvent) {
+  if (!isDraggingSubTag.value) return;
+  const target = e.target as HTMLElement | null;
+  const isOverNode = Boolean(target?.closest('.tm-tree-node'));
+  if (!isOverNode) {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+    isDraggingOverScrollerBlank.value = true;
+  } else {
+    isDraggingOverScrollerBlank.value = false;
+  }
+}
+
+function handleScrollerDragLeave(e: DragEvent) {
+  const related = e.relatedTarget as HTMLElement | null;
+  const current = e.currentTarget as HTMLElement | null;
+  if (!current || !related || !current.contains(related)) {
+    isDraggingOverScrollerBlank.value = false;
+  }
+}
+
+function handleScrollerDrop(e: DragEvent) {
+  if (!isDraggingSubTag.value) return;
+  const target = e.target as HTMLElement | null;
+  const isOverNode = Boolean(target?.closest('.tm-tree-node'));
+  if (!isOverNode) {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingOverScrollerBlank.value = false;
+    dragIndicator.value = null;
+    handleDropToRoot(e);
+  }
 }
 
 function handleDragOverNode(node: ITagItem, e: DragEvent) {
@@ -827,7 +915,43 @@ function handleDragOverNode(node: ITagItem, e: DragEvent) {
   if (e.dataTransfer) {
     e.dataTransfer.dropEffect = 'move';
   }
-  dragOverTagLabel.value = node.label;
+
+  const targetEl = (e.currentTarget as HTMLElement) || (e.target as HTMLElement)?.closest('.tm-tree-node');
+  if (!targetEl) return;
+  const rect = targetEl.getBoundingClientRect();
+  const height = rect.height || 28;
+  const offsetY = e.clientY - rect.top;
+  const ratio = Math.max(0, Math.min(1, offsetY / height));
+  const offsetX = e.clientX - rect.left;
+
+  const isSubTag = Boolean(currentDragging.includes('/'));
+
+  // 三段式指示线定位：
+  // 1. 上边缘 (ratio < 0.28) 或 靠左拉出 (isSubTag && offsetX < 28) -> 显示上方指示线，拖出为独立根标签
+  // 2. 下边缘 (ratio > 0.72) -> 显示下方指示线，拖出为独立根标签
+  // 3. 悬停在节点主体 (0.28 <= ratio <= 0.72) -> 目标节点高亮，归为该节点的子标签
+  if (ratio < 0.28 || (isSubTag && offsetX < 28)) {
+    dragIndicator.value = {
+      nodeLabel: node.label,
+      position: 'before',
+      mode: 'root',
+    };
+    dragOverTagLabel.value = null;
+  } else if (ratio > 0.72) {
+    dragIndicator.value = {
+      nodeLabel: node.label,
+      position: 'after',
+      mode: 'root',
+    };
+    dragOverTagLabel.value = null;
+  } else {
+    dragIndicator.value = {
+      nodeLabel: node.label,
+      position: 'inside',
+      mode: 'child',
+    };
+    dragOverTagLabel.value = node.label;
+  }
 }
 
 function handleDragLeaveNode(node: ITagItem, e: DragEvent) {
@@ -835,6 +959,9 @@ function handleDragLeaveNode(node: ITagItem, e: DragEvent) {
   const related = e.relatedTarget as HTMLElement | null;
   const currentTarget = e.currentTarget as HTMLElement | null;
   if (!currentTarget || !related || !currentTarget.contains(related)) {
+    if (dragIndicator.value?.nodeLabel === node.label) {
+      dragIndicator.value = null;
+    }
     if (dragOverTagLabel.value === node.label) {
       dragOverTagLabel.value = null;
     }
@@ -848,16 +975,25 @@ function handleDropOnNode(targetNode: ITagItem, e: DragEvent) {
     e.dataTransfer?.getData('application/siyuan-tag') ||
     e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
 
+  const indicator = dragIndicator.value;
+  dragIndicator.value = null;
   dragOverTagLabel.value = null;
-  isDraggingOverRoot.value = false;
+  isDraggingOverScrollerBlank.value = false;
+
   if (!src || src === targetNode.label) return;
   if (targetNode.label.startsWith(`${src}/`)) return;
 
   e.preventDefault();
   e.stopPropagation();
 
+  // 根据指示线显示状态精准判定：
+  // 若处于上下边缘指示线，执行拖出为独立根标签；
+  // 若处于节点主体，执行归为该节点的子标签
+  const isRootMode = indicator ? indicator.mode === 'root' && indicator.position !== 'inside' : false;
+  const targetParent = isRootMode ? null : targetNode.label;
+
   // 计算重构变动路径
-  const moves = TagTreeService.calculateReparentMoves(src, targetNode.label, virtualAllTags.value);
+  const moves = TagTreeService.calculateReparentMoves(src, targetParent, virtualAllTags.value);
   if (moves.length === 0) return;
 
   const srcTagItem = virtualAllTags.value.find(t => t.label === src);
@@ -867,7 +1003,7 @@ function handleDropOnNode(targetNode: ITagItem, e: DragEvent) {
   reparentConfirmState.value = {
     visible: true,
     srcLabel: src,
-    targetParentLabel: targetNode.label,
+    targetParentLabel: targetParent,
     moves,
     quoteCount,
   };
@@ -880,7 +1016,9 @@ function handleDropToRoot(e: DragEvent) {
     e.dataTransfer?.getData('application/siyuan-tag') ||
     e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
 
-  isDraggingOverRoot.value = false;
+  dragIndicator.value = null;
+  dragOverTagLabel.value = null;
+  isDraggingOverScrollerBlank.value = false;
   if (!src) return;
 
   e.preventDefault();

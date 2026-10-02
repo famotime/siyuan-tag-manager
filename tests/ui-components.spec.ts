@@ -885,6 +885,24 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
 
     const html = await renderToString(app);
     expect(html).toContain('配置子标签与层级...');
+    expect(html).not.toContain('移出父级，恢复为独立标签');
+  });
+
+  it('TagRowMenu 针对子标签应动态渲染“移出父级，恢复为独立标签”选项', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagRowMenu, {
+      state: {
+        visible: true,
+        label: 'frontend/vue',
+        top: 100,
+        left: 100,
+      },
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('移出父级，恢复为独立标签');
   });
 
   it('TagReparentModal 渲染时应支持搜索目标父级并提供预期路径预览', async () => {
@@ -977,6 +995,33 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('tm-tree-scroller');
     expect(html).not.toContain('is-tree-dragging');
   });
+
+  it('TagTreeView 中应通过指示线控制子标签/独立标签放置，且不再渲染顶部吸顶和底部根释放区域', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { label: 'parent', count: 10, depth: 0, name: 'parent' },
+        { label: 'parent/child', count: 3, depth: 1, name: 'child' },
+      ],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    // 不应再包含突兀的顶部和底部根释放占位区域
+    expect(html).not.toContain('tm-sticky-root-dropzone');
+    expect(html).not.toContain('tm-root-dropzone');
+    // 树滚动容器正常渲染
+    expect(html).toContain('tm-tree-scroller');
+    expect(html).toContain('tm-tree-node');
+  });
 });
+
 
 
