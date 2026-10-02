@@ -215,9 +215,17 @@
       </div>
     </div>
 
-    <!-- 检索结果卡片流 -->
+    <!-- 检索结果卡片流 (支持多打标段落同文档合并展示一个标题) -->
     <div class="tm-results-header">
-      <span>匹配结果：<b>{{ matchedBlocks.length }}</b> 条记录</span>
+      <div class="tm-results-count">
+        <span>匹配结果：<b>{{ matchedBlocks.length }}</b> 条记录</span>
+        <span
+          v-if="groupedMatchedDocs.length > 0 && groupedMatchedDocs.length !== matchedBlocks.length"
+          class="tm-results-doc-count"
+        >
+          （合并为 <b>{{ groupedMatchedDocs.length }}</b> 篇文档）
+        </span>
+      </div>
       <span v-if="queryLoading" class="tm-loading-indicator">
         <SyLineIcon name="refresh-cw" :size="12" :spin="true" />
         <span>检索中...</span>
@@ -229,23 +237,43 @@
         <div class="tm-empty-text">没有符合多维组合条件的块记录</div>
       </div>
       <div
-        v-for="block in matchedBlocks"
-        :key="block.id"
-        class="tm-card"
-        @click="emit('jump-block', block.rootId, block.id)"
+        v-for="group in groupedMatchedDocs"
+        :key="group.rootId"
+        class="tm-card tm-doc-card"
       >
-        <div class="tm-card-doc">
-          <SyLineIcon :name="block.type === 'd' ? 'file-text' : 'file-up'" :size="13" class="tm-doc-icon" />
-          <span>{{ block.docTitle }}</span>
-          <span v-if="block.type === 'd'" class="tm-doc-badge">文档</span>
-        </div>
-        <div class="tm-card-content" v-html="highlightTags(block.content || block.markdown)"></div>
-        <div class="tm-card-footer">
-          <span class="tm-card-time">{{ block.updated }}</span>
-          <span class="tm-card-jump">
-            <span>定位跳转</span>
-            <SyLineIcon name="external-link" :size="11" />
+        <!-- 同文档合并统一展示的一个标题栏 -->
+        <div
+          class="tm-card-doc"
+          v-tooltip="'点击定位至文档'"
+          @click="emit('jump-block', group.rootId, group.blocks[0]?.id || group.rootId)"
+        >
+          <SyLineIcon :name="group.hasDocType ? 'file-text' : 'file-up'" :size="13" class="tm-doc-icon" />
+          <span class="tm-doc-title" :title="group.docTitle">{{ group.docTitle }}</span>
+          <span v-if="group.hasDocType" class="tm-doc-badge">文档</span>
+          <span v-if="group.blocks.length > 1" class="tm-doc-badge tm-doc-badge--count">
+            {{ group.blocks.length }} 处打标
           </span>
+        </div>
+
+        <!-- 所属该文档的打标段落列表 -->
+        <div class="tm-doc-blocks">
+          <div
+            v-for="(block, bIdx) in group.blocks"
+            :key="block.id"
+            class="tm-doc-block-item"
+            :class="{ 'has-divider': bIdx > 0 }"
+            v-tooltip="'点击定位跳转至打标段落并在屏幕正中展示'"
+            @click.stop="emit('jump-block', block.rootId, block.id)"
+          >
+            <div class="tm-card-content" v-html="highlightTags(block.content || block.markdown)"></div>
+            <div class="tm-card-footer">
+              <span class="tm-card-time">{{ block.updated }}</span>
+              <span class="tm-card-jump">
+                <span>定位跳转</span>
+                <SyLineIcon name="external-link" :size="11" />
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -256,6 +284,7 @@
 import { computed, nextTick, ref, watch } from 'vue';
 import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
+import { TagFilterEngine } from '../../services/TagFilterEngine';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = defineProps<{
@@ -303,6 +332,10 @@ watch(
 function handleModeButtonClick(mode: TagFilterConditionMode) {
   currentMode.value = mode;
 }
+
+const groupedMatchedDocs = computed(() => {
+  return TagFilterEngine.groupMatchedBlocksByDoc(props.matchedBlocks || []);
+});
 
 const isFilterEmpty = computed(() => {
   return (

@@ -1,4 +1,10 @@
-import type { ISmartTagView, IFilterSelectionState, TagFilterConditionMode } from '../types/tag';
+import type {
+  ISmartTagView,
+  IFilterSelectionState,
+  TagFilterConditionMode,
+  ITagMatchedBlock,
+  ITagMatchedDocGroup,
+} from '../types/tag';
 
 /**
  * 标签布尔筛选与 SQL 查询组装引擎
@@ -332,5 +338,44 @@ export class TagFilterEngine {
       optionalTags: mode === 'optional' ? validTags : [],
     };
   }
+
+  /**
+   * 将多维筛选匹配的块记录按所属文档（rootId）进行合并分组
+   * 保留原本的文档出现先后顺序，同一个文档合并展示一个标题，内部聚合该文档下的所有打标段落
+   * @param blocks 匹配的块列表
+   */
+  public static groupMatchedBlocksByDoc(blocks: ITagMatchedBlock[]): ITagMatchedDocGroup[] {
+    if (!blocks || blocks.length === 0) {
+      return [];
+    }
+
+    const groups: ITagMatchedDocGroup[] = [];
+    const map = new Map<string, ITagMatchedDocGroup>();
+
+    for (const block of blocks) {
+      const key = block.rootId || block.id;
+      let group = map.get(key);
+      if (!group) {
+        group = {
+          rootId: key,
+          docTitle: block.docTitle || (block.type === 'd' ? (block.content || '无标题文档') : '无标题文档'),
+          hasDocType: block.type === 'd',
+          blocks: [],
+        };
+        map.set(key, group);
+        groups.push(group);
+      }
+      if (block.type === 'd') {
+        group.hasDocType = true;
+        if (block.content && (!group.docTitle || group.docTitle === '无标题文档')) {
+          group.docTitle = block.content;
+        }
+      }
+      group.blocks.push(block);
+    }
+
+    return groups;
+  }
 }
+
 

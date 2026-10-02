@@ -172,18 +172,6 @@
           </div>
         </div>
 
-        <!-- 拖拽至顶级根标签释放提示区 (正在拖拽时展示) -->
-        <div
-          v-if="draggingTagLabel"
-          class="tm-root-dropzone"
-          :class="{ 'is-drag-over': isDraggingOverRoot }"
-          @dragover.prevent="isDraggingOverRoot = true"
-          @dragleave="isDraggingOverRoot = false"
-          @drop="handleDropToRoot"
-        >
-          <SyLineIcon name="corner-down-right" :size="12" />
-          <span>释放至此处恢复为顶级根标签 (一级标签)</span>
-        </div>
 
         <!-- 多选状态控制横条 -->
         <div v-if="selectedTags && selectedTags.length > 0" class="tm-selection-bar" style="margin: 4px 8px;">
@@ -268,7 +256,6 @@
               class="tm-tree-node"
               :class="{
                 'is-selected': isTagSelected(node.label),
-                'is-dragging': draggingTagLabel === node.label,
                 'is-drag-over': dragOverTagLabel === node.label,
                 'tm-node-highlight': highlightedTagLabel === node.label,
               }"
@@ -294,7 +281,10 @@
               </span>
 
               <!-- 节点主内容 -->
-              <div class="tm-node-content" @click="emit('tag-click', node.label, $event)">
+              <div
+                class="tm-node-content"
+                @click="emit('tag-click', node.label, $event)"
+              >
                 <span
                   class="tm-node-name"
                   :data-tag="node.label"
@@ -316,7 +306,7 @@
               <!-- 悬停放置子标签落位指示胶囊 -->
               <span v-if="dragOverTagLabel === node.label" class="tm-drag-target-indicator">
                 <SyLineIcon name="corner-down-right" :size="11" />
-                <span>归入 #{{ node.name }}# 下</span>
+                <span>归入 #{{ node.name }}# 下作为子标签</span>
               </span>
 
               <!-- 操作区：即时筛选 + 定制色彩与别名 + 删除标签 + 更多菜单 -->
@@ -351,6 +341,19 @@
                   <SyLineIcon name="more-horizontal" :size="13" />
                 </button>
               </div>
+            </div>
+
+            <!-- 拖拽至顶级根标签释放提示区 (位于列表末尾，绝不推挤上方任何树节点) -->
+            <div
+              v-show="draggingTagLabel"
+              class="tm-root-dropzone"
+              :class="{ 'is-drag-over': isDraggingOverRoot }"
+              @dragover.prevent="isDraggingOverRoot = true"
+              @dragleave="isDraggingOverRoot = false"
+              @drop="handleDropToRoot"
+            >
+              <SyLineIcon name="corner-down-right" :size="12" />
+              <span>释放至此处恢复为顶级根标签 (一级标签)</span>
             </div>
           </div>
         </div>
@@ -652,7 +655,12 @@ async function handleExecuteReparentDirectly() {
   try {
     emit('batch-reparent', reparentConfirmState.value.moves);
     if (reparentConfirmState.value.targetParentLabel) {
-      collapsedSet.value.delete(reparentConfirmState.value.targetParentLabel);
+      // 确保目标标签及其所有祖先层级均从折叠集合中移除，使其在树中展开立即可见
+      const parts = reparentConfirmState.value.targetParentLabel.split('/');
+      for (let i = 1; i <= parts.length; i++) {
+        const parentPath = parts.slice(0, i).join('/');
+        collapsedSet.value.delete(parentPath);
+      }
     }
     stagedRenames.value.clear();
     reparentConfirmState.value.visible = false;
@@ -788,7 +796,6 @@ function formatNodeTooltip(node: ITagItem): string {
 // ==========================================
 
 function handleDragStart(node: ITagItem, e: DragEvent) {
-  draggingTagLabel.value = node.label;
   TagDropService.setDraggingTag(node.label);
 
   if (e.dataTransfer) {
@@ -796,6 +803,11 @@ function handleDragStart(node: ITagItem, e: DragEvent) {
     e.dataTransfer.setData('application/siyuan-tag', node.label);
     e.dataTransfer.setData('text/plain', `#${node.label}# `);
   }
+
+  // 异步延迟更新 draggingTagLabel，避免同步修改响应式状态导致 DOM 重新渲染和布局突变（Layout Shift）打断 Chromium 原生拖拽启动
+  setTimeout(() => {
+    draggingTagLabel.value = node.label;
+  }, 0);
 }
 
 function handleDragEnd() {
@@ -1029,12 +1041,15 @@ function handleCloudTagClick(label: string) {
 }
 
 function handleCloudDragStart(tag: ITagItem, e: DragEvent) {
-  draggingTagLabel.value = tag.label;
   TagDropService.setDraggingTag(tag.label);
   if (e.dataTransfer) {
     e.dataTransfer.effectAllowed = 'copyMove';
     e.dataTransfer.setData('application/siyuan-tag', tag.label);
     e.dataTransfer.setData('text/plain', `#${tag.label}# `);
   }
+
+  setTimeout(() => {
+    draggingTagLabel.value = tag.label;
+  }, 0);
 }
 </script>

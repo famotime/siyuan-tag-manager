@@ -295,5 +295,108 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       expect(res.excludeTags).toEqual([]);
     });
   });
+
+  describe('groupMatchedBlocksByDoc 同文档打标段落合并展示测试', () => {
+    it('空数组返回空数组', () => {
+      expect(TagFilterEngine.groupMatchedBlocksByDoc([])).toEqual([]);
+    });
+
+    it('多个打标段落属于同一个文档时，按文档合并为一组并保留一个标题', () => {
+      const blocks = [
+        {
+          id: 'b1',
+          rootId: 'doc1',
+          docTitle: 'OpenClaw记忆黑科技',
+          content: '说话直接，技术讨论给出代码 #算法控制#',
+          markdown: '说话直接，技术讨论给出代码 #算法控制#',
+          type: 'p',
+          updated: '20261002105517',
+          matchedTags: ['算法控制'],
+        },
+        {
+          id: 'b2',
+          rootId: 'doc1',
+          docTitle: 'OpenClaw记忆黑科技',
+          content: '想对 Agent 做脑部手术? #算法控制#',
+          markdown: '想对 Agent 做脑部手术? #算法控制#',
+          type: 'p',
+          updated: '20261002105403',
+          matchedTags: ['算法控制'],
+        },
+        {
+          id: 'b3',
+          rootId: 'doc2',
+          docTitle: '哪有什么真正的自由',
+          content: '哪有什么真正的自由 · #算法控制#',
+          markdown: '哪有什么真正的自由 · #算法控制#',
+          type: 'd',
+          updated: '20260809144636',
+          matchedTags: ['算法控制'],
+        },
+      ];
+
+      const groups = TagFilterEngine.groupMatchedBlocksByDoc(blocks);
+
+      expect(groups).toHaveLength(2);
+
+      // 第一组：doc1
+      expect(groups[0].rootId).toBe('doc1');
+      expect(groups[0].docTitle).toBe('OpenClaw记忆黑科技');
+      expect(groups[0].blocks).toHaveLength(2);
+      expect(groups[0].blocks[0].id).toBe('b1');
+      expect(groups[0].blocks[1].id).toBe('b2');
+      expect(groups[0].hasDocType).toBe(false);
+
+      // 第二组：doc2
+      expect(groups[1].rootId).toBe('doc2');
+      expect(groups[1].docTitle).toBe('哪有什么真正的自由');
+      expect(groups[1].blocks).toHaveLength(1);
+      expect(groups[1].blocks[0].id).toBe('b3');
+      expect(groups[1].hasDocType).toBe(true);
+    });
+
+    it('保留原始块排序顺序（文档首次出现的先后顺序）', () => {
+      const blocks = [
+        {
+          id: 'b1',
+          rootId: 'docA',
+          docTitle: '文档A',
+          content: '段落1',
+          markdown: '段落1',
+          type: 'p',
+          updated: '20261002100000',
+          matchedTags: ['tag1'],
+        },
+        {
+          id: 'b2',
+          rootId: 'docB',
+          docTitle: '文档B',
+          content: '段落2',
+          markdown: '段落2',
+          type: 'p',
+          updated: '20261002090000',
+          matchedTags: ['tag1'],
+        },
+        {
+          id: 'b3',
+          rootId: 'docA',
+          docTitle: '文档A',
+          content: '段落3',
+          markdown: '段落3',
+          type: 'p',
+          updated: '20261002080000',
+          matchedTags: ['tag1'],
+        },
+      ];
+
+      const groups = TagFilterEngine.groupMatchedBlocksByDoc(blocks);
+      expect(groups).toHaveLength(2);
+      expect(groups[0].rootId).toBe('docA');
+      expect(groups[0].blocks).toHaveLength(2);
+      expect(groups[1].rootId).toBe('docB');
+      expect(groups[1].blocks).toHaveLength(1);
+    });
+  });
 });
+
 

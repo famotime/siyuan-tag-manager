@@ -216,3 +216,18 @@ export interface ITagMatchedBlock {
   updated: string;
   matchedTags: string[];
 }
+
+/**
+ * 标签命中结果按文档聚合组（用于多维筛选同文档合并展示）
+ */
+export interface ITagMatchedDocGroup {
+  /** 文档根块 ID */
+  rootId: string;
+  /** 文档标题 */
+  docTitle: string;
+  /** 是否包含文档级打标 */
+  hasDocType: boolean;
+  /** 该文档下所有命中的打标段落块列表 */
+  blocks: ITagMatchedBlock[];
+}
+

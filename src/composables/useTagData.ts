@@ -255,9 +255,23 @@ export function useTagData() {
     if (!moves || moves.length === 0) return { success: true };
     loading.value = true;
     try {
+      // 1. 过滤出需要调用内核 renameTag 的根变动节点（思源内核 renameTag 会自动级联处理下属所有子标签）
+      const kernelRenames: Array<{ oldLabel: string; newLabel: string }> = [];
       for (const m of moves) {
         if (m.oldLabel === m.newLabel) continue;
-        await TagApiClient.renameTag(m.oldLabel, m.newLabel);
+        const isCoveredByPrevious = kernelRenames.some(r => m.oldLabel.startsWith(`${r.oldLabel}/`));
+        if (!isCoveredByPrevious) {
+          kernelRenames.push(m);
+        }
+      }
+
+      for (const kr of kernelRenames) {
+        await TagApiClient.renameTag(kr.oldLabel, kr.newLabel);
+      }
+
+      // 2. 迁移所有变动项的元数据与侧面板自定义标签
+      for (const m of moves) {
+        if (m.oldLabel === m.newLabel) continue;
         const oldMeta = metadataMap.value.get(m.oldLabel);
         if (oldMeta) {
           metadataMap.value.delete(m.oldLabel);
@@ -266,6 +280,10 @@ export function useTagData() {
             label: m.newLabel,
             updatedAt: Date.now(),
           });
+        }
+        const customIdx = customTags.value.indexOf(m.oldLabel);
+        if (customIdx >= 0) {
+          customTags.value[customIdx] = m.newLabel;
         }
       }
       await persistConfig();

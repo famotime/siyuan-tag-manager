@@ -3,6 +3,7 @@ import { showMessage } from 'siyuan';
 import type { ITagMatchedBlock, ISmartTagView, IFilterSelectionState, TagFilterConditionMode } from '../types/tag';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagFilterEngine } from '../services/TagFilterEngine';
+import { TagNavigationService } from '../services/TagNavigationService';
 import { usePlugin } from '../main';
 
 // 共享的筛选状态
@@ -160,14 +161,13 @@ export function useTagFilter() {
   }
 
   function jumpToBlock(rootId: string, blockId: string) {
-    if ((window as any).siyuan && (window as any).siyuan.openTab) {
-      (window as any).siyuan.openTab({
-        app: (window as any).siyuan.appId,
-        doc: { id: rootId, focusBlockId: blockId },
-      });
-    } else {
-      window.open(`siyuan://blocks/${blockId}`);
+    let plugin: any = null;
+    try {
+      plugin = usePlugin();
+    } catch {
+      // 容错处理独立测试或插件未初始化环境
     }
+    TagNavigationService.jumpToBlock(rootId, blockId, plugin);
   }
 
   return {

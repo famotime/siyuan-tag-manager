@@ -301,10 +301,15 @@
   justify-content: space-between;
   padding: 3px 6px;
   border-radius: 4px;
-  cursor: pointer;
+  cursor: grab;
+  -webkit-user-drag: element;
+  user-select: none;
   transition: background-color 0.15s, box-shadow 0.15s;
   min-height: 26px;
-  user-select: none;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .tm-tree-node:hover {
@@ -354,7 +359,8 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   align-items: center;
   justify-content: center;
   color: var(--b3-theme-on-surface-light);
-  cursor: pointer;
+  cursor: pointer !important;
+  -webkit-user-drag: none !important;
   margin-right: 2px;
   flex-shrink: 0;
 }
@@ -406,6 +412,13 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   gap: 2px;
   margin-left: 4px;
   flex-shrink: 0;
+  cursor: default;
+  -webkit-user-drag: none !important;
+
+  .tm-action-btn {
+    cursor: pointer !important;
+    -webkit-user-drag: none !important;
+  }
 }
 
 .tm-tree-node:hover .tm-node-actions,
@@ -969,6 +982,18 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   color: var(--b3-theme-on-surface-light);
 }
 
+.tm-results-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tm-results-doc-count {
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  font-weight: normal;
+}
+
 .tm-loading-indicator {
   display: inline-flex;
   align-items: center;
@@ -1000,14 +1025,35 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   transform: translateY(-1px);
 }
 
+.tm-doc-card {
+  padding: 8px 10px;
+  cursor: default;
+}
+
 .tm-card-doc {
   font-weight: 600;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: var(--b3-theme-primary);
   display: flex;
   align-items: center;
   gap: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--b3-theme-surface-lighter, rgba(0, 0, 0, 0.04));
+  }
+}
+
+.tm-doc-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 .tm-doc-badge {
@@ -1020,6 +1066,41 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   color: var(--b3-theme-on-surface-light);
   border: 1px solid var(--b3-border-color);
   margin-left: 2px;
+  white-space: nowrap;
+}
+
+.tm-doc-badge--count {
+  background-color: var(--tm-badge-primary-bg, rgba(26, 86, 219, 0.08));
+  color: var(--tm-badge-primary-text, var(--b3-theme-primary));
+  border-color: var(--tm-badge-primary-border, rgba(26, 86, 219, 0.2));
+  font-weight: 600;
+}
+
+.tm-doc-blocks {
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-doc-block-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &.has-divider {
+    border-top: 1px dashed var(--b3-border-color);
+    margin-top: 6px;
+    padding-top: 8px;
+  }
+
+  &:hover {
+    background-color: var(--b3-theme-surface-lighter, rgba(0, 0, 0, 0.04));
+
+    .tm-card-jump {
+      color: var(--b3-theme-primary);
+      text-decoration: underline;
+    }
+  }
 }
 
 .tm-card-content {
@@ -1053,6 +1134,15 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   align-items: center;
   gap: 2px;
   color: var(--b3-theme-primary);
+  transition: all 0.15s ease;
+}
+
+// 目标块定位高亮微动效
+.tm-block-jump-highlight {
+  outline: 2px solid var(--b3-theme-primary) !important;
+  outline-offset: 2px !important;
+  background-color: var(--b3-theme-primary-light, rgba(26, 86, 219, 0.08)) !important;
+  transition: all 0.3s ease !important;
 }
 
 /* 认知图谱与生命周期 */
@@ -2847,6 +2937,16 @@ body.theme--dark .tm-cloud-bubble {
   outline-offset: 2px;
   background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.08)) !important;
   transition: outline 0.15s ease, background-color 0.15s ease;
+}
+
+/* 思源编辑器文档顶部标签展示区域/标题区域打标落位高亮 */
+.tm-drop-doc-active {
+  outline: 2px dashed var(--b3-theme-primary) !important;
+  outline-offset: 3px !important;
+  background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.12)) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 12px rgba(53, 116, 240, 0.25) !important;
+  transition: all 0.15s ease !important;
 }
 
 
