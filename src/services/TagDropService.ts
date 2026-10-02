@@ -22,38 +22,131 @@ export class TagDropService {
   }
 
   /**
-   * 判断目标是否属于思源文档顶部的标签展示区域或文档标题区域
+   * 从 DOM 元素出发，多层级解析当前文档的 rootId / docId
+   */
+  public static resolveDocIdFromElement(targetEl: HTMLElement): string | null {
+    if (!targetEl) return null;
+
+    // 1. 检查祖先 .protyle[data-node-id] 容器 (思源在 syncRootAttributes 为 protyle 设置该属性)
+    const protyleEl = targetEl.closest?.<HTMLElement>('.protyle');
+    if (protyleEl && typeof protyleEl.getAttribute === 'function') {
+      const protyleDocId = protyleEl.getAttribute('data-node-id');
+      if (protyleDocId) return protyleDocId;
+
+      // 2. 检查面包屑导航的第一项 (面包屑首个 item 的 data-node-id 即为文档根 ID)
+      const breadcrumbItem = protyleEl.querySelector?.<HTMLElement>(
+        '.protyle-breadcrumb__bar [data-node-id], .protyle-breadcrumb__item[data-node-id]',
+      );
+      const breadcrumbDocId = breadcrumbItem?.getAttribute('data-node-id');
+      if (breadcrumbDocId) return breadcrumbDocId;
+
+      // 3. 检查是否有挂载的 protyle 实例
+      if ((protyleEl as any).protyle?.block?.rootID) {
+        return (protyleEl as any).protyle.block.rootID;
+      }
+    }
+
+    // 4. 若元素直接带有 data-node-id
+    if (typeof targetEl.getAttribute === 'function') {
+      const selfDocId = targetEl.getAttribute('data-node-id');
+      if (selfDocId) return selfDocId;
+    }
+
+    // 5. 检查所在分栏窗口 (.layout__wnd) 中的当前激活页签
+    const wndEl = targetEl.closest?.<HTMLElement>('.layout__wnd');
+    if (wndEl) {
+      const activeTab = wndEl.querySelector?.<HTMLElement>('.item--focus[data-id], .tab-header--active[data-id]');
+      const tabInitData = activeTab?.getAttribute?.('data-initdata');
+      if (tabInitData) {
+        try {
+          const parsed = JSON.parse(tabInitData);
+          if (parsed?.rootId || parsed?.blockId) {
+            return parsed.rootId || parsed.blockId;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // 6. 遍历思源全局布局中所有打开的编辑器模型
+    try {
+      const siyuanGlobal = (window as any).siyuan;
+      if (siyuanGlobal?.layout?.centerLayout) {
+        const findEditorRootId = (layout: any): string | null => {
+          if (!layout || !layout.children) return null;
+          for (const child of layout.children) {
+            if (child.model?.editor?.element && protyleEl && child.model.editor.element === protyleEl) {
+              return child.model.editor.block?.rootID || child.model.rootId || null;
+            }
+            if (child.panelElement && typeof child.panelElement.contains === 'function' && child.panelElement.contains(targetEl)) {
+              return child.model?.editor?.block?.rootID || child.model?.rootId || null;
+            }
+            const nested = findEditorRootId(child);
+            if (nested) return nested;
+          }
+          return null;
+        };
+        const found = findEditorRootId(siyuanGlobal.layout.centerLayout);
+        if (found) return found;
+      }
+    } catch {
+      // ignore
+    }
+
+    // 7. 回退策略：查找当前窗口中激活的 protyle 容器
+    const activeProtyle = document?.querySelector?.<HTMLElement>(
+      '.layout__wnd--active .protyle[data-node-id], .protyle:not(.fn__none)[data-node-id]',
+    );
+    const fallbackId = activeProtyle?.getAttribute?.('data-node-id');
+    if (fallbackId) return fallbackId;
+
+    return null;
+  }
+
+  /**
+   * 判断目标是否属于思源文档顶部的标签展示区域、文档标题区域或头部交互区
    */
   public static resolveDocTarget(targetEl: HTMLElement): { el: HTMLElement; docId: string } | null {
     if (!targetEl) return null;
 
-    // 1. 直接命中或位于文档标题区
-    const titleEl = targetEl.closest?.<HTMLElement>('.protyle-title[data-node-id]');
-    if (titleEl && typeof titleEl.getAttribute === 'function') {
-      const docId = titleEl.getAttribute('data-node-id');
-      if (docId) return { el: titleEl, docId };
+    // 若明确处于正文段落块内部 (.protyle-wysiwyg)，由正文块处理，不作为文档级目标
+    const inWysiwyg = Boolean(targetEl.closest?.('.protyle-wysiwyg'));
+    if (inWysiwyg) {
+      return null;
     }
 
-    // 2. 命中思源文档头部的标签展示区、添加标签按钮或背景交互区
-    const docTagArea = targetEl.closest?.<HTMLElement>(
-      '.b3-chips__doctag, .b3-chips, .b3-chip, [data-type="tag"], .protyle-background__ia, .protyle-background, .protyle-attr--av',
-    );
-    if (docTagArea) {
-      // 在同一个 protyle 编辑器容器中寻找对应的文档标题节点
-      const protyleContainer = targetEl.closest?.<HTMLElement>('.protyle, .protyle-content');
-      const containerTitle = protyleContainer?.querySelector?.<HTMLElement>('.protyle-title[data-node-id]');
-      const docId = containerTitle?.getAttribute?.('data-node-id');
+    // 1. 命中标题区域 (.protyle-title 及其子元素：输入框、图标、属性区)
+    const titleContainer = targetEl.closest?.<HTMLElement>('.protyle-title');
+    if (titleContainer) {
+      const docId = this.resolveDocIdFromElement(titleContainer);
       if (docId) {
-        return { el: docTagArea, docId };
+        return { el: titleContainer, docId };
       }
+    }
 
-      // 回退：查找当前窗口中激活的 protyle 标题
-      const fallbackTitle = document?.querySelector?.<HTMLElement>(
-        '.layout__wnd--active .protyle-title[data-node-id], .protyle:not(.fn__none) .protyle-title[data-node-id]',
-      );
-      const fallbackDocId = fallbackTitle?.getAttribute?.('data-node-id');
-      if (fallbackDocId) {
-        return { el: docTagArea, docId: fallbackDocId };
+    // 2. 命中思源文档头部的标签展示区、添加标签按钮、背景交互区、顶部容器或面包屑
+    const headerContainer = targetEl.closest?.<HTMLElement>(
+      '.b3-chips__doctag, .b3-chips, .b3-chip, [data-type="tag"], .protyle-background__ia, .protyle-background, .protyle-top, .protyle-breadcrumb, .protyle-attr--av',
+    );
+    if (headerContainer) {
+      const docId = this.resolveDocIdFromElement(headerContainer);
+      if (docId) {
+        // 高亮元素优先选择内部的标签展示区或标题区，使视觉更聚焦
+        const highlightEl =
+          headerContainer.querySelector?.<HTMLElement>('.b3-chips__doctag, .protyle-title') ||
+          headerContainer;
+        return { el: highlightEl, docId };
+      }
+    }
+
+    // 3. 通用顶部兜底：位于 .protyle 容器内部且不在正文 wysiwyg 之中 (即整个文档头部)
+    const protyleContainer = targetEl.closest?.<HTMLElement>('.protyle');
+    if (protyleContainer) {
+      const docId = this.resolveDocIdFromElement(protyleContainer);
+      if (docId) {
+        const titleEl = protyleContainer.querySelector?.<HTMLElement>('.protyle-title') || protyleContainer;
+        return { el: titleEl, docId };
       }
     }
 
@@ -124,12 +217,17 @@ export class TagDropService {
 
   /**
    * 初始化全局正文与标签展示区拖放监听器
+   * 采用 capture: true 捕获阶段监听，避免被思源大标题输入框自带的 stopPropagation 吞没
    */
   public static initGlobalDropListener(client: typeof TagApiClient = TagApiClient): () => void {
     if (typeof document === 'undefined') return () => {};
 
     const handleDragOver = (e: DragEvent) => {
-      const tag = e.dataTransfer?.getData('application/siyuan-tag') || this.draggingTag;
+      const tag =
+        e.dataTransfer?.getData('application/siyuan-tag') ||
+        this.draggingTag ||
+        e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
+
       if (!tag) return;
 
       const target = e.target as HTMLElement | null;
@@ -161,7 +259,7 @@ export class TagDropService {
     };
 
     const handleDragLeave = (e: DragEvent) => {
-      if (this.activeHighlightEl && !this.activeHighlightEl.contains(e.relatedTarget as Node | null)) {
+      if (this.activeHighlightEl && (!e.relatedTarget || !this.activeHighlightEl.contains(e.relatedTarget as Node | null))) {
         this.clearHighlight();
       }
     };
@@ -169,22 +267,32 @@ export class TagDropService {
     const handleDrop = async (e: DragEvent) => {
       const tag =
         e.dataTransfer?.getData('application/siyuan-tag') ||
-        e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim() ||
-        this.draggingTag;
+        this.draggingTag ||
+        e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
+
       const target = e.target as HTMLElement | null;
-      this.clearHighlight();
-      this.draggingTag = null;
 
-      if (!tag || !target) return;
+      if (!tag || !target) {
+        this.clearHighlight();
+        this.draggingTag = null;
+        return;
+      }
 
-      // 判断落点是文档标签区还是正文段落
-      const isDocTarget = Boolean(this.resolveDocTarget(target));
-      const isBlockTarget = Boolean(this.resolveBlockTarget(target));
+      // 判断落点是文档头部/标题区还是正文段落
+      const docTarget = this.resolveDocTarget(target);
+      const blockTarget = this.resolveBlockTarget(target);
 
-      if (!isDocTarget && !isBlockTarget) return;
+      if (!docTarget && !blockTarget) {
+        this.clearHighlight();
+        return;
+      }
 
+      // 阻止思源输入框默认行为及事件冒泡（防止把文字直接插到标题文本框中）
       e.preventDefault();
       e.stopPropagation();
+
+      this.clearHighlight();
+      this.draggingTag = null;
 
       const res = await this.applyTagToTarget(target, tag, client);
       if (res.success) {
@@ -203,18 +311,20 @@ export class TagDropService {
       this.draggingTag = null;
     };
 
-    document.addEventListener('dragover', handleDragOver);
-    document.addEventListener('dragleave', handleDragLeave);
-    document.addEventListener('drop', handleDrop);
-    document.addEventListener('dragend', handleDragEnd);
+    const eventOptions: AddEventListenerOptions = { capture: true };
+
+    document.addEventListener('dragover', handleDragOver, eventOptions);
+    document.addEventListener('dragleave', handleDragLeave, eventOptions);
+    document.addEventListener('drop', handleDrop, eventOptions);
+    document.addEventListener('dragend', handleDragEnd, eventOptions);
 
     return () => {
       this.clearHighlight();
       this.draggingTag = null;
-      document.removeEventListener('dragover', handleDragOver);
-      document.removeEventListener('dragleave', handleDragLeave);
-      document.removeEventListener('drop', handleDrop);
-      document.removeEventListener('dragend', handleDragEnd);
+      document.removeEventListener('dragover', handleDragOver, eventOptions);
+      document.removeEventListener('dragleave', handleDragLeave, eventOptions);
+      document.removeEventListener('drop', handleDrop, eventOptions);
+      document.removeEventListener('dragend', handleDragEnd, eventOptions);
     };
   }
 
