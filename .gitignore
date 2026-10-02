@@ -10,3 +10,4 @@ tmp
 .env
 *.zip
 *.log
+developer_docs/
