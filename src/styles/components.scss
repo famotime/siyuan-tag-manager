@@ -454,6 +454,36 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   }
 }
 
+.tm-node-inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+
+  .tm-inline-rename-input {
+    height: 22px !important;
+    line-height: 20px !important;
+    padding: 0 6px !important;
+    font-size: 12px !important;
+    flex: 1;
+    min-width: 60px;
+    border-radius: 3px;
+    border: 1px solid var(--b3-theme-primary) !important;
+    background: var(--b3-theme-background) !important;
+    color: var(--b3-theme-on-background) !important;
+  }
+
+  .tm-btn-confirm {
+    color: var(--b3-theme-primary);
+
+    &:hover {
+      background-color: var(--tm-badge-primary-bg);
+      color: var(--b3-theme-primary);
+    }
+  }
+}
+
 /* 浮动右键/更多菜单 */
 .tm-row-menu {
   position: fixed;

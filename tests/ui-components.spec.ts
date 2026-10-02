@@ -39,6 +39,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(typeof data.saveTagMetadata).toBe('function');
     expect(typeof data.handleRemoveTag).toBe('function');
     expect(typeof data.handleConvertToDoc).toBe('function');
+    expect(typeof data.handleRenameTag).toBe('function');
   });
 
   it('useTagFilter 提供多维筛选与智能视图管理能力', () => {
@@ -195,6 +196,27 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('is-selected');
     expect(html).toContain('tm-selection-bar');
     expect(html).toContain('已多选');
+  });
+
+  it('TagTreeView 节点操作区应渲染重命名编辑按钮，具备 sy-line-icon--edit 图标', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { name: 'vue', label: 'vue', count: 10, depth: 0 },
+      ],
+      loading: false,
+      selectedTags: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('sy-line-icon--edit');
+    expect(html).toContain('tm-node-actions');
   });
 
   it('TagStyleModal 渲染时应包含重置按钮，且重置行为仅清空色彩主题并保留符号前缀和别名', async () => {

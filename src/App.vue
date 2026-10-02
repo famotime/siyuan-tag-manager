@@ -78,6 +78,7 @@
         @edit-style="openStyleDialog"
         @remove-tag="handleTreeRemoveTag"
         @batch-reparent="handleBatchReparent"
+        @rename-tag="onTreeRenameTag"
       />
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
@@ -264,6 +265,7 @@ const {
   handleRemoveTag,
   handleConvertToDoc,
   handleBatchReparent,
+  handleRenameTag,
 } = useTagData();
 
 const {
@@ -734,16 +736,51 @@ function openRenameDialog(label: string) {
   };
 }
 
+function migrateActiveFilter(oldLabel: string, newLabel: string) {
+  const oldPrefix = `${oldLabel}/`;
+  const newPrefix = `${newLabel}/`;
+  const migrateList = (list: string[]) =>
+    list.map(t => {
+      if (t === oldLabel) return newLabel;
+      if (t.startsWith(oldPrefix)) return `${newPrefix}${t.slice(oldPrefix.length)}`;
+      return t;
+    });
+
+  activeFilter.value.includeTags = migrateList(activeFilter.value.includeTags);
+  if (activeFilter.value.optionalTags) {
+    activeFilter.value.optionalTags = migrateList(activeFilter.value.optionalTags);
+  }
+  if (activeFilter.value.excludeTags) {
+    activeFilter.value.excludeTags = migrateList(activeFilter.value.excludeTags);
+  }
+}
+
+async function onTreeRenameTag(oldLabel: string, newLabel: string) {
+  const res = await handleRenameTag(oldLabel, newLabel, savedViews.value);
+  if (res.success) {
+    migrateActiveFilter(oldLabel, newLabel);
+    showMessage(`已成功将标签 "#${oldLabel}#" 重命名为 "#${newLabel}#"！`, 3000, 'info');
+    await refreshAllData();
+  } else {
+    showMessage(`重命名失败: ${res.error || '未知错误'}`, 4000, 'error');
+  }
+}
+
 async function confirmRenameTag(newLabel: string) {
   const oldLabel = renameModal.value.oldLabel;
   if (!oldLabel || !newLabel || oldLabel === newLabel) return;
 
   renameModal.value.executing = true;
   try {
-    await TagApiClient.renameTag(oldLabel, newLabel);
-    showMessage(`已成功将标签 "#${oldLabel}#" 重命名为 "#${newLabel}#"`, 3000, 'info');
-    renameModal.value.visible = false;
-    await refreshAllData();
+    const res = await handleRenameTag(oldLabel, newLabel, savedViews.value);
+    if (res.success) {
+      migrateActiveFilter(oldLabel, newLabel);
+      showMessage(`已成功将标签 "#${oldLabel}#" 重命名为 "#${newLabel}#"`, 3000, 'info');
+      renameModal.value.visible = false;
+      await refreshAllData();
+    } else {
+      showMessage(`重命名失败: ${res.error || '未知错误'}`, 4000, 'error');
+    }
   } catch (err: any) {
     showMessage(`重命名失败: ${err.message || err}`, 4000, 'error');
   } finally {

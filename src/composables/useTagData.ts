@@ -299,6 +299,99 @@ export function useTagData() {
     }
   }
 
+  /**
+   * 执行标签重命名并全面迁移关联元数据（含所有子标签、自定义标签、标签组）
+   */
+  async function handleRenameTag(
+    oldLabel: string,
+    newLabel: string,
+    savedViews: any[] = [],
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!oldLabel || !newLabel || oldLabel === newLabel) {
+      return { success: false, error: '新旧标签名称相同或为空' };
+    }
+    loading.value = true;
+    try {
+      // 1. 调用内核原生重命名接口（思源内核会自动级联处理全库中下属所有子标签）
+      await TagApiClient.renameTag(oldLabel, newLabel);
+
+      // 2. 迁移该标签及其所有子标签的元数据（metadataMap）
+      const oldPrefix = `${oldLabel}/`;
+      const newPrefix = `${newLabel}/`;
+      const metasToMigrate: Array<{ oldKey: string; newKey: string; meta: ITagMetadata }> = [];
+
+      for (const [key, meta] of metadataMap.value.entries()) {
+        if (key === oldLabel) {
+          metasToMigrate.push({
+            oldKey: key,
+            newKey: newLabel,
+            meta: { ...meta, label: newLabel, updatedAt: Date.now() },
+          });
+        } else if (key.startsWith(oldPrefix)) {
+          const subSuffix = key.slice(oldPrefix.length);
+          const migratedKey = `${newPrefix}${subSuffix}`;
+          metasToMigrate.push({
+            oldKey: key,
+            newKey: migratedKey,
+            meta: { ...meta, label: migratedKey, updatedAt: Date.now() },
+          });
+        }
+      }
+
+      for (const item of metasToMigrate) {
+        metadataMap.value.delete(item.oldKey);
+        metadataMap.value.set(item.newKey, item.meta);
+      }
+
+      // 3. 迁移侧面板独立自定义标签（customTags）
+      customTags.value = customTags.value.map(tag => {
+        if (tag === oldLabel) return newLabel;
+        if (tag.startsWith(oldPrefix)) {
+          return `${newPrefix}${tag.slice(oldPrefix.length)}`;
+        }
+        return tag;
+      });
+
+      // 4. 迁移标签组（tagGroups）中的标签引用
+      tagGroups.value = tagGroups.value.map(g => {
+        let changed = false;
+        const nextTags = g.tags.map(t => {
+          if (t === oldLabel) {
+            changed = true;
+            return newLabel;
+          }
+          if (t.startsWith(oldPrefix)) {
+            changed = true;
+            return `${newPrefix}${t.slice(oldPrefix.length)}`;
+          }
+          return t;
+        });
+        if (changed) {
+          return { ...g, tags: nextTags };
+        }
+        return g;
+      });
+
+      // 5. 应用最新 CSS 样式并持久化存储配置
+      const metaList = Array.from(metadataMap.value.values());
+      const css = TagVisualService.generateCssRules(metaList);
+      TagVisualService.applyStyles(css);
+      if (typeof document !== 'undefined') {
+        TagDomDecorator.decorateElement(document);
+      }
+
+      await persistConfig(savedViews);
+      await refreshTags();
+
+      return { success: true };
+    } catch (err: any) {
+      await refreshTags();
+      return { success: false, error: err.message || String(err) };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     allTags,
     loading,
@@ -317,5 +410,6 @@ export function useTagData() {
     handleRemoveTag,
     handleConvertToDoc,
     handleBatchReparent,
+    handleRenameTag,
   };
 }

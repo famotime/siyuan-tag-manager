@@ -108,6 +108,80 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(repeatRes.success).toBe(false);
       expect(repeatRes.error).toContain('已存在');
     });
+
+    it('handleRenameTag 能够正确重命名标签并级联迁移子标签元数据与标签组', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagData } = await import('../src/composables/useTagData');
+
+      let renamedOld = '';
+      let renamedNew = '';
+      vi.spyOn(TagApiClient, 'renameTag').mockImplementation(async (oldLabel, newLabel) => {
+        renamedOld = oldLabel;
+        renamedNew = newLabel;
+      });
+
+      let savedData: any = null;
+      const mockPlugin = {
+        loadData: async () => null,
+        saveData: async (_file: string, data: any) => {
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      const {
+        metadataMap,
+        customTags,
+        tagGroups,
+        handleRenameTag,
+      } = useTagData();
+
+      // 准备初始元数据、自定义标签、标签组
+      metadataMap.value.set('Tech', {
+        label: 'Tech',
+        backgroundColor: '#112233',
+        icon: '💻',
+      });
+      metadataMap.value.set('Tech/Vue', {
+        label: 'Tech/Vue',
+        textColor: '#42b883',
+      });
+      metadataMap.value.set('Other', {
+        label: 'Other',
+      });
+
+      customTags.value = ['Tech', 'Tech/Vue', 'Other'];
+      tagGroups.value = [
+        { id: 'g1', name: '技术栈', tags: ['Tech', 'Tech/Vue', 'Other'] },
+      ];
+
+      // 执行重命名 Tech -> Technology
+      const res = await handleRenameTag('Tech', 'Technology');
+      expect(res.success).toBe(true);
+      expect(renamedOld).toBe('Tech');
+      expect(renamedNew).toBe('Technology');
+
+      // 验证自身与下属子标签元数据键名同步迁移
+      expect(metadataMap.value.has('Tech')).toBe(false);
+      expect(metadataMap.value.has('Tech/Vue')).toBe(false);
+      expect(metadataMap.value.get('Technology')?.backgroundColor).toBe('#112233');
+      expect(metadataMap.value.get('Technology')?.icon).toBe('💻');
+      expect(metadataMap.value.get('Technology/Vue')?.textColor).toBe('#42b883');
+      expect(metadataMap.value.has('Other')).toBe(true);
+
+      // 验证 customTags 同步迁移
+      expect(customTags.value).toContain('Technology');
+      expect(customTags.value).toContain('Technology/Vue');
+      expect(customTags.value).not.toContain('Tech');
+      expect(customTags.value).not.toContain('Tech/Vue');
+
+      // 验证 tagGroups 中的引用同步迁移
+      expect(tagGroups.value[0].tags).toEqual(['Technology', 'Technology/Vue', 'Other']);
+
+      // 验证保存的配置正确持久化
+      expect(savedData).toBeDefined();
+    });
   });
 
   describe('useTagFilter AND/OR 逻辑切换与即时刷新测试', () => {

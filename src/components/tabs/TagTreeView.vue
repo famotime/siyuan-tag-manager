@@ -267,7 +267,7 @@
                 'tm-node-highlight': highlightedTagLabel === node.label,
               }"
               :style="{ paddingLeft: `${node.depth * 14 + 6}px` }"
-              draggable="true"
+              :draggable="editingLabel !== node.label"
               @dragstart="handleDragStart(node, $event)"
               @dragend="handleDragEnd"
               @dragover.prevent="handleDragOverNode(node, $event)"
@@ -315,6 +315,7 @@
 
               <!-- 节点主内容 -->
               <div
+                v-if="editingLabel !== node.label"
                 class="tm-node-content"
                 @click="emit('tag-click', node.label, $event)"
               >
@@ -336,14 +337,48 @@
                 <span class="tm-node-count" v-tooltip="formatNodeTooltip(node)">{{ node.count }}</span>
               </div>
 
+              <!-- 行内就地重命名编辑输入框 -->
+              <div
+                v-else
+                class="tm-node-inline-edit"
+                @click.stop
+              >
+                <SyLineIcon name="hash" :size="12" class="tm-default-hash" />
+                <input
+                  ref="inlineInputRef"
+                  v-model="inlineRenameValue"
+                  class="b3-text-field tm-inline-rename-input"
+                  :placeholder="node.name"
+                  @keydown.enter.prevent="submitInlineRename(node)"
+                  @keydown.esc.prevent="cancelInlineRename"
+                  @blur="handleInlineRenameBlur(node)"
+                />
+                <button
+                  class="tm-icon-btn tm-action-btn tm-btn-confirm"
+                  v-tooltip="'确认重命名 (Enter)'"
+                  @mousedown.prevent
+                  @click.stop="submitInlineRename(node)"
+                >
+                  <SyLineIcon name="check" :size="12" />
+                </button>
+                <button
+                  class="tm-icon-btn tm-action-btn"
+                  v-tooltip="'取消 (Esc)'"
+                  @mousedown.prevent
+                  @click.stop="cancelInlineRename"
+                >
+                  <SyLineIcon name="close" :size="12" />
+                </button>
+              </div>
+
               <!-- 悬停放置子标签落位指示胶囊（中间区域，归为子标签） -->
               <span v-if="dragIndicator?.nodeLabel === node.label && dragIndicator.position === 'inside'" class="tm-drag-target-indicator">
                 <SyLineIcon name="corner-down-right" :size="11" />
                 <span>归入 #{{ node.name }}# 下作为子标签</span>
               </span>
 
-              <!-- 操作区：即时筛选 + 定制色彩与别名 + 删除标签 + 更多菜单 -->
-              <div class="tm-node-actions">
+              <!-- 操作区：即时筛选 + 定制色彩与别名 + 重命名标签 + 删除标签 + 更多菜单 -->
+              <div v-if="editingLabel !== node.label" class="tm-node-actions">
                 <button
                   class="tm-icon-btn tm-action-btn"
                   :class="{ 'is-active': isTagSelected(node.label) }"
@@ -360,6 +395,13 @@
                   <SyLineIcon name="palette" :size="13" />
                 </button>
                 <button
+                  class="tm-icon-btn tm-action-btn"
+                  v-tooltip="'重命名标签'"
+                  @click.stop="startInlineRename(node)"
+                >
+                  <SyLineIcon name="edit" :size="13" />
+                </button>
+                <button
                   class="tm-icon-btn tm-action-btn tm-btn-danger"
                   v-tooltip="'删除标签'"
                   @click.stop="emit('remove-tag', node.label)"
@@ -368,7 +410,7 @@
                 </button>
                 <button
                   class="tm-icon-btn tm-action-btn"
-                  v-tooltip="'更多操作选项（含配置子标签、升格文档）'"
+                  v-tooltip="'更多操作'"
                   @click.stop="emit('open-menu', node.label, $event)"
                 >
                   <SyLineIcon name="more-horizontal" :size="13" />
@@ -594,17 +636,55 @@
         </div>
       </div>
     </div>
+
+    <!-- 级联重命名子标签确认对话框 (自定义 DOM 弹窗，保证在 Electron 中鼠标指针正常可见且主题一致) -->
+    <div v-if="cascadeRenameConfirmState.visible" class="tm-modal-mask" @click.self="cascadeRenameConfirmState.visible = false">
+      <div class="tm-modal-card" style="max-width: 400px;">
+        <div class="tm-modal-title">
+          <SyLineIcon name="alert-triangle" :size="16" style="color: var(--b3-theme-primary);" />
+          <span>确认级联重命名子标签</span>
+        </div>
+        <div class="tm-modal-body" style="font-size: 12px; line-height: 1.6;">
+          <div>
+            重命名标签 <strong style="color: var(--b3-theme-primary);">#{{ cascadeRenameConfirmState.oldLabel }}#</strong> 为 <strong style="color: var(--b3-theme-primary);">#{{ cascadeRenameConfirmState.newLabel }}#</strong> 将影响其下属子标签：
+          </div>
+
+          <div style="margin: 10px 0; padding: 10px 12px; background: var(--b3-theme-background-light); border-radius: 6px; border: 1px solid var(--b3-border-color);">
+            <div style="font-weight: 500; margin-bottom: 4px;">
+              包含 <span style="color: var(--b3-theme-primary); font-weight: 600;">{{ cascadeRenameConfirmState.childCount }}</span> 个下属子标签将同步级联变更：
+            </div>
+            <div style="font-size: 11px; color: var(--b3-theme-on-surface-light); font-family: var(--b3-font-family-code, monospace);">
+              {{ cascadeRenameConfirmState.oldLabel }}/* → {{ cascadeRenameConfirmState.newLabel }}/*
+            </div>
+          </div>
+
+          <div style="color: var(--b3-theme-on-surface-light); font-size: 11px; display: flex; align-items: center; gap: 4px;">
+            <SyLineIcon name="info" :size="12" />
+            <span>确认后将立即调用内核更新全库中所有关联引用块与元数据。</span>
+          </div>
+        </div>
+
+        <div class="tm-modal-footer">
+          <button class="b3-button b3-button--cancel" @click="cascadeRenameConfirmState.visible = false">取消</button>
+          <button class="b3-button b3-button--primary" @click="confirmCascadeRename">
+            确认并级联重命名
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { showMessage } from 'siyuan';
 import type { ITagItem, ITagGroup } from '../../types/tag';
 import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import { TagCreationService } from '../../services/TagCreationService';
 import { TagGroupService } from '../../services/TagGroupService';
 import { TagDropService } from '../../services/TagDropService';
+import { TagGovernanceService } from '../../services/TagGovernanceService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = withDefaults(
@@ -636,7 +716,112 @@ const emit = defineEmits<{
   (e: 'edit-style', label: string): void;
   (e: 'remove-tag', label: string): void;
   (e: 'batch-reparent', moves: Array<{ oldLabel: string; newLabel: string }>): void;
+  (e: 'rename-tag', oldLabel: string, newLabel: string): void;
 }>();
+
+// 行内就地重命名状态与方法
+const editingLabel = ref<string | null>(null);
+const inlineRenameValue = ref('');
+const inlineInputRef = ref<HTMLInputElement | null>(null);
+const isSubmittingRename = ref(false);
+
+// 级联重命名子标签模态对话框状态
+const cascadeRenameConfirmState = ref<{
+  visible: boolean;
+  oldLabel: string;
+  newLabel: string;
+  childCount: number;
+}>({
+  visible: false,
+  oldLabel: '',
+  newLabel: '',
+  childCount: 0,
+});
+
+function startInlineRename(node: ITagItem) {
+  editingLabel.value = node.label;
+  inlineRenameValue.value = node.name;
+  nextTick(() => {
+    inlineInputRef.value?.focus();
+    inlineInputRef.value?.select();
+  });
+}
+
+function cancelInlineRename() {
+  editingLabel.value = null;
+  inlineRenameValue.value = '';
+  isSubmittingRename.value = false;
+}
+
+async function submitInlineRename(node: ITagItem) {
+  if (isSubmittingRename.value) return;
+  const newName = inlineRenameValue.value.trim();
+  if (!newName) {
+    showMessage('标签名称不能为空', 3000, 'error');
+    return;
+  }
+  if (newName === node.name) {
+    cancelInlineRename();
+    return;
+  }
+  if (newName.includes('/')) {
+    showMessage('节点名称不能包含层级斜杠 "/"，如需调整层级请使用拖拽或层级配置', 3000, 'error');
+    return;
+  }
+
+  const check = TagGovernanceService.isValidLabel(newName);
+  if (!check.valid) {
+    showMessage(check.error || '标签名称格式不合法', 3000, 'error');
+    return;
+  }
+
+  const lastSlashIndex = node.label.lastIndexOf('/');
+  const newFullLabel = lastSlashIndex >= 0
+    ? `${node.label.slice(0, lastSlashIndex)}/${newName}`
+    : newName;
+
+  if (props.allTags.some(t => t.label.toLowerCase() === newFullLabel.toLowerCase())) {
+    showMessage(`标签 "#${newFullLabel}#" 已存在于标签库中`, 3000, 'error');
+    return;
+  }
+
+  const subTagPrefix = `${node.label}/`;
+  const childTags = props.allTags.filter(t => t.label.startsWith(subTagPrefix));
+  if (childTags.length > 0) {
+    // 唤起自定义 DOM 模态对话框，彻底杜绝 Electron 原生 confirm 引起的鼠标光标指针丢失问题
+    cascadeRenameConfirmState.value = {
+      visible: true,
+      oldLabel: node.label,
+      newLabel: newFullLabel,
+      childCount: childTags.length,
+    };
+    return;
+  }
+
+  isSubmittingRename.value = true;
+  try {
+    emit('rename-tag', node.label, newFullLabel);
+    cancelInlineRename();
+  } finally {
+    isSubmittingRename.value = false;
+  }
+}
+
+function confirmCascadeRename() {
+  const { oldLabel, newLabel } = cascadeRenameConfirmState.value;
+  cascadeRenameConfirmState.value.visible = false;
+  if (oldLabel && newLabel) {
+    emit('rename-tag', oldLabel, newLabel);
+    cancelInlineRename();
+  }
+}
+
+function handleInlineRenameBlur(node: ITagItem) {
+  if (isSubmittingRename.value || cascadeRenameConfirmState.value.visible) return;
+  if (inlineRenameValue.value.trim() === node.name || !inlineRenameValue.value.trim()) {
+    cancelInlineRename();
+  }
+}
 
 // 搜索与排序
 const searchKeyword = ref('');
