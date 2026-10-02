@@ -829,6 +829,153 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('#AI#');
     expect(html).toContain('#Vue#');
   });
+
+  it('TagTreeView 应具备“标签全景”（默认展开）与“标签热度”（默认折叠）折叠条，且树节点支持拖拽', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { label: 'tech', count: 15, depth: 0, name: 'tech' },
+        { label: 'tech/vue', count: 10, depth: 1, name: 'vue' },
+        { label: 'AI', count: 30, depth: 0, name: 'AI' },
+      ],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+
+    // 1. 验证包含三大折叠板块：常用标签组、标签全景、标签热度
+    expect(html).toContain('常用标签组');
+    expect(html).toContain('标签全景');
+    expect(html).toContain('标签热度');
+    expect(html).toContain('tm-panorama-section');
+    expect(html).toContain('tm-heat-section');
+
+    // 2. 验证树节点具备 draggable="true" 属性
+    expect(html).toContain('draggable="true"');
+
+    // 3. 验证标签热度双模切换与控制栏存在
+    expect(html).toContain('tm-cloud-container');
+    expect(html).toContain('词云');
+    expect(html).toContain('排行');
+    expect(html).toContain('TOP 20');
+    expect(html).toContain('TOP 50');
+    expect(html).toContain('全部');
+    expect(html).toContain('tm-cloud-bubble');
+    expect(html).toContain('tier-');
+  });
+
+  it('TagRowMenu 菜单中应包含“配置子标签与层级...”选项', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagRowMenu, {
+      state: {
+        visible: true,
+        label: 'vue',
+        top: 100,
+        left: 100,
+      },
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('配置子标签与层级...');
+  });
+
+  it('TagReparentModal 渲染时应支持搜索目标父级并提供预期路径预览', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+    const { default: TagReparentModal } = await import('../src/components/dialogs/TagReparentModal.vue');
+
+    const app = createSSRApp(TagReparentModal, {
+      visible: true,
+      sourceLabel: 'tech/vue',
+      allTags: [
+        { label: 'tech', count: 10 },
+        { label: 'frontend', count: 5 },
+        { label: 'tech/vue', count: 2 },
+      ],
+    });
+
+    const html = await renderToString(app);
+    expect(html).toContain('配置子标签与层级归属');
+    expect(html).toContain('#tech/vue#');
+    expect(html).toContain('[设为顶级根标签 (脱离当前父级)]');
+    expect(html).toContain('#frontend#');
+  });
+
+  it('TagTreeView 中排序下拉框不应包含挤压箭头的内联 padding 样式', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [{ label: 'test', count: 1, depth: 0, name: 'test' }],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('tm-sort-select');
+    expect(html).not.toMatch(/class="[^"]*tm-sort-select[^"]*"[^>]*style="[^"]*padding:\s*0\s*4px/);
+  });
+
+  it('TagTreeView 标签热度折叠条按钮应移动至展开后的工具条中，且全库待引用标签正确渲染', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { label: 'tag1', count: 5, depth: 0, name: 'tag1' },
+        { label: 'tag2', count: 0, depth: 0, name: 'tag2' },
+      ],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('tm-heat-toolbar');
+    expect(html).toContain('tm-heat-toolbar-header');
+    expect(html).toContain('tm-heat-toolbar-info');
+    expect(html).toContain('tier-zero');
+  });
+
+  it('TagTreeView 中应支持拖拽配置子标签，且包含贯通高度的热度容器并移除破坏指针的类名', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { label: 'parent', count: 10, depth: 0, name: 'parent' },
+        { label: 'child', count: 3, depth: 0, name: 'child' },
+      ],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('tm-tree-node');
+    expect(html).toContain('tm-cloud-container');
+    expect(html).toContain('tm-panorama-section');
+    expect(html).not.toContain('is-tree-dragging');
+  });
 });
 
 

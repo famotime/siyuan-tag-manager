@@ -21,6 +21,7 @@ import {
   openStandaloneBatchModal,
   closeStandaloneBatchModal,
 } from '@/utils/batchTagModalManager';
+import { TagDropService } from '@/services/TagDropService';
 
 // 注册专属标签管家 SVG 图标
 const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024">
@@ -41,6 +42,7 @@ try {
 export default class TagManagerPlugin extends Plugin {
   public isReadonly = false;
   public readonly version = PluginInfo.version;
+  private disposeDropListener?: () => void;
 
   async onload() {
     this.isReadonly = Boolean((window as any).siyuan?.config?.readonly || (window as any).siyuan?.isPublish);
@@ -118,6 +120,9 @@ export default class TagManagerPlugin extends Plugin {
 
     // 9. 监听思源原生文档树右键菜单事件，支持选中多篇文档一键批量打标
     this.eventBus.on('open-menu-doctree', this.handleDocTreeMenu);
+
+    // 10. 启动全局正文拖拽打标签监听器（块级末尾追加模式）
+    this.disposeDropListener = TagDropService.initGlobalDropListener();
   }
 
   private handleProtyleLoaded = (e: CustomEvent<any>) => {
@@ -156,6 +161,11 @@ export default class TagManagerPlugin extends Plugin {
   };
 
   async onunload() {
+    if (this.disposeDropListener) {
+      this.disposeDropListener();
+      this.disposeDropListener = undefined;
+    }
+
     this.eventBus.off('open-menu-doctree', this.handleDocTreeMenu);
     this.eventBus.off('loaded-protyle-static', this.handleProtyleLoaded);
     this.eventBus.off('loaded-protyle-dynamic', this.handleProtyleLoaded);

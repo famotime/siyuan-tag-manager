@@ -203,10 +203,16 @@
 
 .tm-sort-select {
   font-size: 11px;
-  height: 28px;
-  padding: 0 20px 0 8px;
+  height: 22px !important;
+  line-height: 20px;
+  padding: 0 22px 0 6px !important;
   cursor: pointer;
   border-radius: 4px;
+  box-sizing: border-box;
+  min-width: 82px;
+  background-position: right 4px center !important;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 树节点列表 */
@@ -2311,6 +2317,536 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 body.theme--dark .tm-guide-kbd {
   background: rgba(255, 255, 255, 0.12);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   标签全景折叠面板、层级拖拽重构与热度双模可视化样式
+   ========================================================================== */
+
+.tm-accordion-section {
+  border-bottom: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-surface);
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  transition: flex 0.18s ease;
+
+  &.is-collapsed {
+    flex: 0 0 auto !important;
+    height: auto !important;
+  }
+}
+
+.tm-panorama-section {
+  &.is-expanded {
+    flex: 1;
+    min-height: 160px;
+    overflow: hidden;
+  }
+  &.is-collapsed {
+    flex: 0 0 auto !important;
+    height: auto !important;
+  }
+}
+
+.tm-heat-section {
+  display: flex;
+  flex-direction: column;
+
+  &.is-standalone-expanded {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  &.is-dual-expanded {
+    flex: 0 0 auto;
+    height: 48%;
+    max-height: 48%;
+    min-height: 180px;
+    overflow: hidden;
+  }
+  &.is-collapsed {
+    flex: 0 0 auto !important;
+    height: auto !important;
+  }
+}
+
+.tm-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--b3-theme-background-light);
+  }
+}
+
+.tm-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface);
+}
+
+.tm-accordion-icon {
+  color: var(--b3-theme-primary);
+}
+
+.tm-accordion-badge {
+  font-size: 10px;
+  background: var(--b3-theme-background-light);
+  color: var(--b3-theme-on-surface);
+  padding: 0 5px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.tm-accordion-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 待保存层级重构暂存条 */
+.tm-staged-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--tm-badge-warning-bg, rgba(234, 179, 8, 0.12));
+  border-bottom: 1px solid var(--tm-badge-warning-border, rgba(234, 179, 8, 0.3));
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.tm-staged-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tm-badge-warning-text, #b45309);
+  font-weight: 600;
+}
+
+.tm-staged-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-staged-tag-badge {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--tm-badge-warning-bg, rgba(234, 179, 8, 0.2));
+  color: var(--tm-badge-warning-text, #b45309);
+  border: 1px solid var(--tm-badge-warning-border, rgba(234, 179, 8, 0.35));
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* 顶级根节点拖拽释放区 */
+.tm-root-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 10px;
+  padding: 6px 10px;
+  border: 1px dashed var(--b3-theme-primary);
+  border-radius: 4px;
+  background: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.08));
+  color: var(--b3-theme-primary);
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+
+  &.is-drag-over {
+    background: var(--b3-theme-primary);
+    color: #fff;
+    border-style: solid;
+  }
+}
+
+.tm-tree-node {
+  position: relative;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+
+  &.is-dragging {
+    opacity: 0.45;
+  }
+
+  &.is-drag-over {
+    background: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.22)) !important;
+    box-shadow: inset 0 0 0 2px var(--b3-theme-primary) !important;
+    border-radius: 4px;
+  }
+
+  &.tm-node-highlight {
+    animation: tm-pulse-highlight 1.8s ease-in-out;
+  }
+}
+
+.tm-drag-target-indicator {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--b3-theme-primary);
+  color: #fff;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  animation: tm-pop-in 0.15s ease-out;
+}
+
+@keyframes tm-pop-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes tm-pulse-highlight {
+  0% {
+    background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.25));
+    box-shadow: 0 0 0 2px var(--b3-theme-primary);
+  }
+  50% {
+    background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.45));
+    box-shadow: 0 0 0 3px var(--b3-theme-primary);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* 标签热度控制栏与统计 */
+.tm-heat-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--b3-theme-background-light);
+  border-bottom: 1px solid var(--b3-border-color);
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light);
+  flex-shrink: 0;
+}
+
+.tm-heat-toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tm-heat-toolbar-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.tm-heat-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--b3-theme-on-surface);
+}
+
+.tm-heat-sub-count {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.tm-heat-hint {
+  font-size: 10px;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.tm-vis-btn-group {
+  display: inline-flex;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tm-vis-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border: none;
+  background: var(--b3-theme-surface);
+  color: var(--b3-theme-on-surface-light);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:not(:last-child) {
+    border-right: 1px solid var(--b3-border-color);
+  }
+
+  &.is-active {
+    background: var(--b3-theme-primary);
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+/* 模式 A：气泡色温词云容器与卡片 */
+.tm-cloud-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: var(--b3-theme-background);
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.tm-cloud-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: grab;
+  user-select: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-surface);
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease, border-color 0.15s ease;
+  line-height: 1.35;
+
+  &:hover {
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    z-index: 2;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  .tm-bubble-name {
+    font-weight: 500;
+  }
+
+  .tm-bubble-count {
+    font-size: 9px;
+    font-weight: 700;
+    opacity: 0.85;
+    margin-left: 2px;
+  }
+
+  /* 五级色温梯度与 0 引用待打标样式 */
+  &.tier-extreme {
+    border-color: rgba(244, 63, 94, 0.45);
+    background: rgba(244, 63, 94, 0.12);
+    color: #e11d48;
+  }
+  &.tier-high {
+    border-color: rgba(245, 158, 11, 0.45);
+    background: rgba(245, 158, 11, 0.12);
+    color: #d97706;
+  }
+  &.tier-medium {
+    border-color: rgba(16, 185, 129, 0.45);
+    background: rgba(16, 185, 129, 0.12);
+    color: #059669;
+  }
+  &.tier-low {
+    border-color: rgba(6, 182, 212, 0.45);
+    background: rgba(6, 182, 212, 0.12);
+    color: #0891b2;
+  }
+  &.tier-minimal {
+    border-color: rgba(139, 92, 246, 0.35);
+    background: rgba(139, 92, 246, 0.08);
+    color: #7c3aed;
+  }
+  &.tier-zero {
+    border-color: var(--b3-border-color);
+    background: var(--b3-theme-background-light);
+    color: var(--b3-theme-on-surface-light);
+    border-style: dashed;
+    opacity: 0.75;
+
+    .tm-bubble-count {
+      opacity: 0.6;
+    }
+  }
+}
+
+[data-theme-mode="dark"] .tm-cloud-bubble,
+body.theme--dark .tm-cloud-bubble {
+  &.tier-extreme {
+    color: #fb7185;
+    background: rgba(244, 63, 94, 0.2);
+  }
+  &.tier-high {
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.2);
+  }
+  &.tier-medium {
+    color: #34d399;
+    background: rgba(16, 185, 129, 0.2);
+  }
+  &.tier-low {
+    color: #38bdf8;
+    background: rgba(6, 182, 212, 0.2);
+  }
+  &.tier-minimal {
+    color: #a78bfa;
+    background: rgba(139, 92, 246, 0.15);
+  }
+  &.tier-zero {
+    color: var(--b3-theme-on-surface-light);
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+/* 模式 B：热度排行榜条形图容器与卡片 */
+.tm-rank-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  background: var(--b3-theme-background);
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.tm-rank-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  cursor: grab;
+  user-select: none;
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+
+  &:hover {
+    transform: translateX(2px);
+    border-color: var(--b3-theme-primary);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.tm-rank-fill-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  opacity: 0.15;
+  border-radius: 3px 0 0 3px;
+  pointer-events: none;
+  transition: width 0.3s ease;
+}
+
+.tm-rank-left {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.tm-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  flex-shrink: 0;
+  color: var(--b3-theme-on-surface-light);
+
+  &.is-top-1 {
+    font-size: 14px;
+  }
+  &.is-top-2 {
+    font-size: 14px;
+  }
+  &.is-top-3 {
+    font-size: 14px;
+  }
+}
+
+.tm-rank-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--b3-theme-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-rank-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.tm-rank-percent {
+  font-size: 10px;
+  color: var(--b3-theme-on-surface-light);
+}
+
+.tm-rank-count-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--b3-theme-background-light);
+  color: var(--b3-theme-on-surface);
+  border: 1px solid var(--b3-border-color);
+}
+
+/* 思源编辑器正文打标落位高亮 */
+.tm-drop-target-active {
+  outline: 2px dashed var(--b3-theme-primary) !important;
+  outline-offset: 2px;
+  background-color: var(--b3-theme-primary-light, rgba(53, 116, 240, 0.08)) !important;
+  transition: outline 0.15s ease, background-color 0.15s ease;
 }
 
 

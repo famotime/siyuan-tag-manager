@@ -17,6 +17,10 @@
       <SyLineIcon name="git-fork-nodes" :size="13" />
       <span>查看关联洞察与时序</span>
     </div>
+    <div class="tm-row-menu-item" @click="emitAction('reparent')">
+      <SyLineIcon name="corner-down-right" :size="13" />
+      <span>配置子标签与层级...</span>
+    </div>
     <div class="tm-row-menu-item" @click="emitAction('merge')">
       <SyLineIcon name="git-merge" :size="13" />
       <span>重构合并到其他标签...</span>
@@ -33,11 +37,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'action', action: 'style' | 'doc' | 'graph' | 'merge' | 'remove', label: string): void;
+  (e: 'action', action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent', label: string): void;
   (e: 'close'): void;
 }>();
 
-function emitAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove') {
+function emitAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent') {
   const label = props.state.label;
   emit('close');
   emit('action', action, label);

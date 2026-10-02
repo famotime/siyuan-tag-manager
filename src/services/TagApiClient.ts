@@ -247,4 +247,48 @@ export class TagApiClient {
     const rows: Array<{ updated: string }> = await this.request('/api/query/sql', { stmt: sql });
     return (rows || []).map(r => r.updated).filter(Boolean);
   }
+
+  /**
+   * 获取指定块的 Markdown 文本内容
+   */
+  public static async getBlockMarkdown(blockId: string): Promise<string> {
+    if (!blockId) return '';
+    const clean = TagFilterEngine.escapeSql(blockId);
+    const sql = `SELECT markdown FROM blocks WHERE id = '${clean}' LIMIT 1;`;
+    const rows: any[] = await this.request('/api/query/sql', { stmt: sql });
+    return rows?.[0]?.markdown || '';
+  }
+
+  /**
+   * 更新指定块的内容
+   */
+  public static async updateBlock(blockId: string, markdown: string): Promise<void> {
+    if (!blockId) {
+      throw new Error('目标块 ID 不能为空');
+    }
+    await this.request('/api/block/updateBlock', {
+      id: blockId,
+      dataType: 'markdown',
+      data: markdown,
+    });
+  }
+
+  /**
+   * 为文档根块追加标签属性
+   */
+  public static async addTagToDocument(docId: string, tag: string): Promise<void> {
+    if (!docId || !tag) return;
+    const attrsRes = await this.request('/api/attr/getBlockAttrs', { id: docId });
+    const currentTags = attrsRes?.tags || '';
+    const tagsArr = currentTags ? currentTags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
+    if (!tagsArr.includes(tag)) {
+      tagsArr.push(tag);
+    }
+    await this.request('/api/attr/setBlockAttrs', {
+      id: docId,
+      attrs: {
+        tags: tagsArr.join(','),
+      },
+    });
+  }
 }

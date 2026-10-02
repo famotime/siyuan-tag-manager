@@ -77,6 +77,7 @@
         @create-tag="handleCreateTag"
         @edit-style="openStyleDialog"
         @remove-tag="handleTreeRemoveTag"
+        @batch-reparent="handleBatchReparent"
       />
 
       <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
@@ -185,6 +186,15 @@
       @close="renameModal.visible = false"
       @confirm="confirmRenameTag"
     />
+
+    <!-- 配置子标签层级归属弹窗 -->
+    <TagReparentModal
+      :visible="reparentModal.visible"
+      :source-label="reparentModal.label"
+      :all-tags="allTags"
+      @close="reparentModal.visible = false"
+      @confirm="handleReparentTag"
+    />
   </div>
 </template>
 
@@ -210,6 +220,7 @@ import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagBatchService } from './services/TagBatchService';
 import { TagGroupService } from './services/TagGroupService';
 import { TagCreationService } from './services/TagCreationService';
+import { TagTreeService } from './services/TagTreeService';
 import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
 import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
@@ -233,6 +244,7 @@ import TagBatchModal from './components/dialogs/TagBatchModal.vue';
 import TagGroupModal from './components/dialogs/TagGroupModal.vue';
 import TagMergeModal from './components/dialogs/TagMergeModal.vue';
 import TagRenameModal from './components/dialogs/TagRenameModal.vue';
+import TagReparentModal from './components/dialogs/TagReparentModal.vue';
 
 // 1. 数据状态与 Composables 初始化
 const {
@@ -251,6 +263,7 @@ const {
   saveTagGroups,
   handleRemoveTag,
   handleConvertToDoc,
+  handleBatchReparent,
 } = useTagData();
 
 const {
@@ -332,6 +345,11 @@ const groupModal = ref<ITagGroupModalState>({
   color: '#4285F4',
   icon: '',
   tags: [],
+});
+
+const reparentModal = ref<{ visible: boolean; label: string }>({
+  visible: false,
+  label: '',
 });
 
 // 3. 图谱与时序状态
@@ -442,7 +460,7 @@ function handleTreeRemoveTag(label: string) {
   });
 }
 
-function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove', label: string) {
+function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' | 'reparent', label: string) {
   closeRowMenu();
   if (action === 'style') {
     openStyleDialog(label);
@@ -454,6 +472,19 @@ function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove',
     openMergeDialog(label);
   } else if (action === 'remove') {
     handleTreeRemoveTag(label);
+  } else if (action === 'reparent') {
+    reparentModal.value = { visible: true, label };
+  }
+}
+
+function handleReparentTag(targetParentLabel: string | null) {
+  const moves = TagTreeService.calculateReparentMoves(
+    reparentModal.value.label,
+    targetParentLabel,
+    allTags.value,
+  );
+  if (moves.length > 0) {
+    handleBatchReparent(moves);
   }
 }
 

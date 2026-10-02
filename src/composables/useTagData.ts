@@ -246,6 +246,41 @@ export function useTagData() {
     await persistConfig(savedViews);
   }
 
+  /**
+   * 批量应用拖拽层级重构变动（重命名与元数据迁移）
+   */
+  async function handleBatchReparent(
+    moves: Array<{ oldLabel: string; newLabel: string }>,
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!moves || moves.length === 0) return { success: true };
+    loading.value = true;
+    try {
+      for (const m of moves) {
+        if (m.oldLabel === m.newLabel) continue;
+        await TagApiClient.renameTag(m.oldLabel, m.newLabel);
+        const oldMeta = metadataMap.value.get(m.oldLabel);
+        if (oldMeta) {
+          metadataMap.value.delete(m.oldLabel);
+          metadataMap.value.set(m.newLabel, {
+            ...oldMeta,
+            label: m.newLabel,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+      await persistConfig();
+      await refreshTags();
+      showMessage(`已成功更新 ${moves.length} 项标签层级！`, 3000, 'info');
+      return { success: true };
+    } catch (err: any) {
+      showMessage(`调整层级失败: ${err.message || err}`, 4000, 'error');
+      await refreshTags();
+      return { success: false, error: err.message || String(err) };
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     allTags,
     loading,
@@ -263,5 +298,6 @@ export function useTagData() {
     saveTagGroups,
     handleRemoveTag,
     handleConvertToDoc,
+    handleBatchReparent,
   };
 }
