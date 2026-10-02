@@ -20,6 +20,13 @@
           </button>
           <button
             class="tm-icon-btn tm-btn-sm"
+            v-tooltip="'伴生推荐设置'"
+            @click="companionModalVisible = true"
+          >
+            <SyLineIcon name="sparkles" :size="14" />
+          </button>
+          <button
+            class="tm-icon-btn tm-btn-sm"
             :disabled="loading"
             v-tooltip="'刷新全库标签数据'"
             @click="refreshAllData"
@@ -196,6 +203,14 @@
       @close="reparentModal.visible = false"
       @confirm="handleReparentTag"
     />
+
+    <!-- 伴生推荐设置弹窗 -->
+    <TagCompanionModal
+      :visible="companionModalVisible"
+      :config="companionConfig"
+      @close="companionModalVisible = false"
+      @save="onSaveCompanionConfig"
+    />
   </div>
 </template>
 
@@ -203,6 +218,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagHealthIssue, ITagMetadata, ITagGroup, ITagCombination } from './types/tag';
+import type { ITagCompanionConfig } from './types/companion';
 import type {
   TabType,
   IRowMenuState,
@@ -246,6 +262,7 @@ import TagGroupModal from './components/dialogs/TagGroupModal.vue';
 import TagMergeModal from './components/dialogs/TagMergeModal.vue';
 import TagRenameModal from './components/dialogs/TagRenameModal.vue';
 import TagReparentModal from './components/dialogs/TagReparentModal.vue';
+import TagCompanionModal from './components/dialogs/TagCompanionModal.vue';
 
 // 1. 数据状态与 Composables 初始化
 const {
@@ -254,6 +271,8 @@ const {
   metadataMap,
   tagGroups,
   customColorPresets,
+  companionConfig,
+  saveCompanionConfig,
   saveCustomColorPreset,
   removeCustomColorPreset,
   refreshTags,
@@ -267,6 +286,13 @@ const {
   handleBatchReparent,
   handleRenameTag,
 } = useTagData();
+
+const companionModalVisible = ref(false);
+
+async function onSaveCompanionConfig(config: ITagCompanionConfig) {
+  await saveCompanionConfig(config, savedViews.value);
+  companionModalVisible.value = false;
+}
 
 const {
   activeFilter,

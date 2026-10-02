@@ -2,11 +2,14 @@ import { ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagGroup, ITagItem, ITagMetadata } from '../types/tag';
 import type { IColorPreset } from '../styles/palette';
+import type { ITagCompanionConfig } from '../types/companion';
+import { DEFAULT_COMPANION_CONFIG } from '../types/companion';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagVisualService } from '../services/TagVisualService';
 import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
 import { TagCreationService } from '../services/TagCreationService';
+import { TagCompanionService } from '../services/TagCompanionService';
 import { usePlugin } from '../main';
 
 // 共享的标签资产与元数据状态
@@ -16,6 +19,7 @@ const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
 const tagGroups = ref<ITagGroup[]>([]);
 const customTags = ref<string[]>([]);
 const customColorPresets = ref<IColorPreset[]>([]);
+const companionConfig = ref<ITagCompanionConfig>({ ...DEFAULT_COMPANION_CONFIG });
 
 export function useTagData() {
   /**
@@ -30,6 +34,7 @@ export function useTagData() {
       tagGroups: tagGroups.value,
       customTags: customTags.value,
       customColorPresets: customColorPresets.value,
+      companionConfig: companionConfig.value,
     });
   }
 
@@ -59,6 +64,11 @@ export function useTagData() {
 
       if (localData?.customColorPresets && Array.isArray(localData.customColorPresets)) {
         customColorPresets.value = localData.customColorPresets;
+      }
+
+      if (localData?.companionConfig) {
+        companionConfig.value = { ...DEFAULT_COMPANION_CONFIG, ...localData.companionConfig };
+        TagCompanionService.updateConfig(companionConfig.value);
       }
 
       const tags = await TagApiClient.fetchAllTags();
@@ -392,12 +402,21 @@ export function useTagData() {
     }
   }
 
+  async function saveCompanionConfig(config: ITagCompanionConfig, savedViews: any[] = []) {
+    companionConfig.value = { ...config };
+    TagCompanionService.updateConfig(config);
+    await persistConfig(savedViews);
+    showMessage('伴生推荐设置已保存', 3000, 'info');
+  }
+
   return {
     allTags,
     loading,
     metadataMap,
     customTags,
     customColorPresets,
+    companionConfig,
+    saveCompanionConfig,
     saveCustomColorPreset,
     removeCustomColorPreset,
     addCustomTag,

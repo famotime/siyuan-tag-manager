@@ -22,6 +22,8 @@ import {
   closeStandaloneBatchModal,
 } from '@/utils/batchTagModalManager';
 import { TagDropService } from '@/services/TagDropService';
+import { TagCompanionService } from '@/services/TagCompanionService';
+import { TagCompanionCache } from '@/services/TagCompanionCache';
 
 // 注册专属标签管家 SVG 图标
 const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024">
@@ -123,6 +125,9 @@ export default class TagManagerPlugin extends Plugin {
 
     // 10. 启动全局正文拖拽打标签监听器（块级末尾追加模式）
     this.disposeDropListener = TagDropService.initGlobalDropListener();
+
+    // 11. 启动输入态基于共现图谱的伴生标签智能推荐调度服务
+    TagCompanionService.init(localData?.companionConfig);
   }
 
   private handleProtyleLoaded = (e: CustomEvent<any>) => {
@@ -174,6 +179,9 @@ export default class TagManagerPlugin extends Plugin {
     // 清理可能的独立批量打标弹窗
     closeStandaloneBatchModal();
 
+    // 停止伴生标签推荐服务
+    TagCompanionService.destroy();
+
     // 停止正文 DOM 监听并清理装饰属性与样式
     TagDomDecorator.stopObserving();
     TagDomDecorator.clearDecorations();
@@ -187,6 +195,10 @@ export default class TagManagerPlugin extends Plugin {
         const css = TagVisualService.generateCssRules(localData.metadataList);
         TagVisualService.applyStyles(css);
       }
+      if (localData?.companionConfig) {
+        TagCompanionService.updateConfig(localData.companionConfig);
+      }
+      TagCompanionCache.markDirty();
     } catch {
       // 容错保护，遵循 5 秒拆除预算
     }
