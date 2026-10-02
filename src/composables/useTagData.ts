@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagGroup, ITagItem, ITagMetadata } from '../types/tag';
+import type { IColorPreset } from '../styles/palette';
 import { TagApiClient } from '../services/TagApiClient';
 import { TagVisualService } from '../services/TagVisualService';
 import { TagDomDecorator } from '../services/TagDomDecorator';
@@ -14,6 +15,7 @@ const loading = ref(false);
 const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
 const tagGroups = ref<ITagGroup[]>([]);
 const customTags = ref<string[]>([]);
+const customColorPresets = ref<IColorPreset[]>([]);
 
 export function useTagData() {
   /**
@@ -27,6 +29,7 @@ export function useTagData() {
       savedViews,
       tagGroups: tagGroups.value,
       customTags: customTags.value,
+      customColorPresets: customColorPresets.value,
     });
   }
 
@@ -52,6 +55,10 @@ export function useTagData() {
 
       if (localData?.customTags && Array.isArray(localData.customTags)) {
         customTags.value = localData.customTags;
+      }
+
+      if (localData?.customColorPresets && Array.isArray(localData.customColorPresets)) {
+        customColorPresets.value = localData.customColorPresets;
       }
 
       const tags = await TagApiClient.fetchAllTags();
@@ -224,11 +231,29 @@ export function useTagData() {
     }
   }
 
+  async function saveCustomColorPreset(preset: IColorPreset, savedViews: any[] = []) {
+    const existingIndex = customColorPresets.value.findIndex(p => p.id === preset.id);
+    if (existingIndex >= 0) {
+      customColorPresets.value[existingIndex] = preset;
+    } else {
+      customColorPresets.value.push(preset);
+    }
+    await persistConfig(savedViews);
+  }
+
+  async function removeCustomColorPreset(presetId: string, savedViews: any[] = []) {
+    customColorPresets.value = customColorPresets.value.filter(p => p.id !== presetId);
+    await persistConfig(savedViews);
+  }
+
   return {
     allTags,
     loading,
     metadataMap,
     customTags,
+    customColorPresets,
+    saveCustomColorPreset,
+    removeCustomColorPreset,
     addCustomTag,
     refreshTags,
     getTagIcon,

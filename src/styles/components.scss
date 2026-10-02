@@ -1639,6 +1639,121 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   color: var(--b3-theme-on-surface-light);
 }
 
+.tm-style-modal-card {
+  width: 500px;
+  max-width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+
+  .tm-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+}
+
+/* 实时效果对比 (Live Preview) */
+.tm-preview-section {
+  background: var(--b3-theme-surface-lighter, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.tm-preview-header {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--b3-theme-on-surface-light);
+  margin-bottom: 6px;
+}
+
+.tm-preview-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tm-preview-box {
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-preview-box--light {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #1e293b;
+}
+
+.tm-preview-box--dark {
+  background: #1e2227;
+  border: 1px solid #333842;
+  color: #abb2bf;
+}
+
+.tm-preview-label {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.tm-preview-capsule-wrap {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tm-preview-capsule {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* 自定义预设与双主题色彩 */
+.tm-section-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+
+  label {
+    margin-bottom: 0 !important;
+  }
+}
+
+.tm-btn-add-preset {
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 3px;
+  color: var(--b3-theme-primary) !important;
+  cursor: pointer;
+}
+
+.tm-create-preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--b3-theme-surface-lighter, rgba(0, 0, 0, 0.03));
+  border: 1px dashed var(--b3-theme-primary);
+}
+
 /* 双主题调色板网格 */
 .tm-color-palette-grid {
   display: grid;
@@ -1648,6 +1763,7 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 }
 
 .tm-preset-card {
+  position: relative;
   border: 1px solid var(--b3-border-color);
   border-radius: 4px;
   padding: 4px;
@@ -1669,6 +1785,31 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   background: var(--tm-badge-primary-bg, rgba(26, 86, 219, 0.08));
 }
 
+.tm-preset-delete-btn {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--b3-theme-surface);
+  border: 1px solid var(--b3-border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--b3-theme-on-surface-light);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.15s ease;
+
+  &:hover {
+    opacity: 1;
+    color: #ef4444;
+    border-color: #ef4444;
+    transform: scale(1.1);
+  }
+}
+
 .tm-preset-preview {
   display: flex;
   gap: 2px;
@@ -1688,6 +1829,156 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 .tm-preset-name {
   font-size: 10px;
   color: var(--b3-theme-on-surface);
+}
+
+/* 可视化选色与快捷色板 */
+.tm-color-picker-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tm-color-picker-label {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px var(--b3-border-color);
+  transition: transform 0.15s ease;
+
+  &:hover {
+    transform: scale(1.08);
+  }
+}
+
+.tm-color-input-native {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 50px;
+  height: 50px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tm-color-swatch-circle {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid var(--b3-theme-surface, #ffffff);
+  box-sizing: border-box;
+}
+
+.tm-fast-colors-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.tm-fast-color-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-sizing: border-box;
+  transition: all 0.12s ease;
+
+  &:hover {
+    transform: scale(1.25);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Emoji 快捷候选与分类 */
+.tm-btn-clear-emoji {
+  font-size: 11px !important;
+  padding: 0 4px !important;
+  height: 20px !important;
+  color: var(--b3-theme-on-surface-light) !important;
+  cursor: pointer;
+
+  &:hover {
+    color: #ef4444 !important;
+  }
+}
+
+.tm-emoji-picker-container {
+  margin-top: 6px;
+  border: 1px solid var(--b3-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--b3-theme-surface-lighter, rgba(0, 0, 0, 0.02));
+}
+
+.tm-emoji-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--b3-border-color);
+  background: var(--b3-theme-surface);
+  overflow-x: auto;
+}
+
+.tm-emoji-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--b3-theme-on-surface-light);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+
+  &:hover {
+    color: var(--b3-theme-on-surface);
+  }
+
+  &.is-active {
+    color: var(--b3-theme-primary);
+    border-bottom-color: var(--b3-theme-primary);
+    font-weight: 500;
+  }
+}
+
+.tm-emoji-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.tm-emoji-grid-item {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: var(--b3-theme-surface);
+    border-color: var(--b3-border-color);
+    transform: scale(1.15);
+  }
+
+  &.is-selected {
+    border-color: var(--b3-theme-primary);
+    background: var(--tm-badge-primary-bg, rgba(26, 86, 219, 0.12));
+  }
 }
 
 .tm-form-row {

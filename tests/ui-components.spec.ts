@@ -263,6 +263,62 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(emittedEvent).toBe('reset');
   });
 
+  it('TagStyleModal 增强特性测试：包含双主题实时胶囊对比、可视化拾色器、常用色板、分类 Emoji 候选项与自定义主题预设', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp, reactive } = await import('vue');
+
+    const state = reactive({
+      visible: true,
+      label: 'Python',
+      presetId: '',
+      backgroundColor: '#E8F7F0',
+      textColor: '#0E6E45',
+      darkBackgroundColor: '',
+      darkTextColor: '',
+      icon: '💡',
+      aliasesText: 'py',
+    });
+
+    const customPresets = [
+      {
+        id: 'custom-1',
+        name: '我的自定主题',
+        lightBg: '#FEF3E6',
+        lightText: '#B45309',
+        lightBorder: 'rgba(0,0,0,0.1)',
+        darkBg: 'rgba(245, 158, 11, 0.20)',
+        darkText: '#FCD34D',
+        darkBorder: 'rgba(252, 211, 77, 0.25)',
+        isCustom: true,
+      },
+    ];
+
+    const app = createSSRApp(TagStyleModal, { state, customPresets });
+    const html = await renderToString(app);
+
+    // 1. 验证双主题实时对比预览区域
+    expect(html).toContain('tm-preview-section');
+    expect(html).toContain('Light 亮色');
+    expect(html).toContain('Dark 暗黑');
+    expect(html).toContain('💡 Python');
+
+    // 2. 验证可视化拾色器与快速候选色块
+    expect(html).toContain('tm-color-input-native');
+    expect(html).toContain('tm-fast-colors-row');
+    expect(html).toContain('tm-fast-color-dot');
+
+    // 3. 验证分类 Emoji 候选项
+    expect(html).toContain('tm-emoji-picker-container');
+    expect(html).toContain('tm-emoji-tabs');
+    expect(html).toContain('灵感状态');
+    expect(html).toContain('tm-emoji-grid');
+
+    // 4. 验证自定义预设主题卡片与保存新预设按钮
+    expect(html).toContain('我的自定主题');
+    expect(html).toContain('tm-preset-delete-btn');
+    expect(html).toContain('保存当前为新预设');
+  });
+
   it('TagTreeView 在搜索无匹配标签时，展示清晰的新标签创建引导面板与回车提示', async () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');

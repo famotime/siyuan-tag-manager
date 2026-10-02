@@ -14,7 +14,78 @@ export interface IColorPreset {
   darkBg: string;
   darkText: string;
   darkBorder: string;
+  // 是否为用户自定义预设
+  isCustom?: boolean;
 }
+
+/** 推荐常用底色候选板 (柔和明亮) */
+export const RECOMMENDED_BG_COLORS: string[] = [
+  '#EBF3FE', // 经典蓝底
+  '#E8F7F0', // 翡翠绿底
+  '#FEF3E6', // 琥珀金底
+  '#FEEBEB', // 绯红珊瑚底
+  '#F3ECFE', // 优雅紫底
+  '#E3F8FA', // 青碧浅湖底
+  '#FDF0F5', // 暖粉玛瑙底
+  '#F1F3F5', // 雅致中性灰底
+  '#FEF9C3', // 明黄底
+  '#E0E7FF', // 靛青底
+];
+
+/** 推荐常用字色候选板 (高对比深色) */
+export const RECOMMENDED_TEXT_COLORS: string[] = [
+  '#1A56DB', // 经典深蓝
+  '#0E6E45', // 护眼深绿
+  '#B45309', // 琥珀深橙
+  '#C5221F', // 绯红深红
+  '#6929C4', // 优雅深紫
+  '#006E7F', // 青碧深青
+  '#9F1853', // 暖粉深玫
+  '#495057', // 雅致深灰
+  '#1E293B', // 暗夜炭黑
+  '#0F766E', // 墨绿青
+];
+
+export interface IEmojiCategory {
+  id: string;
+  name: string;
+  icon: string;
+  emojis: string[];
+}
+
+/** 分类 Emoji 高频精选候选项 */
+export const EMOJI_CATEGORIES: IEmojiCategory[] = [
+  {
+    id: 'status',
+    name: '灵感状态',
+    icon: '💡',
+    emojis: ['💡', '🧠', '⚡', '🚀', '🎯', '✨', '🔥', '🔮', '💭', '🌟'],
+  },
+  {
+    id: 'todo',
+    name: '待办优先',
+    icon: '📌',
+    emojis: ['📌', '📍', '⏳', '⏰', '🚩', '⚠️', '🚨', '✅', '❌', '🔄'],
+  },
+  {
+    id: 'org',
+    name: '组织归档',
+    icon: '🏷️',
+    emojis: ['🏷️', '📁', '📂', '📦', '🗂️', '📑', '🔖', '🗃️', '📊', '📈'],
+  },
+  {
+    id: 'tech',
+    name: '技术工具',
+    icon: '💻',
+    emojis: ['💻', '🖥️', '⚙️', '🛠️', '🔧', '🐛', '🌐', '📱', '🤖', '🔑'],
+  },
+  {
+    id: 'review',
+    name: '评估星级',
+    icon: '⭐',
+    emojis: ['⭐', '🌟', '🏆', '🥇', '🥈', '🥉', '💎', '❤️', '👍', '📝'],
+  },
+];
 
 export const DUAL_THEME_COLOR_PRESETS: IColorPreset[] = [
   {

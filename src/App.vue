@@ -137,9 +137,12 @@
     <!-- 样式与别名设置弹窗 -->
     <TagStyleModal
       :state="styleModal"
+      :custom-presets="customColorPresets"
       @close="styleModal.visible = false"
       @save="saveTagStyle"
       @reset="onResetTagStyle"
+      @save-preset="onSaveCustomColorPreset"
+      @remove-preset="onRemoveCustomColorPreset"
     />
 
     <!-- 保存智能视图弹窗 -->
@@ -237,6 +240,9 @@ const {
   loading,
   metadataMap,
   tagGroups,
+  customColorPresets,
+  saveCustomColorPreset,
+  removeCustomColorPreset,
   refreshTags,
   addCustomTag,
   getTagIcon,
@@ -468,6 +474,16 @@ function openStyleDialog(label: string) {
 
 function onResetTagStyle() {
   showMessage('已重置标签色彩主题为最初状态（保留符号前缀和别名），点击“保存并即时生效”后生效', 2500, 'info');
+}
+
+async function onSaveCustomColorPreset(preset: IColorPreset) {
+  await saveCustomColorPreset(preset, savedViews.value);
+  showMessage(`已保存新主题预设 "${preset.name}"`, 2500, 'info');
+}
+
+async function onRemoveCustomColorPreset(presetId: string) {
+  await removeCustomColorPreset(presetId, savedViews.value);
+  showMessage('已移除自定义主题预设', 2500, 'info');
 }
 
 async function saveTagStyle() {
