@@ -99,7 +99,7 @@
                 :key="t"
                 class="tm-group-tag-pill"
                 :data-tag="t"
-                @click.stop="emit('tag-click', t, $event)"
+                @click.stop="handleNodeTagClick(t, $event)"
               >
                 #{{ t }}#
               </span>
@@ -185,7 +185,7 @@
             <button
               class="tm-view-filter-btn"
               v-tooltip="'跳转至多维筛选查看匹配块记录'"
-              @click="emit('switch-to-filter')"
+              @click="handleSwitchToFilter"
             >
               <SyLineIcon name="filter-funnel" :size="12" />
               <span>查看结果</span>
@@ -203,8 +203,10 @@
 
         <!-- 标签树滚动列表 (通过拖拽指示线直观显示归为子标签还是拖出为独立标签) -->
         <div
+          ref="scrollerRef"
           class="tm-tree-scroller fn__flex-1"
           :class="{ 'is-scroller-drag-over': isDraggingOverScrollerBlank && isDraggingSubTag }"
+          @scroll="handleScrollerScroll"
           @dragover="handleScrollerDragOver"
           @dragleave="handleScrollerDragLeave"
           @drop="handleScrollerDrop"
@@ -317,7 +319,7 @@
               <div
                 v-if="editingLabel !== node.label"
                 class="tm-node-content"
-                @click="emit('tag-click', node.label, $event)"
+                @click="handleNodeTagClick(node.label, $event)"
               >
                 <span
                   class="tm-node-name"
@@ -676,7 +678,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagItem, ITagGroup } from '../../types/tag';
 import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
@@ -896,8 +898,78 @@ function refreshActiveContext() {
   activeContext.value = TagGroupService.getActiveContext();
 }
 
+// 保持全景浏览位置逻辑
+const scrollerRef = ref<HTMLElement | null>(null);
+
+function handleScrollerScroll(e: Event) {
+  const target = e.target as HTMLElement;
+  if (target) {
+    TagTreeService.saveScrollPosition(target.scrollTop);
+  }
+}
+
+function handleNodeTagClick(label: string, event: MouseEvent) {
+  if (scrollerRef.value) {
+    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop, label);
+  } else {
+    TagTreeService.saveScrollPosition(-1, label);
+  }
+  emit('tag-click', label, event);
+}
+
+function handleSwitchToFilter() {
+  if (scrollerRef.value) {
+    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
+  }
+  emit('switch-to-filter');
+}
+
+function restoreScrollPosition() {
+  const { scrollTop, lastClickedTag } = TagTreeService.getSavedScrollPosition();
+  if (scrollTop <= 0 && !lastClickedTag) return;
+
+  const performRestore = () => {
+    if (!scrollerRef.value) return;
+    if (scrollTop > 0) {
+      scrollerRef.value.scrollTop = scrollTop;
+    } else if (lastClickedTag) {
+      const targetEl = scrollerRef.value.querySelector(
+        `.tm-tree-node[data-node-tag="${lastClickedTag}"]`
+      ) as HTMLElement | null;
+      if (targetEl) {
+        targetEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  };
+
+  nextTick(() => {
+    performRestore();
+    // 延迟帧双重校验，确保复杂 DOM 树渲染/布局完成后的绝对像素对齐
+    requestAnimationFrame(() => {
+      performRestore();
+    });
+  });
+}
+
 onMounted(() => {
   refreshActiveContext();
+  restoreScrollPosition();
+});
+
+onActivated(() => {
+  restoreScrollPosition();
+});
+
+onDeactivated(() => {
+  if (scrollerRef.value) {
+    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
+  }
+});
+
+onUnmounted(() => {
+  if (scrollerRef.value) {
+    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
+  }
 });
 
 const normalizedKeyword = computed(() => TagCreationService.cleanTag(searchKeyword.value));

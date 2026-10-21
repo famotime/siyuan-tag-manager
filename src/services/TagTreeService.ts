@@ -230,4 +230,44 @@ export class TagTreeService {
 
     return result;
   }
+
+  /**
+   * 记录最后一次全景树浏览的垂直滚动位置（像素）
+   */
+  public static lastScrollTop: number = 0;
+
+  /**
+   * 记录最后一次交互的目标标签
+   */
+  public static lastClickedTag: string | null = null;
+
+  /**
+   * 保存浏览位置及目标标签
+   */
+  public static saveScrollPosition(scrollTop: number, clickedTag?: string): void {
+    if (scrollTop >= 0) {
+      this.lastScrollTop = scrollTop;
+    }
+    if (clickedTag !== undefined) {
+      this.lastClickedTag = clickedTag;
+    }
+  }
+
+  /**
+   * 获取持久化的全景树浏览位置与目标标签
+   */
+  public static getSavedScrollPosition(): { scrollTop: number; lastClickedTag: string | null } {
+    return {
+      scrollTop: this.lastScrollTop,
+      lastClickedTag: this.lastClickedTag,
+    };
+  }
+
+  /**
+   * 重置全景树浏览位置记录（用于重置或测试）
+   */
+  public static resetScrollPosition(): void {
+    this.lastScrollTop = 0;
+    this.lastClickedTag = null;
+  }
 }

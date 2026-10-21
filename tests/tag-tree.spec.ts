@@ -130,4 +130,33 @@ describe('TagTreeService 树形构建与检索服务测试', () => {
     expect(reactItem?.label).toBe('react');
     expect(reactItem?.depth).toBe(0);
   });
+
+  describe('标签全景浏览位置持久化保持测试', () => {
+    it('能够正确保存与恢复全景树滚动位置及目标标签', () => {
+      TagTreeService.resetScrollPosition();
+      expect(TagTreeService.getSavedScrollPosition()).toEqual({
+        scrollTop: 0,
+        lastClickedTag: null,
+      });
+
+      // 模拟用户滚动到 320px 并点击了某个标签
+      TagTreeService.saveScrollPosition(320, 'tech/backend/python');
+      expect(TagTreeService.getSavedScrollPosition()).toEqual({
+        scrollTop: 320,
+        lastClickedTag: 'tech/backend/python',
+      });
+
+      // 仅更新滚动位置，保持上次点击的标签
+      TagTreeService.saveScrollPosition(450);
+      expect(TagTreeService.getSavedScrollPosition()).toEqual({
+        scrollTop: 450,
+        lastClickedTag: 'tech/backend/python',
+      });
+
+      // 重置恢复
+      TagTreeService.resetScrollPosition();
+      expect(TagTreeService.getSavedScrollPosition().scrollTop).toBe(0);
+      expect(TagTreeService.getSavedScrollPosition().lastClickedTag).toBeNull();
+    });
+  });
 });

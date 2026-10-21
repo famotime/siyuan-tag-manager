@@ -1043,6 +1043,57 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('tm-tree-scroller');
     expect(html).toContain('tm-tree-node');
   });
+
+  it('App 顶栏选项卡应简化为4个核心动作文字：全景、筛选、洞察、治理', async () => {
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+    const App = (await import('../src/App.vue')).default;
+
+    const app = createSSRApp(App);
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('全景');
+    expect(html).toContain('筛选');
+    expect(html).toContain('洞察');
+    expect(html).toContain('治理');
+
+    // 确保不再包含旧的长文案 Tab 标签
+    expect(html).not.toMatch(/<span class="tm-tab-name">标签全景<\/span>/);
+    expect(html).not.toMatch(/<span class="tm-tab-name">多维筛选<\/span>/);
+    expect(html).not.toMatch(/<span class="tm-tab-name">关联洞察<\/span>/);
+    expect(html).not.toMatch(/<span class="tm-tab-name">健康治理<\/span>/);
+  });
+
+  it('TagTreeView 能够在点击标签跳转后持久化滚动位置，并在返回时恢复原浏览位置', async () => {
+    const { TagTreeService } = await import('../src/services/TagTreeService');
+    TagTreeService.saveScrollPosition(320, 'tech/backend/python');
+
+    const { renderToString } = await import('vue/server-renderer');
+    const { createSSRApp } = await import('vue');
+
+    const app = createSSRApp(TagTreeView, {
+      allTags: [
+        { label: 'tech', count: 10, depth: 0, name: 'tech' },
+        { label: 'tech/backend', count: 8, depth: 1, name: 'backend' },
+        { label: 'tech/backend/python', count: 5, depth: 2, name: 'python' },
+      ],
+      loading: false,
+      selectedTags: [],
+      tagGroups: [],
+      getTagStyle: () => ({}),
+      getTagIcon: () => '',
+    });
+    app.directive('tooltip', {});
+
+    const html = await renderToString(app);
+    expect(html).toContain('data-node-tag="tech/backend/python"');
+    expect(html).toContain('tm-tree-scroller');
+
+    const saved = TagTreeService.getSavedScrollPosition();
+    expect(saved.scrollTop).toBe(320);
+    expect(saved.lastClickedTag).toBe('tech/backend/python');
+  });
 });
 
 

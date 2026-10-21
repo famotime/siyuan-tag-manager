@@ -63,77 +63,79 @@
 
     <!-- 主体内容区域 -->
     <main class="tm-body">
-      <!-- TAB 1: 标签全景资产树 -->
-      <TagTreeView
-        v-if="currentTab === 'tree'"
-        :all-tags="allTags"
-        :loading="loading"
-        :selected-tags="activeFilter.includeTags"
-        :tag-groups="tagGroups"
-        :get-tag-style="getTagStyle"
-        :get-tag-icon="getTagIcon"
-        @tag-click="onTagClick"
-        @quick-filter="onQuickFilter"
-        @clear-selected="clearFilterTags"
-        @switch-to-filter="switchTab('filter')"
-        @open-menu="openRowMenu"
-        @open-create-group="openCreateGroupDialog"
-        @open-edit-group="openEditGroupDialog"
-        @delete-group="handleDeleteGroup"
-        @apply-group="handleApplyGroup"
-        @create-tag="handleCreateTag"
-        @edit-style="openStyleDialog"
-        @remove-tag="handleTreeRemoveTag"
-        @batch-reparent="handleBatchReparent"
-        @rename-tag="onTreeRenameTag"
-      />
+      <KeepAlive>
+        <!-- TAB 1: 标签全景资产树 -->
+        <TagTreeView
+          v-if="currentTab === 'tree'"
+          :all-tags="allTags"
+          :loading="loading"
+          :selected-tags="activeFilter.includeTags"
+          :tag-groups="tagGroups"
+          :get-tag-style="getTagStyle"
+          :get-tag-icon="getTagIcon"
+          @tag-click="onTagClick"
+          @quick-filter="onQuickFilter"
+          @clear-selected="clearFilterTags"
+          @switch-to-filter="switchTab('filter')"
+          @open-menu="openRowMenu"
+          @open-create-group="openCreateGroupDialog"
+          @open-edit-group="openEditGroupDialog"
+          @delete-group="handleDeleteGroup"
+          @apply-group="handleApplyGroup"
+          @create-tag="handleCreateTag"
+          @edit-style="openStyleDialog"
+          @remove-tag="handleTreeRemoveTag"
+          @batch-reparent="handleBatchReparent"
+          @rename-tag="onTreeRenameTag"
+        />
 
-      <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
-      <TagFilterView
-        v-if="currentTab === 'filter'"
-        v-model:selected-smart-view-id="selectedSmartViewId"
-        :all-tags="allTags"
-        :active-filter="activeFilter"
-        :matched-blocks="matchedBlocks"
-        :query-loading="queryLoading"
-        :saved-views="savedViews"
-        @apply-smart-view="applySmartView"
-        @open-save-view="openSaveViewDialog"
-        @clear-filter="clearFilterTags"
-        @switch-filter-mode="switchFilterMode"
-        @toggle-condition="toggleTagCondition"
-        @cycle-condition="cycleTagCondition"
-        @remove-tag="removeFilterTag"
-        @toggle-tag="toggleTagFilter"
-        @jump-block="jumpToBlock"
-      />
+        <!-- TAB 2: 多维交叉筛选与即时卡片流 -->
+        <TagFilterView
+          v-else-if="currentTab === 'filter'"
+          v-model:selected-smart-view-id="selectedSmartViewId"
+          :all-tags="allTags"
+          :active-filter="activeFilter"
+          :matched-blocks="matchedBlocks"
+          :query-loading="queryLoading"
+          :saved-views="savedViews"
+          @apply-smart-view="applySmartView"
+          @open-save-view="openSaveViewDialog"
+          @clear-filter="clearFilterTags"
+          @switch-filter-mode="switchFilterMode"
+          @toggle-condition="toggleTagCondition"
+          @cycle-condition="cycleTagCondition"
+          @remove-tag="removeFilterTag"
+          @toggle-tag="toggleTagFilter"
+          @jump-block="jumpToBlock"
+        />
 
-      <!-- TAB 3: 关联洞察与生命周期分析 -->
-      <TagGraphView
-        v-if="currentTab === 'graph'"
-        v-model:selected-graph-tag="selectedGraphTag"
-        :all-tags="allTags"
-        :graph-data="graphData"
-        :timeline-stats="timelineStats"
-        :associated-tags="associatedTags"
-        :top-links="topLinks"
-        :tag-combinations="tagCombinations"
-        @focus-tag-change="onFocusTagChange"
-        @combine-filter="combineFilterWithAssociated"
-        @save-as-group="handleSaveAsGroup"
-      />
+        <!-- TAB 3: 关联洞察与生命周期分析 -->
+        <TagGraphView
+          v-else-if="currentTab === 'graph'"
+          v-model:selected-graph-tag="selectedGraphTag"
+          :all-tags="allTags"
+          :graph-data="graphData"
+          :timeline-stats="timelineStats"
+          :associated-tags="associatedTags"
+          :top-links="topLinks"
+          :tag-combinations="tagCombinations"
+          @focus-tag-change="onFocusTagChange"
+          @combine-filter="combineFilterWithAssociated"
+          @save-as-group="handleSaveAsGroup"
+        />
 
-      <!-- TAB 4: 标签治理与健康体检 -->
-      <TagHygieneView
-        v-if="currentTab === 'hygiene'"
-        :health-result="healthResult"
-        :all-tags="allTags"
-        @auto-resolve="onAutoResolveIssue"
-        @remove-tag="handleRemoveTag"
-        @open-rename="openRenameDialog"
-        @auto-normalize="handleAutoNormalizeTag"
-        @refresh-tags="refreshAllData"
-      />
+        <!-- TAB 4: 标签治理与健康体检 -->
+        <TagHygieneView
+          v-else-if="currentTab === 'hygiene'"
+          :health-result="healthResult"
+          :all-tags="allTags"
+          @auto-resolve="onAutoResolveIssue"
+          @remove-tag="handleRemoveTag"
+          @open-rename="openRenameDialog"
+          @auto-normalize="handleAutoNormalizeTag"
+          @refresh-tags="refreshAllData"
+        />
+      </KeepAlive>
     </main>
 
     <!-- 浮动行内菜单 -->
@@ -388,17 +390,17 @@ const associatedTags = ref<Array<{ label: string; weight: number; jaccard: numbe
 const timelineStats = ref<ITagTimelineStats | null>(null);
 
 const tabs = computed(() => [
-  { id: 'tree' as const, name: '标签全景', iconName: 'folder-tree' },
+  { id: 'tree' as const, name: '全景', iconName: 'folder-tree' },
   {
     id: 'filter' as const,
-    name: '多维筛选',
+    name: '筛选',
     iconName: 'filter-funnel',
     badge: activeFilter.value.includeTags.length + activeFilter.value.excludeTags.length,
   },
-  { id: 'graph' as const, name: '关联洞察', iconName: 'git-fork-nodes' },
+  { id: 'graph' as const, name: '洞察', iconName: 'git-fork-nodes' },
   {
     id: 'hygiene' as const,
-    name: '健康治理',
+    name: '治理',
     iconName: 'shield-check',
     badge: healthResult.value.issues.length,
   },
