@@ -4,6 +4,8 @@ import type {
 } from 'siyuan';
 import {
   Plugin,
+  Setting,
+  showMessage,
 } from 'siyuan';
 import PluginInfoString from '@/../plugin.json';
 import {
@@ -24,6 +26,8 @@ import {
 import { TagDropService } from '@/services/TagDropService';
 import { TagCompanionService } from '@/services/TagCompanionService';
 import { TagCompanionCache } from '@/services/TagCompanionCache';
+import type { ITagDeleteConfig, TTagDeleteMode } from '@/types/tag';
+import { DEFAULT_TAG_DELETE_CONFIG } from '@/types/tag';
 
 // 注册专属标签管家 SVG 图标
 const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024">
@@ -45,6 +49,8 @@ export default class TagManagerPlugin extends Plugin {
   public isReadonly = false;
   public readonly version = PluginInfo.version;
   private disposeDropListener?: () => void;
+  private settingDeleteSelect?: HTMLSelectElement;
+  private settingDeleteInput?: HTMLInputElement;
 
   async onload() {
     this.isReadonly = Boolean((window as any).siyuan?.config?.readonly || (window as any).siyuan?.isPublish);
@@ -109,6 +115,14 @@ export default class TagManagerPlugin extends Plugin {
             toggleTagManagerDock(DOCK_TYPE);
           },
         });
+        menu.addItem({
+          id: 'tm-open-setting',
+          icon: 'iconSettings',
+          label: (this.i18n.setting as string) ?? '设置',
+          click: () => {
+            this.openSetting();
+          },
+        });
       },
     });
 
@@ -128,6 +142,9 @@ export default class TagManagerPlugin extends Plugin {
 
     // 11. 启动输入态基于共现图谱的伴生标签智能推荐调度服务
     TagCompanionService.init(localData?.companionConfig);
+
+    // 12. 注册思源原生标准插件设置页（标签删除偏好）
+    this.initNativeSettings(localData?.tagDeleteConfig);
   }
 
   private handleProtyleLoaded = (e: CustomEvent<any>) => {
@@ -198,9 +215,101 @@ export default class TagManagerPlugin extends Plugin {
       if (localData?.companionConfig) {
         TagCompanionService.updateConfig(localData.companionConfig);
       }
+      if (localData?.tagDeleteConfig) {
+        if (this.settingDeleteSelect) {
+          this.settingDeleteSelect.value = localData.tagDeleteConfig.mode || 'strip_hash';
+        }
+        if (this.settingDeleteInput) {
+          this.settingDeleteInput.value = localData.tagDeleteConfig.replaceWith || '';
+          this.settingDeleteInput.disabled = (localData.tagDeleteConfig.mode || 'strip_hash') !== 'replace_hash';
+        }
+      }
       TagCompanionCache.markDirty();
     } catch {
       // 容错保护，遵循 5 秒拆除预算
     }
+  }
+
+  /**
+   * 初始化思源系统原生标准插件设置面板
+   */
+  private initNativeSettings(initialConfig?: ITagDeleteConfig) {
+    const currentConfig: ITagDeleteConfig = {
+      ...DEFAULT_TAG_DELETE_CONFIG,
+      ...(initialConfig || {}),
+    };
+
+    const selectEl = document.createElement('select');
+    selectEl.className = 'b3-select fn__flex-center fn__size200';
+    selectEl.innerHTML = `
+      <option value="strip_hash">#（剥离前后“#”，保持标签文字）</option>
+      <option value="remove_all">#+标签文字（彻底删除标签及其文字）</option>
+      <option value="replace_hash">用...替代#（自定义文本替代前后“#”）</option>
+    `;
+    selectEl.value = currentConfig.mode;
+    this.settingDeleteSelect = selectEl;
+
+    const inputEl = document.createElement('input');
+    inputEl.className = 'b3-text-field fn__flex-center fn__size200';
+    inputEl.placeholder = '例如 * 或 _（默认为空）';
+    inputEl.value = currentConfig.replaceWith || '';
+    inputEl.disabled = currentConfig.mode !== 'replace_hash';
+    this.settingDeleteInput = inputEl;
+
+    selectEl.addEventListener('change', () => {
+      inputEl.disabled = selectEl.value !== 'replace_hash';
+      if (selectEl.value === 'replace_hash') {
+        inputEl.focus();
+      }
+    });
+
+    this.setting = new Setting({
+      confirmCallback: async () => {
+        const selectedMode = selectEl.value as TTagDeleteMode;
+        const replaceText = inputEl.value.trim();
+        const newDeleteConfig: ITagDeleteConfig = {
+          mode: selectedMode,
+          replaceWith: replaceText,
+        };
+
+        const existing = await this.loadData(STORAGE_NAME).catch(() => ({}));
+        await this.saveData(STORAGE_NAME, {
+          ...(existing || {}),
+          tagDeleteConfig: newDeleteConfig,
+        });
+        showMessage('标签管家设置已保存', 3000, 'info');
+      },
+    });
+
+    this.setting.addItem({
+      title: '非文档级标签删除模式',
+      description: '段落正文内标签删除时的默认处理行为（文档级标签始终从文档属性中移除）',
+      actionElement: selectEl,
+    });
+
+    this.setting.addItem({
+      title: '替换字符/文本',
+      description: '当删除模式为【用...替代#】时，用于替换前后“#”的内容（若留空则等同于仅移除“#”）',
+      actionElement: inputEl,
+    });
+  }
+
+  public openSetting() {
+    if (this.settingDeleteSelect && this.settingDeleteInput) {
+      this.loadData(STORAGE_NAME).then((localData) => {
+        const cfg: ITagDeleteConfig = {
+          ...DEFAULT_TAG_DELETE_CONFIG,
+          ...(localData?.tagDeleteConfig || {}),
+        };
+        if (this.settingDeleteSelect) {
+          this.settingDeleteSelect.value = cfg.mode;
+        }
+        if (this.settingDeleteInput) {
+          this.settingDeleteInput.value = cfg.replaceWith || '';
+          this.settingDeleteInput.disabled = cfg.mode !== 'replace_hash';
+        }
+      }).catch(() => null);
+    }
+    super.openSetting();
   }
 }

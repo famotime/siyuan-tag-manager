@@ -182,6 +182,53 @@ describe('UI Composables 与状态管理规范化测试', () => {
       // 验证保存的配置正确持久化
       expect(savedData).toBeDefined();
     });
+
+    it('handleRemoveTag 在删除确认后调用 TagDeletionService 并清理元数据与自定义标签', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { TagDeletionService } = await import('../src/services/TagDeletionService');
+      const { useTagData } = await import('../src/composables/useTagData');
+
+      // mock confirm 模拟用户确认
+      (globalThis as any).confirm = vi.fn().mockReturnValue(true);
+
+      let executedLabel = '';
+      vi.spyOn(TagDeletionService, 'executeDeleteTag').mockImplementation(async (label) => {
+        executedLabel = label;
+        return { success: true, affectedBlocks: 1, errors: [] };
+      });
+
+      let savedData: any = { customTags: ['DeleteMe', 'KeepMe'] };
+      const mockPlugin = {
+        loadData: async () => savedData,
+        saveData: async (_file: string, data: any) => {
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      vi.spyOn(TagApiClient, 'fetchAllTags').mockResolvedValue([]);
+
+      const {
+        metadataMap,
+        customTags,
+        handleRemoveTag,
+      } = useTagData();
+
+      customTags.value = ['DeleteMe', 'KeepMe'];
+      metadataMap.value.set('DeleteMe', {
+        label: 'DeleteMe',
+        updatedAt: Date.now(),
+      });
+
+      const success = await handleRemoveTag('DeleteMe');
+      expect(success).toBe(true);
+      expect(executedLabel).toBe('DeleteMe');
+      expect(customTags.value).not.toContain('DeleteMe');
+      expect(customTags.value).toContain('KeepMe');
+      expect(metadataMap.value.has('DeleteMe')).toBe(false);
+      expect(savedData).toBeDefined();
+    });
   });
 
   describe('useTagFilter AND/OR 逻辑切换与即时刷新测试', () => {

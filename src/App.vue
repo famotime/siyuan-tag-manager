@@ -35,6 +35,13 @@
           </button>
           <button
             class="tm-icon-btn tm-btn-sm"
+            v-tooltip="'标签管家偏好设置'"
+            @click="openPluginSettings"
+          >
+            <SyLineIcon name="settings" :size="14" />
+          </button>
+          <button
+            class="tm-icon-btn tm-btn-sm"
             v-tooltip="'折叠标签管家侧栏'"
             @click="closePanel"
           >
@@ -213,13 +220,21 @@
       @close="companionModalVisible = false"
       @save="onSaveCompanionConfig"
     />
+
+    <!-- 偏好设置弹窗 (包含非文档级标签删除偏好) -->
+    <TagSettingsModal
+      :visible="settingsModalVisible"
+      :config="tagDeleteConfig"
+      @close="settingsModalVisible = false"
+      @save="onSaveTagDeleteConfig"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagHealthIssue, ITagMetadata, ITagGroup, ITagCombination } from './types/tag';
+import type { ITagHealthIssue, ITagMetadata, ITagGroup, ITagCombination, ITagDeleteConfig } from './types/tag';
 import type { ITagCompanionConfig } from './types/companion';
 import type {
   TabType,
@@ -265,6 +280,7 @@ import TagMergeModal from './components/dialogs/TagMergeModal.vue';
 import TagRenameModal from './components/dialogs/TagRenameModal.vue';
 import TagReparentModal from './components/dialogs/TagReparentModal.vue';
 import TagCompanionModal from './components/dialogs/TagCompanionModal.vue';
+import TagSettingsModal from './components/dialogs/TagSettingsModal.vue';
 
 // 1. 数据状态与 Composables 初始化
 const {
@@ -274,7 +290,9 @@ const {
   tagGroups,
   customColorPresets,
   companionConfig,
+  tagDeleteConfig,
   saveCompanionConfig,
+  saveTagDeleteConfig,
   saveCustomColorPreset,
   removeCustomColorPreset,
   refreshTags,
@@ -290,10 +308,17 @@ const {
 } = useTagData();
 
 const companionModalVisible = ref(false);
+const settingsModalVisible = ref(false);
 
 async function onSaveCompanionConfig(config: ITagCompanionConfig) {
   await saveCompanionConfig(config, savedViews.value);
   companionModalVisible.value = false;
+}
+
+async function onSaveTagDeleteConfig(config: ITagDeleteConfig) {
+  await saveTagDeleteConfig(config, savedViews.value);
+  settingsModalVisible.value = false;
+  showMessage('偏好设置已保存', 3000, 'info');
 }
 
 const {
@@ -894,6 +919,10 @@ function handleSaveAsGroup(tags: string[]) {
   };
 }
 
+function openPluginSettings() {
+  settingsModalVisible.value = true;
+}
+
 function closePanel() {
   toggleTagManagerDock();
 }
@@ -918,6 +947,14 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     }
     if (mergeModal.value.visible) {
       mergeModal.value.visible = false;
+      return;
+    }
+    if (companionModalVisible.value) {
+      companionModalVisible.value = false;
+      return;
+    }
+    if (settingsModalVisible.value) {
+      settingsModalVisible.value = false;
       return;
     }
     closePanel();

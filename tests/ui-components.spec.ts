@@ -195,7 +195,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const html = await renderToString(app);
     expect(html).toContain('is-selected');
     expect(html).toContain('tm-selection-bar');
-    expect(html).toContain('已多选');
+    expect(html).toContain('已选');
   });
 
   it('TagTreeView 节点操作区应渲染重命名编辑按钮，具备 sy-line-icon--edit 图标', async () => {

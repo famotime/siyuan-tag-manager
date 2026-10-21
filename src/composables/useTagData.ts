@@ -1,6 +1,12 @@
 import { ref } from 'vue';
 import { showMessage } from 'siyuan';
-import type { ITagGroup, ITagItem, ITagMetadata } from '../types/tag';
+import type {
+  ITagDeleteConfig,
+  ITagGroup,
+  ITagItem,
+  ITagMetadata,
+} from '../types/tag';
+import { DEFAULT_TAG_DELETE_CONFIG } from '../types/tag';
 import type { IColorPreset } from '../styles/palette';
 import type { ITagCompanionConfig } from '../types/companion';
 import { DEFAULT_COMPANION_CONFIG } from '../types/companion';
@@ -10,6 +16,7 @@ import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
 import { TagCreationService } from '../services/TagCreationService';
 import { TagCompanionService } from '../services/TagCompanionService';
+import { TagDeletionService } from '../services/TagDeletionService';
 import { usePlugin } from '../main';
 
 // 共享的标签资产与元数据状态
@@ -20,6 +27,7 @@ const tagGroups = ref<ITagGroup[]>([]);
 const customTags = ref<string[]>([]);
 const customColorPresets = ref<IColorPreset[]>([]);
 const companionConfig = ref<ITagCompanionConfig>({ ...DEFAULT_COMPANION_CONFIG });
+const tagDeleteConfig = ref<ITagDeleteConfig>({ ...DEFAULT_TAG_DELETE_CONFIG });
 
 export function useTagData() {
   /**
@@ -35,6 +43,7 @@ export function useTagData() {
       customTags: customTags.value,
       customColorPresets: customColorPresets.value,
       companionConfig: companionConfig.value,
+      tagDeleteConfig: tagDeleteConfig.value,
     });
   }
 
@@ -69,6 +78,10 @@ export function useTagData() {
       if (localData?.companionConfig) {
         companionConfig.value = { ...DEFAULT_COMPANION_CONFIG, ...localData.companionConfig };
         TagCompanionService.updateConfig(companionConfig.value);
+      }
+
+      if (localData?.tagDeleteConfig) {
+        tagDeleteConfig.value = { ...DEFAULT_TAG_DELETE_CONFIG, ...localData.tagDeleteConfig };
       }
 
       const tags = await TagApiClient.fetchAllTags();
@@ -189,27 +202,42 @@ export function useTagData() {
   }
 
   async function handleRemoveTag(label: string): Promise<boolean> {
-    if (!confirm(`确定要彻底删除标签 "${label}" 吗？此操作将移除关联引用的标签标记。`)) {
+    const modeDesc = TagDeletionService.getDeleteModeDescription(tagDeleteConfig.value);
+    const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm.bind(window)
+      : (typeof globalThis !== 'undefined' && typeof (globalThis as any).confirm === 'function'
+        ? (globalThis as any).confirm
+        : () => true);
+    if (!confirmFn(`确定要彻底删除标签 "${label}" 吗？当前将按设置【${modeDesc}】处理正文中的标签标记。`)) {
       return false;
     }
     loading.value = true;
     try {
-      // 1. 若在 customTags 中，将其剔除并持久化
+      // 1. 若在 customTags 中，将其剔除
       if (customTags.value.some(t => t.toLowerCase() === label.toLowerCase())) {
         customTags.value = customTags.value.filter(t => t.toLowerCase() !== label.toLowerCase());
-        await persistConfig();
       }
 
-      // 2. 调用思源内核删除（若在思源库中存在引用）
-      try {
-        await TagApiClient.removeTag(label);
-      } catch {
-        // 若为仅本地存在的侧面板标签，内核中无引用时忽略该错误
+      // 2. 若在元数据中，将其删除
+      if (metadataMap.value.has(label)) {
+        metadataMap.value.delete(label);
       }
 
-      showMessage(`已成功删除标签 "${label}"`, 3000, 'info');
+      // 3. 执行标签删除（非文档级按配置剥离/替换/删除，文档级更新属性）
+      const result = await TagDeletionService.executeDeleteTag(label, tagDeleteConfig.value);
+
+      await persistConfig();
+
+      if (result.errors.length > 0) {
+        showMessage(`已删除标签 "${label}"，但有 ${result.errors.length} 处更新遇到异常`, 4000, 'error');
+      } else if (result.affectedBlocks > 0) {
+        showMessage(`已成功删除标签 "${label}"，处理了 ${result.affectedBlocks} 处标签引用`, 3000, 'info');
+      } else {
+        showMessage(`已成功删除标签 "${label}"`, 3000, 'info');
+      }
+
       await refreshTags();
-      return true;
+      return result.success;
     } catch (err: any) {
       showMessage(`删除标签失败: ${err.message || err}`, 4000, 'error');
       return false;
@@ -409,6 +437,11 @@ export function useTagData() {
     showMessage('伴生推荐设置已保存', 3000, 'info');
   }
 
+  async function saveTagDeleteConfig(config: ITagDeleteConfig, savedViews: any[] = []) {
+    tagDeleteConfig.value = { ...config };
+    await persistConfig(savedViews);
+  }
+
   return {
     allTags,
     loading,
@@ -416,7 +449,9 @@ export function useTagData() {
     customTags,
     customColorPresets,
     companionConfig,
+    tagDeleteConfig,
     saveCompanionConfig,
+    saveTagDeleteConfig,
     saveCustomColorPreset,
     removeCustomColorPreset,
     addCustomTag,

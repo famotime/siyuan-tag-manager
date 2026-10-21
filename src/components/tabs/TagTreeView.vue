@@ -178,7 +178,7 @@
           <div class="tm-selection-info">
             <SyLineIcon name="check-circle" :size="13" class="tm-selection-icon" />
             <span class="tm-selection-text">
-              已多选 <strong>{{ selectedTags.length }}</strong> 个标签
+              已选 <strong>{{ selectedTags.length }}</strong> 个标签
             </span>
           </div>
           <div class="tm-selection-actions">

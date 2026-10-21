@@ -231,3 +231,42 @@ export interface ITagMatchedDocGroup {
   blocks: ITagMatchedBlock[];
 }
 
+/**
+ * 非文档级标签删除模式
+ * - 'strip_hash': #，仅剥离前后“#”，保持标签文字（默认）
+ * - 'remove_all': #+标签文字，彻底删除标签及其文字（思源原生行为）
+ * - 'replace_hash': 用...替代#，将“#”替换为用户指定的文本，保持标签文字
+ */
+export type TTagDeleteMode = 'strip_hash' | 'remove_all' | 'replace_hash';
+
+/**
+ * 标签删除偏好配置接口
+ */
+export interface ITagDeleteConfig {
+  /** 删除非文档级正文标签时的处理模式 */
+  mode: TTagDeleteMode;
+  /** 当 mode 为 'replace_hash' 时用于替换 '#' 的自定义文本 */
+  replaceWith: string;
+}
+
+/**
+ * 标签删除操作执行结果
+ */
+export interface ITagDeleteResult {
+  /** 操作是否完全成功 */
+  success: boolean;
+  /** 受影响的块总数（包含正文块与文档块） */
+  affectedBlocks: number;
+  /** 更新失败的块错误信息列表 */
+  errors: string[];
+}
+
+/**
+ * 默认标签删除配置
+ */
+export const DEFAULT_TAG_DELETE_CONFIG: Readonly<ITagDeleteConfig> = {
+  mode: 'strip_hash',
+  replaceWith: '',
+};
+
+

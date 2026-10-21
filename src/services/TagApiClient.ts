@@ -42,6 +42,13 @@ export class TagApiClient {
   }
 
   /**
+   * 执行 SQL 查询接口
+   */
+  public static async sqlQuery<T = any>(sql: string): Promise<T[]> {
+    return this.request<T[]>('/api/query/sql', { stmt: sql });
+  }
+
+  /**
    * 获取全库所有标签（基于 SQL 高性能聚合，失败时平滑降级至 getTag 接口）
    */
   public static async fetchAllTags(): Promise<ITagItem[]> {
@@ -289,6 +296,17 @@ export class TagApiClient {
       attrs: {
         tags: tagsArr.join(','),
       },
+    });
+  }
+
+  /**
+   * 设置块自定义属性
+   */
+  public static async setBlockAttrs(blockId: string, attrs: Record<string, string>): Promise<void> {
+    if (!blockId) return;
+    await this.request('/api/attr/setBlockAttrs', {
+      id: blockId,
+      attrs,
     });
   }
 }
