@@ -5,7 +5,7 @@ import { TagCooccurrenceService } from './TagCooccurrenceService';
 
 /**
  * 伴生标签共现网络内存倒排索引缓存池
- * 
+ *
  * 核心目标：
  * 1. 预热构建全库标签无向共现图谱的倒排字典，支持 O(1) 亚毫秒级亚延迟查询；
  * 2. 在索引构建阶段执行最小相似度过滤 (minSimilarity)，消除噪音；

@@ -14,7 +14,7 @@ import type {
  * 从 App.vue 抽离：10 个弹窗/菜单状态 + 定位逻辑 + 分层关闭优先级
  *
  * Escape 关闭优先级：
- * rowMenu → styleModal → saveViewModal → renameModal → groupModal → reparentModal
+ * confirmDialog → rowMenu → styleModal → saveViewModal → renameModal → groupModal → reparentModal
  * → batchModal → mergeModal → companion → settings → 回退
  */
 export function useModalOrchestration(options: {
@@ -85,8 +85,50 @@ export function useModalOrchestration(options: {
     label: '',
   });
 
+  // 通用自绘确认对话框状态（替代 window.confirm，回调由宿主注册）
+  const confirmDialog = ref<{
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    danger: boolean;
+    onConfirm: (() => void) | null;
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    confirmText: '确认',
+    danger: false,
+    onConfirm: null,
+  });
+
+  function openConfirmDialog(options: { title: string; message: string; confirmText?: string; danger?: boolean; onConfirm: () => void }) {
+    confirmDialog.value = {
+      visible: true,
+      title: options.title,
+      message: options.message,
+      confirmText: options.confirmText || '确认',
+      danger: options.danger || false,
+      onConfirm: options.onConfirm,
+    };
+  }
+
+  function closeConfirmDialog() {
+    confirmDialog.value.visible = false;
+    confirmDialog.value.onConfirm = null;
+  }
+
+  function handleConfirmDialog() {
+    const callback = confirmDialog.value.onConfirm;
+    closeConfirmDialog();
+    if (callback) {
+      callback();
+    }
+  }
+
   // Escape 关闭链（顺序即优先级）
   const escapeClosers = [
+    { isVisible: () => confirmDialog.value.visible, close: closeConfirmDialog },
     { isVisible: () => rowMenu.value.visible, close: () => { rowMenu.value.visible = false; } },
     { isVisible: () => styleModal.value.visible, close: () => { styleModal.value.visible = false; } },
     { isVisible: () => saveViewModal.value.visible, close: () => { saveViewModal.value.visible = false; } },
@@ -149,8 +191,12 @@ export function useModalOrchestration(options: {
     renameModal,
     groupModal,
     reparentModal,
+    confirmDialog,
     openRowMenu,
     closeRowMenu,
+    openConfirmDialog,
+    closeConfirmDialog,
+    handleConfirmDialog,
     handleGlobalKeydown,
   };
 }

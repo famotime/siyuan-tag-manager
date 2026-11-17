@@ -148,8 +148,8 @@ export class TagGroupService {
 
     // 2. 若未从 title 取得，尝试从 wysiwyg 容器属性获取
     if (!docId) {
-      const activeWysiwyg = document.querySelector('.layout__wnd--active .protyle-wysiwyg[data-doc-type]') ||
-        document.querySelector('.protyle-wysiwyg');
+      const activeWysiwyg = document.querySelector('.layout__wnd--active .protyle-wysiwyg[data-doc-type]')
+        || document.querySelector('.protyle-wysiwyg');
       if (activeWysiwyg) {
         docId = activeWysiwyg.getAttribute('data-doc-id') || activeWysiwyg.getAttribute('data-node-id') || undefined;
       }
@@ -188,6 +188,7 @@ export class TagGroupService {
 
   /**
    * 将标签组的标签应用到文档（通过思源原生 IAL tags 属性，去重且不污染正文）
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async applyGroupToDoc(
     docId: string,
@@ -201,11 +202,11 @@ export class TagGroupService {
       return { success: false, error: '待打标签列表不能为空' };
     }
 
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     try {
       const attrsRes = await post('/api/attr/getBlockAttrs', { id: docId });
-      const currentTags = attrsRes?.data?.tags || '';
+      const currentTags = attrsRes?.tags || '';
       const newTagsStr = TagBatchService.appendDocTags(currentTags, tags);
 
       await post('/api/attr/setBlockAttrs', {
@@ -221,6 +222,7 @@ export class TagGroupService {
 
   /**
    * 将标签组的标签应用到具体块（在块正文末尾追加 #tag#）
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async applyGroupToBlock(
     blockId: string,
@@ -234,11 +236,11 @@ export class TagGroupService {
       return { success: false, error: '待打标签列表不能为空' };
     }
 
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     try {
       const mdRes = await post('/api/block/getBlockKramdown', { id: blockId });
-      const currentMd = mdRes?.data?.kramdown || '';
+      const currentMd = mdRes?.kramdown || '';
       let updatedMd = currentMd;
 
       for (const t of tags) {

@@ -163,7 +163,7 @@ export class TagCompanionService {
     if (targetCtx.isDoc) {
       const protyleEl = targetCtx.targetElement.closest<HTMLElement>('.protyle') || document.body;
       const docChips = Array.from(
-        protyleEl.querySelectorAll<HTMLElement>('.b3-chips__doctag .b3-chip, .b3-chips .b3-chip')
+        protyleEl.querySelectorAll<HTMLElement>('.b3-chips__doctag .b3-chip, .b3-chips .b3-chip'),
       );
       return docChips
         .map(c => c.getAttribute('data-tag') || TagDomDecorator.extractTagLabel(TagDomDecorator.extractElementText(c)))
@@ -171,7 +171,7 @@ export class TagCompanionService {
     }
 
     const tagElements = Array.from(
-      targetCtx.targetElement.querySelectorAll<HTMLElement>('span[data-type~="tag"]')
+      targetCtx.targetElement.querySelectorAll<HTMLElement>('span[data-type~="tag"]'),
     );
     return tagElements
       .map(el => el.getAttribute('data-tag') || TagDomDecorator.extractTagLabel(TagDomDecorator.extractElementText(el)))
@@ -211,10 +211,10 @@ export class TagCompanionService {
 
       // 若用户按任意输入键、回车或方向键，立即隐退
       if (
-        e.key === 'Enter' ||
-        e.key === 'Backspace' ||
-        e.key.length === 1 ||
-        e.key.startsWith('Arrow')
+        e.key === 'Enter'
+        || e.key === 'Backspace'
+        || e.key.length === 1
+        || e.key.startsWith('Arrow')
       ) {
         this.hide();
       }
@@ -276,7 +276,7 @@ export class TagCompanionService {
       if (!target) return;
 
       const tagEl = target.closest<HTMLElement>(
-        'span[data-type~="tag"], [data-tag], .b3-chips__doctag .b3-chip, .b3-chips .b3-chip'
+        'span[data-type~="tag"], [data-tag], .b3-chips__doctag .b3-chip, .b3-chips .b3-chip',
       );
       if (!tagEl) return;
 
@@ -480,7 +480,7 @@ export class TagCompanionService {
     if (!targetCtx) return;
 
     const tagElements = Array.from(
-      targetCtx.targetElement.querySelectorAll<HTMLElement>('span[data-type~="tag"], .b3-chip')
+      targetCtx.targetElement.querySelectorAll<HTMLElement>('span[data-type~="tag"], .b3-chip'),
     );
     if (tagElements.length === 0) return;
 

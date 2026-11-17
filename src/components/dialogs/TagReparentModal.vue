@@ -102,7 +102,7 @@ watch(
       searchKeyword.value = '';
       selectedParent.value = undefined;
     }
-  }
+  },
 );
 
 // 过滤候选标签：不能是自身，也不能是自身的子孙节点

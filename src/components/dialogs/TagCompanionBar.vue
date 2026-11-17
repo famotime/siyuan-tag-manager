@@ -1,48 +1,3 @@
-<script setup lang="ts">
-import { computed } from 'vue';
-import type { ITagCompanionCandidate, ICompanionBarState } from '../../types/companion';
-import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
-
-interface Props {
-  state?: ICompanionBarState;
-  candidates?: ITagCompanionCandidate[];
-  activeIndex?: number;
-  position?: { top: number; left: number };
-  acceptedLabels?: string[];
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  candidates: () => [],
-  activeIndex: 0,
-  position: () => ({ top: 0, left: 0 }),
-  acceptedLabels: () => [],
-});
-
-const emit = defineEmits<{
-  (e: 'select', candidate: ITagCompanionCandidate, index: number): void;
-  (e: 'close'): void;
-}>();
-
-const currentVisible = computed(() => {
-  if (props.state) return props.state.visible && props.state.candidates.length > 0;
-  return props.candidates.length > 0;
-});
-
-const currentCandidates = computed(() => props.state?.candidates ?? props.candidates);
-const currentActiveIndex = computed(() => props.state?.activeIndex ?? props.activeIndex);
-const currentPosition = computed(() => props.state?.position ?? props.position);
-const currentAccepted = computed(() => props.state?.acceptedLabels ?? props.acceptedLabels);
-
-function isAccepted(label: string): boolean {
-  return currentAccepted.value.includes(label);
-}
-
-function handleSelect(item: ITagCompanionCandidate, idx: number) {
-  if (isAccepted(item.label)) return;
-  emit('select', item, idx);
-}
-</script>
-
 <template>
   <div
     v-if="currentVisible"
@@ -90,6 +45,51 @@ function handleSelect(item: ITagCompanionCandidate, idx: number) {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { ITagCompanionCandidate, ICompanionBarState } from '../../types/companion';
+import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
+
+interface Props {
+  state?: ICompanionBarState;
+  candidates?: ITagCompanionCandidate[];
+  activeIndex?: number;
+  position?: { top: number; left: number };
+  acceptedLabels?: string[];
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  candidates: () => [],
+  activeIndex: 0,
+  position: () => ({ top: 0, left: 0 }),
+  acceptedLabels: () => [],
+});
+
+const emit = defineEmits<{
+  (e: 'select', candidate: ITagCompanionCandidate, index: number): void;
+  (e: 'close'): void;
+}>();
+
+const currentVisible = computed(() => {
+  if (props.state) return props.state.visible && props.state.candidates.length > 0;
+  return props.candidates.length > 0;
+});
+
+const currentCandidates = computed(() => props.state?.candidates ?? props.candidates);
+const currentActiveIndex = computed(() => props.state?.activeIndex ?? props.activeIndex);
+const currentPosition = computed(() => props.state?.position ?? props.position);
+const currentAccepted = computed(() => props.state?.acceptedLabels ?? props.acceptedLabels);
+
+function isAccepted(label: string): boolean {
+  return currentAccepted.value.includes(label);
+}
+
+function handleSelect(item: ITagCompanionCandidate, idx: number) {
+  if (isAccepted(item.label)) return;
+  emit('select', item, idx);
+}
+</script>
 
 <style lang="scss" scoped>
 .tm-companion-bar {

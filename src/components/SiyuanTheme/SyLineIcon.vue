@@ -4,7 +4,7 @@
     :class="[
       { 'is-spinning': spin },
       { 'is-disabled': disabled },
-      `sy-line-icon--${name}`
+      `sy-line-icon--${name}`,
     ]"
     :style="{
       width: `${size}px`,
@@ -19,7 +19,7 @@
     <svg
       style="fill: none !important; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; display: block;"
       :style="{
-        strokeWidth: strokeWidth,
+        strokeWidth,
         color: color || undefined,
         width: `${size}px`,
         height: `${size}px`,
@@ -64,7 +64,7 @@ const props = withDefaults(
     strokeWidth: 1.75,
     spin: false,
     disabled: false,
-  }
+  },
 );
 
 const iconData = computed(() => LINE_ICONS[props.name]);

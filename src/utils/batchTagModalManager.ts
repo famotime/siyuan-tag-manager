@@ -1,4 +1,5 @@
-import { createApp, reactive, type App as VueApp } from 'vue';
+import { createApp, reactive } from 'vue';
+import type { App as VueApp } from 'vue';
 import TagBatchModal from '../components/dialogs/TagBatchModal.vue';
 import { TagBatchService } from '../services/TagBatchService';
 import { TagApiClient } from '../services/TagApiClient';
@@ -17,7 +18,7 @@ export async function openStandaloneBatchModal(
     allTags?: ITagItem[];
     tagGroups?: ITagGroup[];
     onSuccess?: () => void;
-  }
+  },
 ): Promise<void> {
   // 确保先关闭并清理旧实例
   closeStandaloneBatchModal();

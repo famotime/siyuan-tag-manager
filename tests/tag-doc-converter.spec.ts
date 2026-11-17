@@ -23,7 +23,7 @@ describe('TagDocConverterService 标签转实体文档服务测试', () => {
     expect(md).toContain('# 🏷️ 主题聚合：YouTube');
     expect(md).toContain('知识资产聚合说明');
     // 检查动态 SQL 嵌入块
-    expect(md).toContain("{{SELECT * FROM blocks WHERE id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'YouTube') ORDER BY updated DESC}}");
+    expect(md).toContain('{{SELECT * FROM blocks WHERE id IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content = \'YouTube\') ORDER BY updated DESC}}');
     // 检查静态历史快照
     expect(md).toContain('《YouTube视频解析》');
     expect(md).toContain('siyuan://blocks/20260926-b1');

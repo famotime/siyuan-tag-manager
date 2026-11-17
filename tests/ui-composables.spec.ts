@@ -311,7 +311,6 @@ describe('UI Composables 与状态管理规范化测试', () => {
     });
 
     it('toggleTagCondition 点击标签仅切换该标签状态，其余标签保持不变，并即时触发 runQuery', async () => {
-      const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       const mockBlocks = [
@@ -349,7 +348,6 @@ describe('UI Composables 与状态管理规范化测试', () => {
     });
 
     it('toggleTagCondition 将 OR 标签转为 NOT (exclude) 时仅影响该标签', async () => {
-      const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;
@@ -375,7 +373,6 @@ describe('UI Composables 与状态管理规范化测试', () => {
     });
 
     it('switchFilterMode 在顶栏模式切换时能够直接双向转换已有标签并刷新结果', async () => {
-      const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;
@@ -408,7 +405,6 @@ describe('UI Composables 与状态管理规范化测试', () => {
     });
 
     it('toggleTagFilter 仅切换指定标签，不影响已有标签条件', async () => {
-      const { TagApiClient } = await import('../src/services/TagApiClient');
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;

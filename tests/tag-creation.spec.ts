@@ -76,12 +76,12 @@ describe('TagCreationService 标签快捷创建服务测试', () => {
     it('当有焦点块 blockId 时，追加到块正文末尾', async () => {
       const mockRequest = vi.fn().mockImplementation(async (url: string) => {
         if (url === '/api/block/getBlockKramdown') {
-          return { code: 0, data: { kramdown: '这是一段测试笔记内容' } };
+          return { kramdown: '这是一段测试笔记内容' };
         }
         if (url === '/api/block/updateBlock') {
-          return { code: 0, data: null };
+          return null;
         }
-        return { code: 0, data: {} };
+        return {};
       });
 
       const res = await TagCreationService.createAndApplyTag(
@@ -104,15 +104,15 @@ describe('TagCreationService 标签快捷创建服务测试', () => {
     it('当无 blockId 但有 docId 时，向文档末尾追加块并打标', async () => {
       const mockRequest = vi.fn().mockImplementation(async (url: string) => {
         if (url === '/api/block/appendBlock') {
-          return { code: 0, data: [{ id: 'new_block_1' }] };
+          return [{ id: 'new_block_1' }];
         }
         if (url === '/api/attr/getBlockAttrs') {
-          return { code: 0, data: { tags: 'oldTag' } };
+          return { tags: 'oldTag' };
         }
         if (url === '/api/attr/setBlockAttrs') {
-          return { code: 0, data: null };
+          return null;
         }
-        return { code: 0, data: {} };
+        return {};
       });
 
       const res = await TagCreationService.createAndApplyTag(

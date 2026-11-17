@@ -81,7 +81,8 @@ export class TagCreationService {
     const label = validation.cleanLabel;
     const active = context || TagGroupService.getActiveContext();
 
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    // 默认传输统一走 TagApiClient.request（含鉴权头、code 校验与解包）
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     // 1. 若光标位于具体内容块上：追加到该块末尾
     if (active.blockId) {

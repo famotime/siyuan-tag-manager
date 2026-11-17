@@ -9,10 +9,10 @@
         <div class="tm-form-group">
           <label>视图名称：</label>
           <input
-            v-model="state.title"
+            v-model="title"
             class="b3-text-field fn__block"
             placeholder="例如：AI视频与提示词重点"
-            @keydown.enter="emit('confirm')"
+            @keydown.enter="handleConfirm"
           />
         </div>
         <div class="tm-section-hint">
@@ -23,17 +23,18 @@
       </div>
       <div class="tm-modal-footer">
         <button class="b3-button b3-button--cancel" @click="emit('close')">取消</button>
-        <button class="b3-button b3-button--primary" @click="emit('confirm')">保存视图</button>
+        <button class="b3-button b3-button--primary" @click="handleConfirm">保存视图</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 import type { ISaveViewModalState } from '../../types/ui';
 
-defineProps<{
+const props = defineProps<{
   state: ISaveViewModalState;
   includeTags: string[];
   optionalTags?: string[];
@@ -42,6 +43,23 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'confirm'): void;
+  (e: 'confirm', title: string): void;
 }>();
+
+// 本地编辑态：不再直接突变 props.state，确认时经事件回传
+const title = ref('');
+
+watch(
+  () => props.state.visible,
+  (visible) => {
+    if (visible) {
+      title.value = props.state.title || '';
+    }
+  },
+  { immediate: true },
+);
+
+function handleConfirm() {
+  emit('confirm', title.value);
+}
 </script>

@@ -104,7 +104,7 @@ export function useDocSelection(options: {
       if (includeSubDocs.value) {
         loadSubDocs();
       }
-    }
+    },
   );
 
   // 初始化监听外部传入的 targetDocs 或 docIdsText
@@ -132,7 +132,7 @@ export function useDocSelection(options: {
         }
       }
     },
-    { immediate: true, deep: true }
+    { immediate: true, deep: true },
   );
 
   function removeDoc(id: string) {

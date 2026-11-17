@@ -1,47 +1,3 @@
-<script setup lang="ts">
-import { reactive, watch } from 'vue';
-import type { ITagDeleteConfig, TTagDeleteMode } from '../../types/tag';
-import { DEFAULT_TAG_DELETE_CONFIG } from '../../types/tag';
-import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
-
-interface Props {
-  visible: boolean;
-  config: ITagDeleteConfig;
-}
-
-const props = defineProps<Props>();
-
-const emit = defineEmits<{
-  (e: 'close'): void;
-  (e: 'save', config: ITagDeleteConfig): void;
-}>();
-
-const form = reactive<ITagDeleteConfig>({
-  ...DEFAULT_TAG_DELETE_CONFIG,
-});
-
-watch(
-  () => props.config,
-  (newVal) => {
-    if (newVal) {
-      Object.assign(form, newVal);
-    }
-  },
-  { immediate: true, deep: true },
-);
-
-function handleSave() {
-  emit('save', {
-    mode: form.mode,
-    replaceWith: (form.replaceWith || '').trim(),
-  });
-}
-
-function handleReset() {
-  Object.assign(form, DEFAULT_TAG_DELETE_CONFIG);
-}
-</script>
-
 <template>
   <div v-if="visible" class="tm-modal-mask" @click.self="emit('close')">
     <div class="tm-modal-card" style="width: 500px; max-width: 95vw;">
@@ -138,3 +94,47 @@ function handleReset() {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { reactive, watch } from 'vue';
+import type { ITagDeleteConfig } from '../../types/tag';
+import { DEFAULT_TAG_DELETE_CONFIG } from '../../types/tag';
+import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
+
+interface Props {
+  visible: boolean;
+  config: ITagDeleteConfig;
+}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  (e: 'close'): void;
+  (e: 'save', config: ITagDeleteConfig): void;
+}>();
+
+const form = reactive<ITagDeleteConfig>({
+  ...DEFAULT_TAG_DELETE_CONFIG,
+});
+
+watch(
+  () => props.config,
+  (newVal) => {
+    if (newVal) {
+      Object.assign(form, newVal);
+    }
+  },
+  { immediate: true, deep: true },
+);
+
+function handleSave() {
+  emit('save', {
+    mode: form.mode,
+    replaceWith: (form.replaceWith || '').trim(),
+  });
+}
+
+function handleReset() {
+  Object.assign(form, DEFAULT_TAG_DELETE_CONFIG);
+}
+</script>

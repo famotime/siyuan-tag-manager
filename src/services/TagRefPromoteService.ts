@@ -5,10 +5,10 @@ import { TagApiClient } from './TagApiClient';
 import { parseIalTags, escapeSqlLiteral } from '../utils/tagText';
 
 export type RefMatchReason =
-  | 'explicit_anchor'       // 显式引用锚文本
-  | 'target_doc_title'      // 被引用目标正文/标题
-  | 'target_name'           // 被引用块或文档的命名 (name)
-  | 'target_alias';         // 被引用块或文档的别名 (alias)
+  | 'explicit_anchor' // 显式引用锚文本
+  | 'target_doc_title' // 被引用目标正文/标题
+  | 'target_name' // 被引用块或文档的命名 (name)
+  | 'target_alias'; // 被引用块或文档的别名 (alias)
 
 export interface IRefMatchedTag {
   tag: string;
@@ -172,6 +172,7 @@ export class TagRefPromoteService {
 
   /**
    * 全库或指定笔记本扫描同名引用候选
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async scanRefsToTags(
     allTags: ITagItem[],
@@ -180,10 +181,10 @@ export class TagRefPromoteService {
   ): Promise<IRefToTagCandidate[]> {
     if (!allTags || allTags.length === 0) return [];
 
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     const limit = options?.limit || 200;
-    let whereClause = "WHERE (r.content != '' OR b_def.content != '' OR b_def.name != '' OR b_def.alias != '' OR b_def_doc.name != '' OR b_def_doc.alias != '')";
+    let whereClause = 'WHERE (r.content != \'\' OR b_def.content != \'\' OR b_def.name != \'\' OR b_def.alias != \'\' OR b_def_doc.name != \'\' OR b_def_doc.alias != \'\')';
     if (options?.notebookId) {
       const cleanNb = escapeSqlLiteral(options.notebookId);
       whereClause += ` AND b_doc.box = '${cleanNb}'`;
@@ -209,9 +210,8 @@ export class TagRefPromoteService {
       + `LIMIT ${limit};`;
 
     try {
-      const res = await post('/api/query/sql', { stmt: sql });
-      const rows = res?.data || (Array.isArray(res) ? res : []);
-      return this.processQueryRows(rows, allTags);
+      const rows = await post('/api/query/sql', { stmt: sql });
+      return this.processQueryRows(rows || [], allTags);
     } catch {
       return [];
     }
@@ -219,6 +219,7 @@ export class TagRefPromoteService {
 
   /**
    * 诊断指定单篇文档中的同名引用候选
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async diagnoseSingleDocRefs(
     docId: string,
@@ -227,7 +228,7 @@ export class TagRefPromoteService {
   ): Promise<IRefToTagCandidate | null> {
     if (!docId || !allTags || allTags.length === 0) return null;
 
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     const cleanId = escapeSqlLiteral(docId);
     const sql = `SELECT `
@@ -249,9 +250,8 @@ export class TagRefPromoteService {
       + `LIMIT 100;`;
 
     try {
-      const res = await post('/api/query/sql', { stmt: sql });
-      const rows = res?.data || (Array.isArray(res) ? res : []);
-      const candidates = this.processQueryRows(rows, allTags);
+      const rows = await post('/api/query/sql', { stmt: sql });
+      const candidates = this.processQueryRows(rows || [], allTags);
       return candidates.find(c => c.docId === docId) || null;
     } catch {
       return null;
@@ -260,12 +260,13 @@ export class TagRefPromoteService {
 
   /**
    * 批量将识别出的引用标签写入对应文档
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async promoteCandidates(
     candidates: Array<{ docId: string; tags: string[] }>,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; updatedCount: number; errors: string[] }> {
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     let updatedCount = 0;
     const errors: string[] = [];
@@ -274,7 +275,7 @@ export class TagRefPromoteService {
       if (!item.docId || !item.tags || item.tags.length === 0) continue;
       try {
         const attrsRes = await post('/api/attr/getBlockAttrs', { id: item.docId });
-        const currentTags = attrsRes?.data?.tags || '';
+        const currentTags = attrsRes?.tags || '';
         const newTagsStr = TagBatchService.appendDocTags(currentTags, item.tags);
 
         await post('/api/attr/setBlockAttrs', {

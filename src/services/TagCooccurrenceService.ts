@@ -1,4 +1,8 @@
-import type { ITagItem, ITagCombination } from '../types/tag';
+import { showMessage } from 'siyuan';
+import type { ITagCombination } from '../types/tag';
+
+/** 思源 SQL 单次查询的常规行数上限，达到即提示图谱数据可能不完整 */
+const SQL_ROW_LIMIT = 9999;
 
 export type { ITagCombination };
 
@@ -53,6 +57,9 @@ export class TagCooccurrenceService {
       + `LIMIT 9999;`;
 
     const rows: Array<{ block_id: string; content: string }> = await transport('/api/query/sql', { stmt: sql });
+    if (rows && rows.length >= SQL_ROW_LIMIT) {
+      showMessage('全库标签引用数已达单次查询上限，共现图谱可能不完整', 5000, 'info');
+    }
     const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);
 
     // 统计各标签总引用数（以块为粒度去重累加，与 block_count 保持一致）
@@ -130,7 +137,7 @@ export class TagCooccurrenceService {
     }
 
     // 构建节点清单
-    const nodes: ITagGraphNode[] = Array.from(activeNodes).map(label => {
+    const nodes: ITagGraphNode[] = Array.from(activeNodes).map((label) => {
       const count = tagCounts.get(label) || 1;
       return {
         id: label,
@@ -206,7 +213,7 @@ export class TagCooccurrenceService {
 
       // 枚举从 2 到 maxK 规模的所有组合
       for (let k = 2; k <= maxK; k++) {
-        TagCooccurrenceService.combineHelper(safeTags, k, 0, [], subset => {
+        TagCooccurrenceService.combineHelper(safeTags, k, 0, [], (subset) => {
           const key = subset.join('\0');
           const existing = comboMap.get(key);
           if (existing) {

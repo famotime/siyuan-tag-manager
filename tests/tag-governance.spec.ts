@@ -206,7 +206,7 @@ describe('TagGovernanceService 标签治理引擎单元测试', () => {
 
       // 验证待查、已读等绝不属于 issues
       const chineseIssues = issues.filter(i =>
-        ['待查', '已读', '标签', '技术报告', '🔍待查', '⭐'].includes(i.primaryLabel)
+        ['待查', '已读', '标签', '技术报告', '🔍待查', '⭐'].includes(i.primaryLabel),
       );
       expect(chineseIssues.length).toBe(0);
     });

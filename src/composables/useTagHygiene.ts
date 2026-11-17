@@ -14,7 +14,7 @@ export function useTagHygiene() {
   async function autoResolveIssue(
     issue: ITagHealthIssue,
     allTags: ITagItem[],
-    onSuccess?: () => void
+    onSuccess?: () => void,
   ) {
     if (!issue.relatedLabels || issue.relatedLabels.length === 0) return;
     const planRes = TagGovernanceService.generateMergePlan(issue.primaryLabel, issue.relatedLabels, allTags, true);

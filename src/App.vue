@@ -92,7 +92,7 @@
           @create-tag="handleCreateTag"
           @edit-style="openStyleDialog"
           @remove-tag="handleTreeRemoveTag"
-          @batch-reparent="handleBatchReparent"
+          @batch-reparent="applyReparentMoves"
           @rename-tag="onTreeRenameTag"
         />
 
@@ -229,6 +229,17 @@
       @close="settingsModalVisible = false"
       @save="onSaveTagDeleteConfig"
     />
+
+    <!-- 通用自绘确认对话框（替代 Electron 下存在指针丢失问题的原生 confirm） -->
+    <TagConfirmModal
+      :visible="confirmDialog.visible"
+      :title="confirmDialog.title"
+      :message="confirmDialog.message"
+      :confirm-text="confirmDialog.confirmText"
+      :danger="confirmDialog.danger"
+      @close="confirmDialog.visible = false"
+      @confirm="handleConfirmDialog"
+    />
   </div>
 </template>
 
@@ -249,10 +260,11 @@ import { TagFilterEngine } from './services/TagFilterEngine';
 import { TagGovernanceService } from './services/TagGovernanceService';
 import { TagBatchService } from './services/TagBatchService';
 import { TagGroupService } from './services/TagGroupService';
-import { TagCreationService } from './services/TagCreationService';
 import { TagTreeService } from './services/TagTreeService';
-import { TagCooccurrenceService, type ITagGraphData } from './services/TagCooccurrenceService';
-import { TagTimelineService, type ITagTimelineStats } from './services/TagTimelineService';
+import { TagCooccurrenceService } from './services/TagCooccurrenceService';
+import type { ITagGraphData } from './services/TagCooccurrenceService';
+import { TagTimelineService } from './services/TagTimelineService';
+import type { ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
 import { batchTagBridge } from './utils/batchTagBridge';
 
@@ -278,6 +290,8 @@ import TagRenameModal from './components/dialogs/TagRenameModal.vue';
 import TagReparentModal from './components/dialogs/TagReparentModal.vue';
 import TagCompanionModal from './components/dialogs/TagCompanionModal.vue';
 import TagSettingsModal from './components/dialogs/TagSettingsModal.vue';
+import TagConfirmModal from './components/dialogs/TagConfirmModal.vue';
+import { TagDeletionService } from './services/TagDeletionService';
 
 // 1. 数据状态与 Composables 初始化
 const {
@@ -316,23 +330,15 @@ const {
   renameModal,
   groupModal,
   reparentModal,
+  confirmDialog,
   openRowMenu,
   closeRowMenu,
+  openConfirmDialog,
+  handleConfirmDialog,
   handleGlobalKeydown,
 } = useModalOrchestration({
   onEscapeFallback: () => closePanel(),
 });
-
-async function onSaveCompanionConfig(config: ITagCompanionConfig) {
-  await saveCompanionConfig(config, savedViews.value);
-  companionModalVisible.value = false;
-}
-
-async function onSaveTagDeleteConfig(config: ITagDeleteConfig) {
-  await saveTagDeleteConfig(config, savedViews.value);
-  settingsModalVisible.value = false;
-  showMessage('偏好设置已保存', 3000, 'info');
-}
 
 const {
   activeFilter,
@@ -352,6 +358,17 @@ const {
   saveSmartView,
   jumpToBlock,
 } = useTagFilter();
+
+async function onSaveCompanionConfig(config: ITagCompanionConfig) {
+  await saveCompanionConfig(config, savedViews.value);
+  companionModalVisible.value = false;
+}
+
+async function onSaveTagDeleteConfig(config: ITagDeleteConfig) {
+  await saveTagDeleteConfig(config, savedViews.value);
+  settingsModalVisible.value = false;
+  showMessage('偏好设置已保存', 3000, 'info');
+}
 
 const { healthResult, updateHealthResult, autoResolveIssue } = useTagHygiene();
 
@@ -390,7 +407,7 @@ const topLinks = computed(() => {
 
 // 4. 事件响应与业务编排
 async function refreshAllData() {
-  await refreshTags(tags => {
+  await refreshTags((tags) => {
     updateHealthResult(tags);
     if (tags.length > 0 && !selectedGraphTag.value) {
       selectedGraphTag.value = tags[0].label;
@@ -429,14 +446,23 @@ function onTagClick(label: string, event: MouseEvent) {
   handleTagClick(label, event);
 }
 
-function onQuickFilter(label: string, append: boolean) {
+function onQuickFilter(label: string) {
   // 不立即跳转多维筛选，而是在后台增加/切换筛选项，跟按住 Ctrl 点击操作保持一致
   handleTagClick(label, { ctrlKey: true } as MouseEvent);
 }
 
 function handleTreeRemoveTag(label: string) {
-  handleRemoveTag(label).then(success => {
-    if (success) refreshAllData();
+  const modeDesc = TagDeletionService.getDeleteModeDescription(tagDeleteConfig.value);
+  openConfirmDialog({
+    title: '删除标签',
+    message: `确定要彻底删除标签 "${label}" 吗？当前将按设置【${modeDesc}】处理正文中的标签标记。`,
+    confirmText: '确认删除',
+    danger: true,
+    onConfirm: () => {
+      handleRemoveTag(label).then((success) => {
+        if (success) refreshAllData();
+      });
+    },
   });
 }
 
@@ -457,7 +483,7 @@ function handleRowAction(action: 'style' | 'doc' | 'graph' | 'merge' | 'remove' 
   } else if (action === 'promote-root') {
     const moves = TagTreeService.calculateReparentMoves(label, null, allTags.value);
     if (moves.length > 0) {
-      handleBatchReparent(moves);
+      applyReparentMoves(moves);
     }
   }
 }
@@ -469,7 +495,7 @@ function handleReparentTag(targetParentLabel: string | null) {
     allTags.value,
   );
   if (moves.length > 0) {
-    handleBatchReparent(moves);
+    applyReparentMoves(moves);
   }
 }
 
@@ -538,8 +564,8 @@ function openSaveViewDialog() {
   };
 }
 
-async function confirmSaveSmartView() {
-  const ok = await saveSmartView(saveViewModal.value.title, Array.from(metadataMap.value.values()));
+async function confirmSaveSmartView(title: string) {
+  const ok = await saveSmartView(title, Array.from(metadataMap.value.values()));
   if (ok) {
     saveViewModal.value.visible = false;
   }
@@ -591,14 +617,19 @@ async function handleSaveGroup(payload: { name: string; tags: string[]; color?: 
   groupModal.value.visible = false;
 }
 
-async function handleDeleteGroup(groupId: string) {
+function handleDeleteGroup(groupId: string) {
   const g = tagGroups.value.find(item => item.id === groupId);
-  if (!confirm(`确定要删除标签组「${g?.name || '此组'}」吗？（不会删除标签本身）`)) {
-    return;
-  }
-  const next = TagGroupService.deleteGroup(tagGroups.value, groupId);
-  await saveTagGroups(next, savedViews.value);
-  showMessage(`已删除标签组「${g?.name || ''}」`, 3000, 'info');
+  openConfirmDialog({
+    title: '删除标签组',
+    message: `确定要删除标签组「${g?.name || '此组'}」吗？（不会删除标签本身）`,
+    confirmText: '确认删除',
+    danger: true,
+    onConfirm: async () => {
+      const next = TagGroupService.deleteGroup(tagGroups.value, groupId);
+      await saveTagGroups(next, savedViews.value);
+      showMessage(`已删除标签组「${g?.name || ''}」`, 3000, 'info');
+    },
+  });
 }
 
 async function handleApplyGroup(group: ITagGroup) {
@@ -644,8 +675,9 @@ function openMergeDialog(sourceLabel: string) {
   };
 }
 
-async function confirmMerge() {
-  const { sourceLabel, targetLabel, setAsAlias } = mergeModal.value;
+async function confirmMerge(payload: { targetLabel: string; setAsAlias: boolean }) {
+  const { sourceLabel } = mergeModal.value;
+  const { targetLabel, setAsAlias } = payload;
   const { plan, error } = TagGovernanceService.generateMergePlan(targetLabel, [sourceLabel], allTags.value, setAsAlias);
 
   if (error || !plan) {
@@ -702,15 +734,19 @@ function openRenameDialog(label: string) {
   };
 }
 
-function migrateActiveFilter(oldLabel: string, newLabel: string) {
-  const oldPrefix = `${oldLabel}/`;
-  const newPrefix = `${newLabel}/`;
-  const migrateList = (list: string[]) =>
-    list.map(t => {
-      if (t === oldLabel) return newLabel;
-      if (t.startsWith(oldPrefix)) return `${newPrefix}${t.slice(oldPrefix.length)}`;
-      return t;
-    });
+function migrateFilterByMoves(moves: Array<{ oldLabel: string; newLabel: string }>) {
+  const migrateList = (list: string[]) => {
+    let next = list;
+    for (const m of moves) {
+      const oldPrefix = `${m.oldLabel}/`;
+      next = next.map((t) => {
+        if (t === m.oldLabel) return m.newLabel;
+        if (t.startsWith(oldPrefix)) return `${m.newLabel}/${t.slice(oldPrefix.length)}`;
+        return t;
+      });
+    }
+    return next;
+  };
 
   activeFilter.value.includeTags = migrateList(activeFilter.value.includeTags);
   if (activeFilter.value.optionalTags) {
@@ -719,6 +755,21 @@ function migrateActiveFilter(oldLabel: string, newLabel: string) {
   if (activeFilter.value.excludeTags) {
     activeFilter.value.excludeTags = migrateList(activeFilter.value.excludeTags);
   }
+}
+
+function migrateActiveFilter(oldLabel: string, newLabel: string) {
+  migrateFilterByMoves([{ oldLabel, newLabel }]);
+}
+
+/**
+ * 执行层级重构并同步迁移当前筛选条件（统一入口：拖拽落位、行菜单与 reparent 弹窗共用）
+ */
+async function applyReparentMoves(moves: Array<{ oldLabel: string; newLabel: string }>) {
+  const res = await handleBatchReparent(moves);
+  if (res.success) {
+    migrateFilterByMoves(moves);
+  }
+  return res;
 }
 
 async function onTreeRenameTag(oldLabel: string, newLabel: string) {

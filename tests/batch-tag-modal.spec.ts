@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
+import { batchTagBridge } from '../src/utils/batchTagBridge';
+import { openStandaloneBatchModal, closeStandaloneBatchModal } from '../src/utils/batchTagModalManager';
+import { TagApiClient } from '../src/services/TagApiClient';
+
 const { mockCreateApp, mockAppInstance } = vi.hoisted(() => {
   const mockAppInstance = {
     directive: vi.fn().mockReturnThis(),
@@ -17,10 +21,6 @@ vi.mock('vue', async (importOriginal) => {
     createApp: mockCreateApp,
   };
 });
-
-import { batchTagBridge } from '../src/utils/batchTagBridge';
-import { openStandaloneBatchModal, closeStandaloneBatchModal } from '../src/utils/batchTagModalManager';
-import { TagApiClient } from '../src/services/TagApiClient';
 
 describe('批量打标桥接与独立全局模态窗测试', () => {
   beforeEach(() => {

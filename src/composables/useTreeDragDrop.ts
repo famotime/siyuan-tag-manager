@@ -1,4 +1,5 @@
-import { computed, ref, type Ref } from 'vue';
+import { computed, ref } from 'vue';
+import type { Ref } from 'vue';
 import type { ITagItem } from '../types/tag';
 import { TagDropService } from '../services/TagDropService';
 import { TagTreeService } from '../services/TagTreeService';
@@ -187,10 +188,10 @@ export function useTreeDragDrop(options: {
 
   function resolveDragSource(e: DragEvent): string {
     return (
-      draggingTagLabel.value ||
-      TagDropService.getDraggingTag() ||
-      e.dataTransfer?.getData('application/siyuan-tag') ||
-      stripTagHash(e.dataTransfer?.getData('text/plain') || '')
+      draggingTagLabel.value
+      || TagDropService.getDraggingTag()
+      || e.dataTransfer?.getData('application/siyuan-tag')
+      || stripTagHash(e.dataTransfer?.getData('text/plain') || '')
     );
   }
 

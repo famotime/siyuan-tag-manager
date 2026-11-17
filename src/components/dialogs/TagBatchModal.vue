@@ -258,7 +258,7 @@ const props = withDefaults(
   {
     allTags: () => [],
     tagGroups: () => [],
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -270,11 +270,8 @@ const emit = defineEmits<{
 // 文档选取子域（三种添加模式、子文档扫描与目标合并抽离至 useDocSelection）
 const {
   docAddMode,
-  selectedDocs,
   includeSubDocs,
-  subDocs,
   loadingSubDocs,
-  excludedSubDocIds,
   docSearchKeyword,
   searchingDocs,
   searched,
@@ -285,7 +282,6 @@ const {
   activeSubDocs,
   allTargetDocs,
   isSubDoc,
-  loadSubDocs,
   removeDoc,
   isDocSelected,
   toggleDocSelection,
@@ -297,7 +293,7 @@ const {
   commitExecuteContext,
 } = useDocSelection({
   getState: () => props.state,
-  onSyncState: (patch) => emit('sync-state', patch),
+  onSyncState: patch => emit('sync-state', patch),
 });
 
 // 待添加标签状态
@@ -319,7 +315,7 @@ watch(
       }
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true },
 );
 
 // 标签操作

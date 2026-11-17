@@ -1,4 +1,3 @@
-import type { IColorPreset } from '../styles/palette';
 
 export type TabType = 'tree' | 'filter' | 'graph' | 'hygiene';
 

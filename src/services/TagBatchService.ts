@@ -66,14 +66,15 @@ export class TagBatchService {
 
   /**
    * 批量为多个文档打标（调用思源 /api/attr/setBlockAttrs）
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”（与 TagApiClient.request 一致）
    */
   public static async batchTagDocuments(
     docIds: string[],
     tagsToAdd: string[],
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; updatedCount: number; errors: string[] }> {
-    // 默认传输统一走 TagApiClient（含鉴权头，修复本方法历史上缺失 Authorization 的缺陷）
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    // 默认传输统一走 TagApiClient.request（含鉴权头、code 校验与解包，失败不再被误计为成功）
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     let updatedCount = 0;
     const errors: string[] = [];
@@ -82,7 +83,7 @@ export class TagBatchService {
       try {
         // 1. 获取当前文档的属性
         const attrsRes = await post('/api/attr/getBlockAttrs', { id });
-        const currentTags = attrsRes?.data?.tags || '';
+        const currentTags = attrsRes?.tags || '';
         const newTagsStr = this.appendDocTags(currentTags, tagsToAdd);
 
         // 2. 更新属性
@@ -141,21 +142,21 @@ export class TagBatchService {
 
   /**
    * 模糊搜索文档候选列表
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async searchDocs(
     keyword: string,
     limit = 20,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     const clean = escapeSqlLiteral(keyword).trim();
     if (!clean) return [];
 
     const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND content LIKE '%${clean}%' ORDER BY updated DESC LIMIT ${limit};`;
     try {
-      const res = await post('/api/query/sql', { stmt: sql });
-      const rows = res?.data || (Array.isArray(res) ? res : []);
+      const rows = await post('/api/query/sql', { stmt: sql });
       return (rows || []).map((r: any) => {
         let tags: string[] = [];
         const tagsAttr = parseIalTags(r.ial);
@@ -175,21 +176,21 @@ export class TagBatchService {
 
   /**
    * 获取指定笔记本下的文档列表
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async getNotebookDocs(
     notebookId: string,
     limit = 50,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     const clean = escapeSqlLiteral(notebookId).trim();
     if (!clean) return [];
 
     const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND box = '${clean}' ORDER BY updated DESC LIMIT ${limit};`;
     try {
-      const res = await post('/api/query/sql', { stmt: sql });
-      const rows = res?.data || (Array.isArray(res) ? res : []);
+      const rows = await post('/api/query/sql', { stmt: sql });
       return (rows || []).map((r: any) => {
         let tags: string[] = [];
         const tagsAttr = parseIalTags(r.ial);
@@ -209,15 +210,16 @@ export class TagBatchService {
 
   /**
    * 获取全量笔记本列表
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async fetchNotebooks(
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; name: string }>> {
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     try {
       const res = await post('/api/notebook/lsNotebooks', {});
-      const list = res?.data?.notebooks || [];
+      const list = res?.notebooks || [];
       return list.map((nb: any) => ({
         id: nb.id,
         name: nb.name,
@@ -234,7 +236,7 @@ export class TagBatchService {
     const conditions: string[] = [];
     for (const row of parentRows) {
       if (!row || !row.box || !row.path) continue;
-      const prefix = row.path.replace(/\.sy$/i, '') + '/';
+      const prefix = `${row.path.replace(/\.sy$/i, '')}/`;
       const cleanBox = escapeSqlLiteral(String(row.box));
       const cleanPrefix = escapeSqlLiteral(prefix);
       conditions.push(`(box = '${cleanBox}' AND path LIKE '${cleanPrefix}%')`);
@@ -246,6 +248,7 @@ export class TagBatchService {
 
   /**
    * 递归检索指定文档名下的所有层级子文档
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async getSubDocs(
     parentDocIds: string[],
@@ -253,9 +256,9 @@ export class TagBatchService {
   ): Promise<Array<{ id: string; title: string }>> {
     const post = requestFn || (async (url: string, data: any) => {
       if (typeof window === 'undefined' && !url.startsWith('http')) {
-        return { code: 0, data: [] };
+        return [];
       }
-      return TagApiClient.postRaw(url, data);
+      return TagApiClient.request(url, data);
     });
 
     const validIds = Array.from(new Set(parentDocIds.map(id => id?.trim()).filter(Boolean)));
@@ -265,8 +268,7 @@ export class TagBatchService {
       // 1. 查询父文档的物理路径与所属笔记本
       const inClause = validIds.map(id => `'${escapeSqlLiteral(id)}'`).join(', ');
       const parentSql = `SELECT id, box, path, content FROM blocks WHERE type = 'd' AND id IN (${inClause});`;
-      const parentRes = await post('/api/query/sql', { stmt: parentSql });
-      const parentRows = parentRes?.data || (Array.isArray(parentRes) ? parentRes : []);
+      const parentRows = await post('/api/query/sql', { stmt: parentSql });
       if (!parentRows || parentRows.length === 0) return [];
 
       // 2. 构造后代子文档 SQL 检索语句
@@ -274,8 +276,7 @@ export class TagBatchService {
       if (!subSql) return [];
 
       // 3. 执行子文档检索
-      const subRes = await post('/api/query/sql', { stmt: subSql });
-      const subRows = subRes?.data || (Array.isArray(subRes) ? subRes : []);
+      const subRows = await post('/api/query/sql', { stmt: subSql });
 
       // 4. 排除已选中的父文档自身，并去重
       const parentIdSet = new Set(validIds);

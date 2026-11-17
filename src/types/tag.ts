@@ -153,10 +153,10 @@ export interface ITagMergePlan {
  */
 export type TagHealthIssueType =
   | 'similar_conflict' // 相似冲突（含大小写变体、分隔符风格、编辑距离）
-  | 'invalid_norm'     // 不合规范（含多余斜杠、非法字符、超长标签、超深层级、纯数字）
-  | 'low_frequency'    // 低频使用（引用数 <= 1，包含孤儿与单次引用）
-  | 'case_conflict'    // 大小写冲突（向后兼容）
-  | 'orphan'           // 孤儿空标签（向后兼容）
+  | 'invalid_norm' // 不合规范（含多余斜杠、非法字符、超长标签、超深层级、纯数字）
+  | 'low_frequency' // 低频使用（引用数 <= 1，包含孤儿与单次引用）
+  | 'case_conflict' // 大小写冲突（向后兼容）
+  | 'orphan' // 孤儿空标签（向后兼容）
   | 'redundant_slash'; // 命名格式异常（向后兼容）
 
 /**

@@ -1,5 +1,9 @@
-import { TagFilterEngine } from './TagFilterEngine';
+import { showMessage } from 'siyuan';
+import { escapeSql } from '../utils/tagText';
 import type { ITagItem, ITagMergePlan } from '../types/tag';
+
+/** 思源 SQL 单次查询的常规行数上限，达到即提示结果可能不完整 */
+const SQL_ROW_LIMIT = 9999;
 
 /**
  * 思源笔记内核 API 交互与适配客户端
@@ -61,7 +65,10 @@ export class TagApiClient {
     try {
       const rows: Array<{ label: string; block_count?: number; doc_count?: number; count?: number }> =
         await this.request('/api/query/sql', { stmt: sql });
-      return (rows || []).map(r => {
+      if (rows && rows.length >= SQL_ROW_LIMIT) {
+        showMessage('全库标签数已达单次查询上限，全景统计可能不完整', 5000, 'info');
+      }
+      return (rows || []).map((r) => {
         const label = String(r.label || '');
         const parts = label.split('/');
         const blockCount = Number(r.block_count ?? r.count ?? 0);
@@ -174,7 +181,7 @@ export class TagApiClient {
    */
   public static async fetchTagTimestamps(label: string): Promise<string[]> {
     if (!label) return [];
-    const clean = TagFilterEngine.escapeSql(label);
+    const clean = escapeSql(label);
     const sql = `SELECT b.updated `
       + `FROM blocks b `
       + `JOIN spans s ON b.id = s.block_id `
@@ -183,6 +190,9 @@ export class TagApiClient {
       + `LIMIT 9999;`;
 
     const rows: Array<{ updated: string }> = await this.request('/api/query/sql', { stmt: sql });
+    if (rows && rows.length >= SQL_ROW_LIMIT) {
+      showMessage('该标签的引用数已达单次查询上限，时序统计可能不完整', 5000, 'info');
+    }
     return (rows || []).map(r => r.updated).filter(Boolean);
   }
 
@@ -191,7 +201,7 @@ export class TagApiClient {
    */
   public static async getBlockMarkdown(blockId: string): Promise<string> {
     if (!blockId) return '';
-    const clean = TagFilterEngine.escapeSql(blockId);
+    const clean = escapeSql(blockId);
     const sql = `SELECT markdown FROM blocks WHERE id = '${clean}' LIMIT 1;`;
     const rows: any[] = await this.request('/api/query/sql', { stmt: sql });
     return rows?.[0]?.markdown || '';

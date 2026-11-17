@@ -8,7 +8,7 @@
           :class="{
             'is-good': healthResult.summary.healthyRate >= 90,
             'is-warn': healthResult.summary.healthyRate >= 70 && healthResult.summary.healthyRate < 90,
-            'is-danger': healthResult.summary.healthyRate < 70
+            'is-danger': healthResult.summary.healthyRate < 70,
           }"
         >
           {{ healthResult.summary.healthyRate }}%
@@ -157,7 +157,7 @@ const props = withDefaults(
   }>(),
   {
     allTags: () => [],
-  }
+  },
 );
 
 const emit = defineEmits<{

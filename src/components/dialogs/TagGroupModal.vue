@@ -11,7 +11,7 @@
         <div class="tm-form-group">
           <label>标签组名称 <span style="color: var(--b3-theme-error);">*</span>：</label>
           <input
-            v-model="state.name"
+            v-model="name"
             class="b3-text-field fn__block"
             placeholder="例如：前端架构栈、待办事务组、设计规范"
             @keydown.enter="handleSave"
@@ -20,10 +20,10 @@
 
         <!-- 已绑定标签列表 -->
         <div class="tm-form-group">
-          <label>组内标签 (共 {{ state.tags.length }} 个)：</label>
-          <div v-if="state.tags.length > 0" class="tm-group-tags-chips">
+          <label>组内标签 (共 {{ tags.length }} 个)：</label>
+          <div v-if="tags.length > 0" class="tm-group-tags-chips">
             <span
-              v-for="t in state.tags"
+              v-for="t in tags"
               :key="t"
               class="tm-group-tag-chip"
             >
@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 import { stripTagHash } from '../../utils/tagText';
 import type { ITagItem } from '../../types/tag';
@@ -119,16 +119,31 @@ const emit = defineEmits<{
   (e: 'save', payload: { name: string; tags: string[]; color?: string; icon?: string }): void;
 }>();
 
+// 本地编辑态：不再直接突变 props.state，保存时经事件回传
+const name = ref('');
+const tags = ref<string[]>([]);
 const searchTagText = ref('');
 
+watch(
+  () => props.state.visible,
+  (visible) => {
+    if (visible) {
+      name.value = props.state.name || '';
+      tags.value = [...(props.state.tags || [])];
+      searchTagText.value = '';
+    }
+  },
+  { immediate: true },
+);
+
 function removeTagFromGroup(tag: string) {
-  props.state.tags = props.state.tags.filter(t => t !== tag);
+  tags.value = tags.value.filter(t => t !== tag);
 }
 
 function addTagToGroup(tag: string) {
   const clean = stripTagHash(tag);
-  if (clean && !props.state.tags.includes(clean)) {
-    props.state.tags.push(clean);
+  if (clean && !tags.value.includes(clean)) {
+    tags.value.push(clean);
   }
 }
 
@@ -141,23 +156,23 @@ function addTypedTag() {
 }
 
 const candidateTotalCount = computed(() => {
-  const existingSet = new Set(props.state.tags);
+  const existingSet = new Set(tags.value);
   return props.allTags.filter(t => !existingSet.has(t.label)).length;
 });
 
 const filteredCandidateTags = computed(() => {
   const q = searchTagText.value.trim().toLowerCase();
-  const existingSet = new Set(props.state.tags);
+  const existingSet = new Set(tags.value);
   return props.allTags
     .filter(t => !existingSet.has(t.label) && (!q || t.label.toLowerCase().includes(q)))
     .slice(0, 100);
 });
 
 function handleSave() {
-  if (!props.state.name.trim()) return;
+  if (!name.value.trim()) return;
   emit('save', {
-    name: props.state.name.trim(),
-    tags: [...props.state.tags],
+    name: name.value.trim(),
+    tags: [...tags.value],
     color: props.state.color,
     icon: props.state.icon,
   });

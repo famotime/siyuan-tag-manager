@@ -8,9 +8,9 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
       includeTags: ['YouTube'],
     });
 
-    expect(sql).toContain("b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'YouTube')");
+    expect(sql).toContain('b.id IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content = \'YouTube\')');
     expect(sql).toContain('b.ial');
-    expect(sql).not.toContain("b.type NOT IN ('d')");
+    expect(sql).not.toContain('b.type NOT IN (\'d\')');
     expect(sql).toContain('LIMIT 50 OFFSET 0');
   });
 
@@ -24,23 +24,23 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
     });
 
     // 必含 AND 检查
-    expect(sql).toContain("content = 'YouTube'");
-    expect(sql).toContain("content = 'Prompt'");
+    expect(sql).toContain('content = \'YouTube\'');
+    expect(sql).toContain('content = \'Prompt\'');
     // 排除 NOT 检查
-    expect(sql).toContain("b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = '旧方案')");
+    expect(sql).toContain('b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content = \'旧方案\')');
     // 可选 OR 检查
-    expect(sql).toContain("content IN ('iOS', 'Cursor')");
+    expect(sql).toContain('content IN (\'iOS\', \'Cursor\')');
     // 分页检查
     expect(sql).toContain('LIMIT 20 OFFSET 10');
   });
 
   it('安全转义包含单引号与反斜杠的异常标签，防注入', () => {
     const sql = TagFilterEngine.buildQuerySql({
-      includeTags: ["tag'with'quote", 'tag\\slash'],
+      includeTags: ['tag\'with\'quote', 'tag\\slash'],
     });
 
-    expect(sql).toContain("content = 'tag''with''quote'");
-    expect(sql).toContain("content = 'tag\\\\slash'");
+    expect(sql).toContain('content = \'tag\'\'with\'\'quote\'');
+    expect(sql).toContain('content = \'tag\\\\slash\'');
   });
 
   it('支持将智能视图对象转换为查询 SQL', () => {
@@ -55,8 +55,8 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
     };
 
     const sql = TagFilterEngine.viewToQuerySql(mockView);
-    expect(sql).toContain("content = 'YouTube'");
-    expect(sql).toContain("content = 'AIGC'");
+    expect(sql).toContain('content = \'YouTube\'');
+    expect(sql).toContain('content = \'AIGC\'');
   });
 
   describe('resolveFilterSelection 标签点击筛选状态解析', () => {
@@ -272,7 +272,7 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
         optionalTags: ['Vue', 'React'],
       });
 
-      expect(sql).toContain("b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN ('Vue', 'React'))");
+      expect(sql).toContain('b.id IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content IN (\'Vue\', \'React\'))');
       expect(sql).not.toContain('b.id NOT IN');
       expect(sql).toContain('LIMIT 50 OFFSET 0');
     });
@@ -284,8 +284,8 @@ describe('TagFilterEngine 布尔筛选与 SQL 组装测试', () => {
         excludeTags: ['Angular'],
       });
 
-      expect(sql).toContain("(b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'Vue') OR b.id IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content IN ('React')))");
-      expect(sql).toContain("b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE '%tag%' AND content = 'Angular')");
+      expect(sql).toContain('(b.id IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content = \'Vue\') OR b.id IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content IN (\'React\')))');
+      expect(sql).toContain('b.id NOT IN (SELECT block_id FROM spans WHERE type LIKE \'%tag%\' AND content = \'Angular\')');
     });
 
     it('resetFilterWithTags 支持 mode="optional" 生成 OR 组合', () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { usePlugin } from '../src/main';
 import { TagConfigStore, TAG_MANAGER_CONFIG_STORAGE } from '../src/services/TagConfigStore';
 
@@ -35,14 +35,6 @@ function createMockPlugin(existingData: any) {
 
 describe('TagConfigStore 配置统一存储', () => {
   let getSavedData: () => any;
-  let mockPlugin: any;
-
-  beforeEach(() => {
-    mockPlugin = {
-      loadData: async () => null,
-      saveData: async () => {},
-    } as any;
-  });
 
   describe('readConfig · 读取配置', () => {
     it('返回既有配置对象', async () => {
@@ -153,7 +145,7 @@ describe('TagConfigStore 配置统一存储', () => {
 
       const saved = getSavedData();
       expect(Object.keys(saved).sort()).toEqual(
-        ['companionConfig', 'customColorPresets', 'customTags', 'metadataList', 'savedViews', 'tagDeleteConfig', 'tagGroups'].sort()
+        ['companionConfig', 'customColorPresets', 'customTags', 'metadataList', 'savedViews', 'tagDeleteConfig', 'tagGroups'].sort(),
       );
       expect(saved.tagGroups).toEqual([{ id: 'g1', name: '组', tags: ['x'] }]);
       expect(saved.tagDeleteConfig).toEqual({ mode: 'remove_all' });

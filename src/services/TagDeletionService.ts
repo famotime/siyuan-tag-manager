@@ -1,12 +1,11 @@
 import { TagApiClient } from './TagApiClient';
-import { TagFilterEngine } from './TagFilterEngine';
-import { stripTagHash, parseIalTags } from '../utils/tagText';
+import { stripTagHash, parseIalTags, escapeSql } from '../utils/tagText';
 import type { ITagDeleteConfig, ITagDeleteResult } from '../types/tag';
 import { DEFAULT_TAG_DELETE_CONFIG } from '../types/tag';
 
 /**
  * 标签删除与格式化清洗领域服务
- * 
+ *
  * 核心特性：
  * 1. 严格支持段落内标签剥离“#”保持文字、用指定字符替代“#”及彻底删除三种模式；
  * 2. 区分正文块（非文档级）与文档根块（文档级标签属性）；
@@ -37,7 +36,7 @@ export class TagDeletionService {
 
   /**
    * 将 Markdown 文本中指定的精确标签按删除策略进行格式化转换
-   * 
+   *
    * @param markdown 原始块 Markdown 文本
    * @param label 待删除的纯标签名称（无前后 #）
    * @param config 删除偏好配置
@@ -76,7 +75,7 @@ export class TagDeletionService {
 
   /**
    * 清洗文档根块 IAL 中的 tags 属性字符串，移除指定标签
-   * 
+   *
    * @param existingTagsAttr 逗号分隔的现有标签字符串，如 "tech,vue,note"
    * @param label 待移除的标签
    */
@@ -95,7 +94,7 @@ export class TagDeletionService {
 
   /**
    * 执行标签删除操作，协调非文档级正文块与文档级属性更新
-   * 
+   *
    * @param label 待删除的标签名称
    * @param config 标签删除策略配置
    * @param client API 通信客户端（支持测试注入）
@@ -125,7 +124,7 @@ export class TagDeletionService {
     // 针对 strip_hash 与 replace_hash 模式：分别处理正文块与文档级标签
     const errors: string[] = [];
     let affectedBlocks = 0;
-    const escapedLabel = TagFilterEngine.escapeSql(cleanLabel);
+    const escapedLabel = escapeSql(cleanLabel);
 
     try {
       // 1. 查询全库引用该标签的非文档级正文块 (type != 'd')

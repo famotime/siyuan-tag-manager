@@ -407,7 +407,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
 
   it('TagTreeView 在搜索无结果渲染 SSR HTML 时包含引导面板与回车键指示', async () => {
     const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp, ref, h } = await import('vue');
+    const { createSSRApp, _ref, h } = await import('vue');
 
     // 通过包裹组件模拟搜索状态渲染完整 DOM
     const wrapper = {
@@ -431,7 +431,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
 
     const searchApp = createSSRApp({
       setup() {
-        let treeInstance: any;
+        let _treeInstance: any;
         const sub = h(TagTreeView, {
           allTags: [{ name: 'vue', label: 'vue', count: 10, depth: 0 }],
           loading: false,
@@ -779,8 +779,8 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('sy-line-icon--search-plus');
     expect(html).toContain('sy-line-icon--layers-plus');
     // 列表项中不应出现文字形式的“探查”或“保存为标签组”按钮文字（严格纯图标化）
-    expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>探查<\/span>/);
-    expect(html).not.toMatch(/<button[^>]*>[\s\n]*<span>保存为标签组<\/span>/);
+    expect(html).not.toMatch(/<button[^>]*>\s*<span>探查<\/span>/);
+    expect(html).not.toMatch(/<button[^>]*>\s*<span>保存为标签组<\/span>/);
   });
 
   it('TagTreeView 常用标签组卡片中套用按钮 tooltip 明确提示仅套用到当前打开的文档', async () => {
@@ -804,7 +804,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     });
 
     // 模拟 v-tooltip 指令
-    app.directive('tooltip', (el, binding) => {
+    app.directive('tooltip', (_el, _binding) => {
       // ssr 中可以通过属性记录
     });
 
@@ -816,8 +816,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagBatchModal 弹窗目标文档区域渲染“包含子文档”复选框及统计徽章', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagBatchModal, {
       state: {
@@ -848,8 +846,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagTreeView 应具备“标签全景”（默认展开）与“标签热度”（默认折叠）折叠条，且树节点支持拖拽', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [
@@ -943,8 +939,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagTreeView 中排序下拉框不应包含挤压箭头的内联 padding 样式', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [{ label: 'test', count: 1, depth: 0, name: 'test' }],
@@ -959,8 +953,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagTreeView 标签热度折叠条按钮应移动至展开后的工具条中，且全库待引用标签正确渲染', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [
@@ -980,8 +972,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagTreeView 中应支持拖拽配置子标签，且包含贯通高度的热度容器并移除破坏指针的类名', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [
@@ -1003,8 +993,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('TagTreeView 中应通过指示线控制子标签/独立标签放置，且不再渲染顶部吸顶和底部根释放区域', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [
@@ -1026,8 +1014,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
   });
 
   it('App 顶栏选项卡应简化为4个核心动作文字：全景、筛选、洞察、治理', async () => {
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
     const App = (await import('../src/App.vue')).default;
 
     const html = await renderComponent(App);
@@ -1047,8 +1033,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { TagTreeService } = await import('../src/services/TagTreeService');
     TagTreeService.saveScrollPosition(320, 'tech/backend/python');
 
-    const { renderToString } = await import('vue/server-renderer');
-    const { createSSRApp } = await import('vue');
 
     const html = await renderComponent(TagTreeView, {
       allTags: [

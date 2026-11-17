@@ -32,7 +32,7 @@
       class="tm-filter-box"
       :class="{
         'is-custom-height': filterBoxHeight !== null,
-        'is-resizing': isResizingFilterBox
+        'is-resizing': isResizingFilterBox,
       }"
       :style="filterBoxStyle"
     >
@@ -182,7 +182,7 @@
             :class="{
               'is-included': activeFilter.includeTags.includes(tag.label),
               'is-optional': (activeFilter.optionalTags || []).includes(tag.label),
-              'is-excluded': activeFilter.excludeTags.includes(tag.label)
+              'is-excluded': activeFilter.excludeTags.includes(tag.label),
             }"
             @click="onQuickTagClick(tag.label)"
           >
@@ -327,7 +327,7 @@ watch(
       currentMode.value = 'include';
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 function handleModeButtonClick(mode: TagFilterConditionMode) {
@@ -340,9 +340,9 @@ const groupedMatchedDocs = computed(() => {
 
 const isFilterEmpty = computed(() => {
   return (
-    (props.activeFilter.includeTags?.length || 0) === 0 &&
-    (props.activeFilter.excludeTags?.length || 0) === 0 &&
-    (props.activeFilter.optionalTags?.length || 0) === 0
+    (props.activeFilter.includeTags?.length || 0) === 0
+    && (props.activeFilter.excludeTags?.length || 0) === 0
+    && (props.activeFilter.optionalTags?.length || 0) === 0
   );
 });
 
@@ -365,8 +365,8 @@ const filterBoxHeight = ref<number | null>((() => {
   try {
     const saved = localStorage.getItem('siyuan_tm_filter_box_height');
     if (saved) {
-      const val = parseInt(saved, 10);
-      if (!isNaN(val) && val >= 80 && val <= 1600) return val;
+      const val = Number.parseInt(saved, 10);
+      if (!Number.isNaN(val) && val >= 80 && val <= 1600) return val;
     }
   } catch {}
   return null;
@@ -463,7 +463,7 @@ function resetFilterBoxHeight() {
         const extra = Math.max(0, quickTagsRef.value.scrollHeight - quickTagsRef.value.clientHeight);
         const targetH = Math.min(
           Math.round(window.innerHeight * 0.75),
-          filterBoxRef.value.offsetHeight + extra + 8
+          filterBoxRef.value.offsetHeight + extra + 8,
         );
         filterBoxHeight.value = targetH;
         try {

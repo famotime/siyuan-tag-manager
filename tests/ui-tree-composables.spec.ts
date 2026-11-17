@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { ref } from 'vue';
 import type { ITagItem } from '../src/types/tag';
 import { useInlineRename } from '../src/composables/useInlineRename';
@@ -24,7 +24,7 @@ describe('useInlineRename 行内就地重命名', () => {
   }
 
   it('startInlineRename 进入编辑态并聚焦输入框', async () => {
-    const { editingLabel, inlineRenameValue, inlineInputRef, startInlineRename } = setup();
+    const { editingLabel, inlineRenameValue, _inlineInputRef, startInlineRename } = setup();
     startInlineRename(mockTags[0]);
     expect(editingLabel.value).toBe('vue');
     expect(inlineRenameValue.value).toBe('vue');
@@ -135,7 +135,7 @@ describe('useHeatVisualization 热度双模可视化', () => {
     const { formatPercent } = setup();
     expect(formatPercent(0)).toBe('0%');
     expect(formatPercent(100)).toBe('59%'); // 100/170 ≈ 58.8%
-    expect(formatPercent(5)).toBe('2.9%');   // 小数保留一位
+    expect(formatPercent(5)).toBe('2.9%'); // 小数保留一位
   });
 
   it('getRankBarWidth 零引用为 0，最大引用为 100', () => {
@@ -186,7 +186,7 @@ describe('useTreeDragDrop 拖拽层级重构', () => {
   }
 
   it('startTagDrag 设置全局拖拽标签并写入 dataTransfer', () => {
-    const { startTagDrag, draggingTagLabel } = setup();
+    const { startTagDrag, _draggingTagLabel } = setup();
     const e = makeDragEvent();
     startTagDrag('vue', e);
     expect(e.dataTransfer?.setData).toHaveBeenCalledWith('application/siyuan-tag', 'vue');

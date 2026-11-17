@@ -1,44 +1,3 @@
-<script setup lang="ts">
-import { reactive, watch } from 'vue';
-import type { ITagCompanionConfig } from '../../types/companion';
-import { DEFAULT_COMPANION_CONFIG } from '../../types/companion';
-import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
-
-interface Props {
-  visible: boolean;
-  config: ITagCompanionConfig;
-}
-
-const props = defineProps<Props>();
-
-const emit = defineEmits<{
-  (e: 'close'): void;
-  (e: 'save', config: ITagCompanionConfig): void;
-}>();
-
-const form = reactive<ITagCompanionConfig>({
-  ...DEFAULT_COMPANION_CONFIG,
-});
-
-watch(
-  () => props.config,
-  (newVal) => {
-    if (newVal) {
-      Object.assign(form, newVal);
-    }
-  },
-  { immediate: true, deep: true },
-);
-
-function handleSave() {
-  emit('save', { ...form });
-}
-
-function handleReset() {
-  Object.assign(form, DEFAULT_COMPANION_CONFIG);
-}
-</script>
-
 <template>
   <div v-if="visible" class="tm-modal-mask" @click.self="emit('close')">
     <div class="tm-modal-card" style="width: 480px; max-width: 95vw;">
@@ -146,6 +105,47 @@ function handleReset() {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { reactive, watch } from 'vue';
+import type { ITagCompanionConfig } from '../../types/companion';
+import { DEFAULT_COMPANION_CONFIG } from '../../types/companion';
+import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
+
+interface Props {
+  visible: boolean;
+  config: ITagCompanionConfig;
+}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  (e: 'close'): void;
+  (e: 'save', config: ITagCompanionConfig): void;
+}>();
+
+const form = reactive<ITagCompanionConfig>({
+  ...DEFAULT_COMPANION_CONFIG,
+});
+
+watch(
+  () => props.config,
+  (newVal) => {
+    if (newVal) {
+      Object.assign(form, newVal);
+    }
+  },
+  { immediate: true, deep: true },
+);
+
+function handleSave() {
+  emit('save', { ...form });
+}
+
+function handleReset() {
+  Object.assign(form, DEFAULT_COMPANION_CONFIG);
+}
+</script>
 
 <style lang="scss" scoped>
 .tm-setting-row {

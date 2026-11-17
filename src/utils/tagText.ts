@@ -31,5 +31,15 @@ export function parseIalTags(ial: string | null | undefined): string {
  */
 export function escapeSqlLiteral(str: string): string {
   if (!str) return '';
-  return str.replace(/'/g, "''");
+  return str.replace(/'/g, '\'\'');
+}
+
+/**
+ * SQL 值完整转义（反斜杠翻倍 + 单引号翻倍）
+ * 适用于 SQL 值等值比较（content = '...' / IN (...)）场景，
+ * 语义与历史 TagFilterEngine.escapeSql 保持一致；LIKE 通配符转义请使用 TagFilterEngine.escapeLike
+ */
+export function escapeSql(str: string): string {
+  if (!str) return '';
+  return str.replace(/\\/g, '\\\\').replace(/'/g, '\'\'');
 }

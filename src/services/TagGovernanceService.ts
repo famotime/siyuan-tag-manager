@@ -31,7 +31,7 @@ export class TagGovernanceService {
       return { valid: false, error: '标签名称不能为空' };
     }
     // 思源标签不能包含部分特殊标记字符
-    const invalidChars = ['#', ' ', '\t', '\n', '"', "'", '`'];
+    const invalidChars = ['#', ' ', '\t', '\n', '"', '\'', '`'];
     for (const char of invalidChars) {
       if (normalized.includes(char)) {
         return { valid: false, error: `标签名称不能包含字符 "${char}"` };
@@ -49,16 +49,16 @@ export class TagGovernanceService {
     if (!b.length) return a.length;
 
     let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
-    let curr = new Array(b.length + 1);
+    let curr = Array.from<number>({ length: b.length + 1 });
 
     for (let i = 0; i < a.length; i++) {
       curr[0] = i + 1;
       for (let j = 0; j < b.length; j++) {
         const cost = a[i] === b[j] ? 0 : 1;
         curr[j + 1] = Math.min(
-          curr[j] + 1,       // 插入
-          prev[j + 1] + 1,   // 删除
-          prev[j] + cost,    // 替换
+          curr[j] + 1, // 插入
+          prev[j + 1] + 1, // 删除
+          prev[j] + cost, // 替换
         );
       }
       const temp = prev;
@@ -73,7 +73,7 @@ export class TagGovernanceService {
    * 涵盖连字符、下划线、中文间隔号、破折号、波浪号、标点点号、全半角空格与全角连字符
    * 注意：层级斜杠 / 已在外层拆分，此处专用于平级节点内部字符排版归一化
    */
-  private static readonly SEPARATOR_REGEX = /[-_.\s·•—–~～－\u3000]/g;
+  private static readonly SEPARATOR_REGEX = /[-_.\s·•—–~～－]/g;
 
   /**
    * 拆分标签路径与叶子节点
@@ -111,7 +111,7 @@ export class TagGovernanceService {
     }
 
     // 3. 首尾含有非标准字符扣分
-    if (/^[-_.\s·•—–~～－\u3000]|[-_.\s·•—–~～－\u3000]$/.test(nfkcLeaf)) {
+    if (/^[-_.\s·•—–~～－]|[-_.\s·•—–~～－]$/.test(nfkcLeaf)) {
       penalty += 20;
     }
 
@@ -174,7 +174,7 @@ export class TagGovernanceService {
     }
 
     // 3.2 防误报保护二：中文/CJK 短词保护（避免“测试”与“考试”、“开发”与“开会”被误判）
-    const hasCJK = /[\p{Unified_Ideograph}]/u.test(lowerA) || /[\p{Unified_Ideograph}]/u.test(lowerB);
+    const hasCJK = /\p{Unified_Ideograph}/u.test(lowerA) || /\p{Unified_Ideograph}/u.test(lowerB);
     if (hasCJK) {
       // 包含中文且长度 < 4（单字、双字、三字词），跳过编辑距离检测
       if (minLen < 4) {
@@ -432,7 +432,7 @@ export class TagGovernanceService {
 
     const total = tags.length;
     const problemTagSet = new Set<string>();
-    similarIssues.forEach(i => {
+    similarIssues.forEach((i) => {
       problemTagSet.add(i.primaryLabel);
       i.relatedLabels?.forEach(l => problemTagSet.add(l));
     });

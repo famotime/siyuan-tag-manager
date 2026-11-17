@@ -75,12 +75,12 @@ describe('TagGroupService 标签组管理与应用测试', () => {
     const mockRequest = async (url: string, data: any) => {
       calls.push({ url, data });
       if (url === '/api/attr/getBlockAttrs') {
-        return { code: 0, data: { tags: 'YouTube,AI' } };
+        return { tags: 'YouTube,AI' };
       }
       if (url === '/api/attr/setBlockAttrs') {
-        return { code: 0, data: null };
+        return null;
       }
-      return { code: 0 };
+      return {};
     };
 
     const res = await TagGroupService.applyGroupToDoc('doc_123', ['Prompt', 'AI'], mockRequest);
@@ -96,12 +96,12 @@ describe('TagGroupService 标签组管理与应用测试', () => {
     const mockRequest = async (url: string, data: any) => {
       calls.push({ url, data });
       if (url === '/api/block/getBlockKramdown') {
-        return { code: 0, data: { kramdown: '这是一段段落正文' } };
+        return { kramdown: '这是一段段落正文' };
       }
       if (url === '/api/block/updateBlock') {
-        return { code: 0, data: null };
+        return null;
       }
-      return { code: 0 };
+      return {};
     };
 
     const res = await TagGroupService.applyGroupToBlock('block_456', ['Vue', 'Vite'], mockRequest);
@@ -121,7 +121,7 @@ describe('TagGroupService 标签组管理与应用测试', () => {
           if (sel.includes('.layout__wnd--active .protyle-title[data-node-id]')) {
             return {
               getAttribute: (attr: string) => (attr === 'data-node-id' ? 'doc_main' : null),
-              querySelector: (sub: string) => ({ textContent: '测试文档标题' }),
+              querySelector: (_sub: string) => ({ textContent: '测试文档标题' }),
               textContent: '测试文档标题',
             };
           }
@@ -142,19 +142,19 @@ describe('TagGroupService 标签组管理与应用测试', () => {
     let docApplied = false;
     let blockApplied = false;
 
-    const mockRequest = async (url: string, data: any) => {
+    const mockRequest = async (url: string, _data: any) => {
       if (url === '/api/attr/getBlockAttrs') {
-        return { code: 0, data: { tags: 'OldTag' } };
+        return { tags: 'OldTag' };
       }
       if (url === '/api/attr/setBlockAttrs') {
         docApplied = true;
-        return { code: 0, data: null };
+        return null;
       }
       if (url === '/api/block/updateBlock') {
         blockApplied = true;
-        return { code: 0, data: null };
+        return null;
       }
-      return { code: 0 };
+      return {};
     };
 
     // 模拟聚焦上下文：即使 blockId 存在，套用流程也仅针对 docId 调用 applyGroupToDoc

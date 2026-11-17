@@ -5,7 +5,7 @@ import type {
   ITagMatchedBlock,
   ITagMatchedDocGroup,
 } from '../types/tag';
-import { escapeSqlLiteral, parseIalTags } from '../utils/tagText';
+import { escapeSql, parseIalTags } from '../utils/tagText';
 
 export interface IQueryBlockOptions {
   includeTags?: string[];
@@ -21,12 +21,10 @@ export interface IQueryBlockOptions {
  */
 export class TagFilterEngine {
   /**
-   * 安全转义 SQL 字符串与通配符
+   * 安全转义 SQL 字符串与通配符（语义全量委托 utils/tagText 规范实现）
    */
   public static escapeSql(str: string): string {
-    if (!str) return '';
-    // 转义反斜杠；单引号翻倍统一委托 utils/tagText 规范实现
-    return escapeSqlLiteral(str.replace(/\\/g, '\\\\'));
+    return escapeSql(str);
   }
 
   /**
@@ -137,7 +135,7 @@ export class TagFilterEngine {
     currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
     label: string,
     append = false,
-    mode: 'include' | 'optional' = 'include'
+    mode: 'include' | 'optional' = 'include',
   ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
     const currentOptionals = currentFilter.optionalTags || [];
@@ -186,7 +184,7 @@ export class TagFilterEngine {
   public static toggleFilterSelection(
     currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
     label: string,
-    mode?: TagFilterConditionMode
+    mode?: TagFilterConditionMode,
   ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
     const currentOptionals = currentFilter.optionalTags || [];
@@ -245,7 +243,7 @@ export class TagFilterEngine {
    */
   public static cycleFilterCondition(
     currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
-    label: string
+    label: string,
   ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
     const currentOptionals = currentFilter.optionalTags || [];
@@ -289,7 +287,7 @@ export class TagFilterEngine {
   public static setTagCondition(
     currentFilter: { includeTags: string[]; excludeTags: string[]; optionalTags?: string[] },
     label: string,
-    condition: TagFilterConditionMode | 'remove'
+    condition: TagFilterConditionMode | 'remove',
   ): IFilterSelectionState {
     const trimmed = label ? label.trim() : '';
     const currentOptionals = currentFilter.optionalTags || [];
@@ -339,7 +337,7 @@ export class TagFilterEngine {
    */
   public static resetFilterWithTags(
     tags: string[],
-    mode: 'include' | 'optional' = 'include'
+    mode: 'include' | 'optional' = 'include',
   ): IFilterSelectionState {
     const validTags = Array.from(new Set(tags.map(t => (t || '').trim()).filter(Boolean)));
     return {
@@ -362,14 +360,14 @@ export class TagFilterEngine {
     const sql = TagFilterEngine.buildQuerySql(options);
     const rows: any[] = await transport('/api/query/sql', { stmt: sql });
 
-    return (rows || []).map(r => {
+    return (rows || []).map((r) => {
       let content = r.content || '';
       // 若为文档级根块 (type === 'd')，且正文中未包含 #tag# 文本，从 ial 中提取 tags 属性展示
       if (r.type === 'd' && r.ial) {
         const tagsAttr = parseIalTags(r.ial);
         if (tagsAttr) {
           const docTags = tagsAttr.split(',').map((t: string) => `#${t.trim()}#`).join(' ');
-          content = docTags ? `${content ? content + ' · ' : ''}${docTags}` : content;
+          content = docTags ? `${content ? `${content} · ` : ''}${docTags}` : content;
         }
       }
 

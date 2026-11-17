@@ -27,9 +27,9 @@ export function useTagFilter() {
   async function runQuery() {
     const seq = ++querySeq;
     if (
-      activeFilter.value.includeTags.length === 0 &&
-      activeFilter.value.excludeTags.length === 0 &&
-      activeFilter.value.optionalTags.length === 0
+      activeFilter.value.includeTags.length === 0
+      && activeFilter.value.excludeTags.length === 0
+      && activeFilter.value.optionalTags.length === 0
     ) {
       matchedBlocks.value = [];
       return;

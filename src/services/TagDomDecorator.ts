@@ -2,7 +2,7 @@ import { stripTagHash } from '../utils/tagText';
 
 /**
  * 正文文档标签 DOM 属性装饰器服务
- * 
+ *
  * 核心职责：
  * 1. 监听思源 Protyle 编辑器内部 DOM 变动与渲染事件；
  * 2. 扫描 span[data-type~="tag"] 节点，提取真实标签名并打上只读属性 data-tag 与 data-content；

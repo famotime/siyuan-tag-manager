@@ -20,16 +20,16 @@ export class TagTimelineService {
     if (!timeStr) return null;
     const clean = timeStr.trim();
     if (/^\d{14}$/.test(clean)) {
-      const year = parseInt(clean.slice(0, 4), 10);
-      const month = parseInt(clean.slice(4, 6), 10) - 1;
-      const day = parseInt(clean.slice(6, 8), 10);
-      const hour = parseInt(clean.slice(8, 10), 10);
-      const min = parseInt(clean.slice(10, 12), 10);
-      const sec = parseInt(clean.slice(12, 14), 10);
+      const year = Number.parseInt(clean.slice(0, 4), 10);
+      const month = Number.parseInt(clean.slice(4, 6), 10) - 1;
+      const day = Number.parseInt(clean.slice(6, 8), 10);
+      const hour = Number.parseInt(clean.slice(8, 10), 10);
+      const min = Number.parseInt(clean.slice(10, 12), 10);
+      const sec = Number.parseInt(clean.slice(12, 14), 10);
       return new Date(year, month, day, hour, min, sec);
     }
     const d = new Date(clean);
-    return isNaN(d.getTime()) ? null : d;
+    return Number.isNaN(d.getTime()) ? null : d;
   }
 
   /**

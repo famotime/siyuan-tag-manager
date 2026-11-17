@@ -8,6 +8,7 @@ export class Plugin {
     off: (_type: string, _callback: any) => {},
     emit: (_type: string, _data?: any) => {},
   };
+
   addIcons() {}
   addDock() {}
   addCommand() {}

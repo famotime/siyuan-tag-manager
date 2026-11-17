@@ -93,7 +93,7 @@ export function useTagData() {
       }
 
       const tags = await TagApiClient.fetchAllTags();
-      tags.forEach(t => {
+      tags.forEach((t) => {
         t.metadata = metadataMap.value.get(t.label);
       });
 
@@ -210,15 +210,7 @@ export function useTagData() {
   }
 
   async function handleRemoveTag(label: string): Promise<boolean> {
-    const modeDesc = TagDeletionService.getDeleteModeDescription(tagDeleteConfig.value);
-    const confirmFn = typeof window !== 'undefined' && typeof window.confirm === 'function'
-      ? window.confirm.bind(window)
-      : (typeof globalThis !== 'undefined' && typeof (globalThis as any).confirm === 'function'
-        ? (globalThis as any).confirm
-        : () => true);
-    if (!confirmFn(`确定要彻底删除标签 "${label}" 吗？当前将按设置【${modeDesc}】处理正文中的标签标记。`)) {
-      return false;
-    }
+    // 确认交互统一由调用层（App 的自绘确认模态）完成，此处专注执行删除
     loading.value = true;
     try {
       // 1. 若在 customTags 中，将其剔除
@@ -298,6 +290,31 @@ export function useTagData() {
   /**
    * 批量应用拖拽层级重构变动（重命名与元数据迁移）
    */
+  /**
+   * 级联迁移共享智能视图中的筛选标签（与元数据/标签组迁移保持一致，避免重命名后旧视图查询失效）
+   */
+  function migrateSavedViewsTags(oldLabel: string, newLabel: string) {
+    const oldPrefix = `${oldLabel}/`;
+    const migrate = (list: string[]) => list.map((t) => {
+      if (t === oldLabel) return newLabel;
+      if (t.startsWith(oldPrefix)) return `${newLabel}/${t.slice(oldPrefix.length)}`;
+      return t;
+    });
+    sharedSavedViews.value = sharedSavedViews.value.map((view) => {
+      const includeTags = migrate(view.includeTags || []);
+      const excludeTags = migrate(view.excludeTags || []);
+      const optionalTags = migrate(view.optionalTags || []);
+      if (
+        includeTags.join('\0') === (view.includeTags || []).join('\0')
+        && excludeTags.join('\0') === (view.excludeTags || []).join('\0')
+        && optionalTags.join('\0') === (view.optionalTags || []).join('\0')
+      ) {
+        return view;
+      }
+      return { ...view, includeTags, excludeTags, optionalTags };
+    });
+  }
+
   async function handleBatchReparent(
     moves: Array<{ oldLabel: string; newLabel: string }>,
   ): Promise<{ success: boolean; error?: string }> {
@@ -318,7 +335,7 @@ export function useTagData() {
         await TagApiClient.renameTag(kr.oldLabel, kr.newLabel);
       }
 
-      // 2. 迁移所有变动项的元数据、侧面板自定义标签与标签组（与 handleRenameTag 行为保持一致）
+      // 2. 迁移所有变动项的元数据、侧面板自定义标签、标签组与智能视图（与 handleRenameTag 行为保持一致）
       for (const m of moves) {
         if (m.oldLabel === m.newLabel) continue;
         const oldMeta = metadataMap.value.get(m.oldLabel);
@@ -335,9 +352,9 @@ export function useTagData() {
           customTags.value[customIdx] = m.newLabel;
         }
         const oldPrefix = `${m.oldLabel}/`;
-        tagGroups.value = tagGroups.value.map(g => {
+        tagGroups.value = tagGroups.value.map((g) => {
           let changed = false;
-          const nextTags = g.tags.map(t => {
+          const nextTags = g.tags.map((t) => {
             if (t === m.oldLabel) {
               changed = true;
               return m.newLabel;
@@ -350,6 +367,7 @@ export function useTagData() {
           });
           return changed ? { ...g, tags: nextTags } : g;
         });
+        migrateSavedViewsTags(m.oldLabel, m.newLabel);
       }
       await persistConfig();
       await refreshTags();
@@ -409,7 +427,7 @@ export function useTagData() {
       }
 
       // 3. 迁移侧面板独立自定义标签（customTags）
-      customTags.value = customTags.value.map(tag => {
+      customTags.value = customTags.value.map((tag) => {
         if (tag === oldLabel) return newLabel;
         if (tag.startsWith(oldPrefix)) {
           return `${newPrefix}${tag.slice(oldPrefix.length)}`;
@@ -418,9 +436,9 @@ export function useTagData() {
       });
 
       // 4. 迁移标签组（tagGroups）中的标签引用
-      tagGroups.value = tagGroups.value.map(g => {
+      tagGroups.value = tagGroups.value.map((g) => {
         let changed = false;
-        const nextTags = g.tags.map(t => {
+        const nextTags = g.tags.map((t) => {
           if (t === oldLabel) {
             changed = true;
             return newLabel;
@@ -437,7 +455,10 @@ export function useTagData() {
         return g;
       });
 
-      // 5. 应用最新 CSS 样式并持久化存储配置
+      // 5. 迁移智能视图（savedViews）中的筛选标签，避免重命名后旧视图查询失效
+      migrateSavedViewsTags(oldLabel, newLabel);
+
+      // 6. 应用最新 CSS 样式并持久化存储配置
       const metaList = Array.from(metadataMap.value.values());
       const css = TagVisualService.generateCssRules(metaList);
       TagVisualService.applyStyles(css);

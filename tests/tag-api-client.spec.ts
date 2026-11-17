@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { TagApiClient } from '../src/services/TagApiClient';
 import { TagFilterEngine } from '../src/services/TagFilterEngine';
 import { TagCooccurrenceService } from '../src/services/TagCooccurrenceService';
@@ -100,7 +100,7 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
         setAsAliasAfterMerge: true,
       };
 
-      const res = await TagApiClient.executeMergePlan(plan, (cur, total, label) => {
+      const res = await TagApiClient.executeMergePlan(plan, (cur, _total, _label) => {
         progressSteps.push(cur);
       });
 

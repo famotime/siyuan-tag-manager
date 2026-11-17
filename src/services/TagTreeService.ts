@@ -83,7 +83,7 @@ export class TagTreeService {
     if (!stagedRenames || stagedRenames.size === 0) {
       return flatTags;
     }
-    return flatTags.map(tag => {
+    return flatTags.map((tag) => {
       const newLabel = stagedRenames.get(tag.label);
       if (newLabel) {
         const parts = newLabel.split('/');

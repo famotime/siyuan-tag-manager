@@ -1,12 +1,14 @@
 import antfu from '@antfu/eslint-config'
-import perfectionist from 'eslint-plugin-perfectionist'
 
+// 配置基线：与代码库既有的“带分号 + 单引号 + 2 空格”风格保持一致，
+// 让 lint 用于发现真实问题而非制造海量风格噪音
 export default antfu(
   {
     type: 'lib',
     stylistic: {
-      indent: 2, // 4, or 'tab'
-      quotes: 'single', // or 'double'
+      indent: 2,
+      quotes: 'single',
+      semi: true,
     },
 
     vue: true,
@@ -20,20 +22,6 @@ export default antfu(
     ],
   },
   {
-    files: [
-      'src/**/*.vue',
-    ],
-    rules: {
-    },
-  },
-  {
-    files: [
-      'src/**/*.ts',
-    ],
-    rules: {
-    },
-  },
-  {
     rules: {
       'antfu/top-level-function': 'off',
       'antfu/if-newline': 'off',
@@ -43,16 +31,21 @@ export default antfu(
       'no-console': 'off',
       'no-empty': 'off',
 
-      'object-curly-newline': ['error', {
-        multiline: true,
-        minProperties: 2,
-        consistent: true,
-      }],
-      'object-property-newline': ['error', {
-        allowAllPropertiesOnSameLine: false,
-      }],
+      // 测试标题大量使用中文开头，与“小写开头”约定不兼容
+      'test/prefer-lowercase-title': 'off',
 
-      'style/arrow-parens': ['warn', 'always'],
+      // 导入/成员按字母序重排会破坏既有按功能分组的注释结构，关闭排序类偏好规则
+      'perfectionist/sort-imports': 'off',
+      'perfectionist/sort-named-imports': 'off',
+      'perfectionist/sort-exports': 'off',
+      'perfectionist/sort-named-exports': 'off',
+
+      // 模板事件名沿用 kebab-case（@quick-filter 等），与 camelCase 约定不兼容
+      'vue/custom-event-name-casing': 'off',
+      // 属性顺序与单行内容换行属布局偏好，重排现有模板代价大于收益
+      'vue/attributes-order': 'off',
+      'vue/singleline-html-element-content-newline': 'off',
+
       'style/brace-style': 'off',
       'style/no-multiple-empty-lines': ['warn', {
         max: 7,
@@ -63,7 +56,6 @@ export default antfu(
         },
       }],
       'style/padded-blocks': 'off',
-      'style/quotes': 'off',
 
       'ts/consistent-type-imports': 'off',
       'ts/explicit-function-return-type': 'off',
@@ -74,6 +66,8 @@ export default antfu(
 
       'unused-imports/no-unused-vars': 'warn',
       'unused-imports/no-unused-imports': 'warn',
+      // 参数语义由 TS 类型签名保证，仅选择性标注 @param 的注释不必强制全量对齐
+      'jsdoc/check-param-names': 'off',
       'unicorn/prefer-dom-node-text-content': 'off',
 
       'format/prettier': 'off',
@@ -94,16 +88,8 @@ export default antfu(
       'vue/first-attribute-linebreak': ['warn', {
         multiline: 'below',
       }],
-      "vue/no-mutating-props": ["error", {
+      'vue/no-mutating-props': ['error', {
         shallowOnly: true,
-      }],
-      'vue/max-attributes-per-line': ['error', {
-        singleline: {
-          max: 1,
-        },
-        multiline: {
-          max: 1,
-        },
       }],
       'vue/attribute-hyphenation': 'off',
       'vue/v-on-event-hyphenation': 'off',
@@ -112,16 +98,6 @@ export default antfu(
       'vue/multiline-html-element-content-newline': 'off',
 
       'vue/valid-template-root': 'off',
-
-      'vue/object-curly-newline': ['error', {
-        multiline: true,
-        minProperties: 2,
-        consistent: true,
-      }],
-      'vue/object-property-newline': ['error', {
-        allowAllPropertiesOnSameLine: false,
-        allowMultiplePropertiesPerLine: true,
-      }],
     },
   },
 )

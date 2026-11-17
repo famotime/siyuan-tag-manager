@@ -12,8 +12,7 @@
 
 - **插件入口与宿主生命周期**：
   - `src/index.ts`：思源笔记顶层插件入口，负责注册 Dock、TopBar、快捷命令、专属图标与动态样式；
-  - `src/main.ts`：Dock 容器挂载/卸载管理 (`mountPanel` / `unmountPanel` / `toggleTagManagerDock`)；
-  - `src/kernel.ts`：思源 Goja 内核插件入口（打包至 `dist/kernel.js`）。
+  - `src/main.ts`：Dock 容器挂载/卸载管理 (`mountPanel` / `unmountPanel` / `toggleTagManagerDock`)。
 - **UI 表现层**：
   - `src/App.vue`：轻量工作台骨架（顶栏、Tab 导航路由与弹窗挂载宿主）；
   - `src/components/tabs/`：4 大工作台 Tab（`TagTreeView` 资产树、`TagFilterView` 多维筛选、`TagGraphView` 认知图谱、`TagHygieneView` 健康治理）；

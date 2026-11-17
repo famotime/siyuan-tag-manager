@@ -48,7 +48,7 @@ export function useScrollPersistence(options: {
         scrollerRef.value.scrollTop = scrollTop;
       } else if (lastClickedTag) {
         const targetEl = scrollerRef.value.querySelector(
-          `.tm-tree-node[data-node-tag="${lastClickedTag}"]`
+          `.tm-tree-node[data-node-tag="${lastClickedTag}"]`,
         ) as HTMLElement | null;
         if (targetEl) {
           targetEl.scrollIntoView({ block: 'nearest' });

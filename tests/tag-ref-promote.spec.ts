@@ -96,21 +96,18 @@ describe('TagRefPromoteService 引用识别为同名标签测试', () => {
     const mockRequest = async (url: string, data: any) => {
       if (url === '/api/query/sql') {
         expect(data.stmt).toContain('FROM refs r');
-        expect(data.stmt).toContain("b_doc.box = 'nb_1'");
-        return {
-          code: 0,
-          data: [
-            {
-              doc_id: 'doc_10',
-              doc_title: 'AI 绘画指引',
-              doc_ial: '',
-              ref_content: 'AI',
-              def_content: '',
-            },
-          ],
-        };
+        expect(data.stmt).toContain('b_doc.box = \'nb_1\'');
+        return [
+          {
+            doc_id: 'doc_10',
+            doc_title: 'AI 绘画指引',
+            doc_ial: '',
+            ref_content: 'AI',
+            def_content: '',
+          },
+        ];
       }
-      return { code: 0 };
+      return {};
     };
 
     const res = await TagRefPromoteService.scanRefsToTags(
@@ -129,12 +126,12 @@ describe('TagRefPromoteService 引用识别为同名标签测试', () => {
     const mockRequest = async (url: string, data: any) => {
       calls.push({ url, data });
       if (url === '/api/attr/getBlockAttrs') {
-        return { code: 0, data: { tags: 'Notes' } };
+        return { tags: 'Notes' };
       }
       if (url === '/api/attr/setBlockAttrs') {
-        return { code: 0, data: null };
+        return null;
       }
-      return { code: 0 };
+      return {};
     };
 
     const candidates = [

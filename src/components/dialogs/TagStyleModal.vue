@@ -20,7 +20,7 @@
               <span class="tm-preview-label">☀️ Light 亮色</span>
               <div class="tm-preview-capsule-wrap">
                 <span class="tm-preview-capsule" :style="lightPreviewStyle">
-                  {{ state.icon ? state.icon + ' ' : '' }}{{ state.label || '标签' }}
+                  {{ state.icon ? `${state.icon} ` : '' }}{{ state.label || '标签' }}
                 </span>
               </div>
             </div>
@@ -29,7 +29,7 @@
               <span class="tm-preview-label">🌙 Dark 暗黑</span>
               <div class="tm-preview-capsule-wrap">
                 <span class="tm-preview-capsule" :style="darkPreviewStyle">
-                  {{ state.icon ? state.icon + ' ' : '' }}{{ state.label || '标签' }}
+                  {{ state.icon ? `${state.icon} ` : '' }}{{ state.label || '标签' }}
                 </span>
               </div>
             </div>
@@ -254,8 +254,9 @@ import {
   RECOMMENDED_BG_COLORS,
   RECOMMENDED_TEXT_COLORS,
   EMOJI_CATEGORIES,
-  type IColorPreset,
+
 } from '../../styles/palette';
+import type { IColorPreset } from '../../styles/palette';
 import { TagVisualService } from '../../services/TagVisualService';
 import type { IStyleModalState } from '../../types/ui';
 
@@ -266,7 +267,7 @@ const props = withDefaults(
   }>(),
   {
     customPresets: () => [],
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -327,8 +328,8 @@ function handleRemovePreset(presetId: string) {
 function ensureHex6(val?: string, fallback = '#000000'): string {
   if (!val) return fallback;
   const clean = val.trim();
-  if (/^#[0-9a-fA-F]{6}$/.test(clean)) return clean;
-  if (/^#[0-9a-fA-F]{3}$/.test(clean)) {
+  if (/^#[0-9a-f]{6}$/i.test(clean)) return clean;
+  if (/^#[0-9a-f]{3}$/i.test(clean)) {
     return `#${clean[1]}${clean[1]}${clean[2]}${clean[2]}${clean[3]}${clean[3]}`;
   }
   return fallback;
@@ -399,7 +400,7 @@ const lightPreviewStyle = computed(() => {
   const color = props.state.textColor || 'var(--b3-theme-on-surface, #333333)';
   return {
     backgroundColor: bg,
-    color: color,
+    color,
   };
 });
 

@@ -1,4 +1,5 @@
-import { createApp, reactive, type App as VueApp } from 'vue';
+import { createApp, reactive } from 'vue';
+import type { App as VueApp } from 'vue';
 import type { ICompanionBarState, ITagCompanionCandidate } from '../types/companion';
 import TagCompanionBar from '../components/dialogs/TagCompanionBar.vue';
 import { TagDomDecorator } from './TagDomDecorator';
@@ -133,7 +134,7 @@ export class TagCompanionOverlay {
 
     // 检查是否已有该 chip
     const existing = Array.from(doctagContainer.querySelectorAll('.b3-chip')).find(
-      c => (c.getAttribute('data-tag') || c.textContent?.trim()) === label
+      c => (c.getAttribute('data-tag') || c.textContent?.trim()) === label,
     );
     if (existing) return;
 

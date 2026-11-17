@@ -113,7 +113,7 @@ export class TagNavigationService {
     if (elements.length === 0) return null;
 
     // 优先匹配主工作区正文编辑区域内的块，排除标签管家侧栏宿主与隐藏节点
-    const primary = elements.find(el => {
+    const primary = elements.find((el) => {
       const inWysiwyg = Boolean(el.closest('.protyle-wysiwyg'));
       const inHost = Boolean(el.closest('.siyuan-tag-manager-host'));
       const isHidden = el.offsetParent === null && el.clientHeight === 0 && el.offsetHeight === 0;

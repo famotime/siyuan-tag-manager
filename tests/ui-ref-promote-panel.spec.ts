@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import TagRefPromotePanel from '../src/components/tabs/TagRefPromotePanel.vue';
 import TagHygieneView from '../src/components/tabs/TagHygieneView.vue';
-import { TagRefPromoteService, type IRefToTagCandidate } from '../src/services/TagRefPromoteService';
+import { TagRefPromoteService } from '../src/services/TagRefPromoteService';
+import type { IRefToTagCandidate } from '../src/services/TagRefPromoteService';
 import { createTestApp, renderComponent } from './helpers/ssr';
 
 /**
@@ -26,7 +27,7 @@ const FIXTURE_CANDIDATES: IRefToTagCandidate[] = [
 ];
 
 async function setupPanel(emitSpy?: (event: string, payload: any) => void) {
-  const { createSSRApp, h } = await import('vue');
+  const { _createSSRApp, h } = await import('vue');
   const { renderToString } = await import('vue/server-renderer');
 
   let ctx: any;

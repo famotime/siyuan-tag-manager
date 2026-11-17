@@ -651,7 +651,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import type { ITagItem, ITagGroup } from '../../types/tag';
-import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
+import { TagTreeService } from '../../services/TagTreeService';
+import type { TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import { TagCreationService } from '../../services/TagCreationService';
 import { TagGroupService } from '../../services/TagGroupService';
@@ -673,7 +674,7 @@ const props = withDefaults(
   {
     selectedTags: () => [],
     tagGroups: () => [],
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -698,7 +699,6 @@ const {
   editingLabel,
   inlineRenameValue,
   inlineInputRef,
-  isSubmittingRename,
   cascadeRenameConfirmState,
   startInlineRename,
   cancelInlineRename,
@@ -719,7 +719,7 @@ const allCollapsed = ref(false);
 // 三大折叠面板展开状态
 const groupsExpanded = ref(false);
 const panoramaExpanded = ref(true); // 标签全景默认展开
-const heatExpanded = ref(false);     // 标签热度默认折叠
+const heatExpanded = ref(false); // 标签热度默认折叠
 
 const activeContext = ref<{ docId?: string; docTitle?: string; blockId?: string }>({});
 const highlightedTagLabel = ref<string | null>(null);
@@ -765,32 +765,12 @@ const canCreateTag = computed(() => {
   return normalizedKeyword.value.length > 0 && validationResult.value.valid && !hasExactMatch.value;
 });
 
-function handleSearchEnter(e: KeyboardEvent) {
-  if (e.isComposing) return;
-  if (displayTreeNodes.value.length === 0) {
-    if (canCreateTag.value) {
-      triggerCreateTag();
-    }
-    return;
-  }
-  if (canCreateTag.value && !hasExactMatch.value) {
-    triggerCreateTag();
-  }
-}
-
-function triggerCreateTag() {
-  if (!canCreateTag.value) return;
-  emit('create-tag', normalizedKeyword.value);
-}
-
 // 虚拟标签列表（历史上曾叠加暂存重命名预览；拖拽重构改为即时确认后恒等于全库列表，
 // 保留计算属性以维持 useTreeDragDrop / useHeatVisualization 的下游接口稳定）
 const virtualAllTags = computed<ITagItem[]>(() => props.allTags);
 
 // 拖拽层级重构（指示线三段定位、空白区拖出为根、落位确认抽离至 useTreeDragDrop）
 const {
-  draggingTagLabel,
-  dragOverTagLabel,
   dragIndicator,
   isDraggingOverScrollerBlank,
   reparentConfirmState,
@@ -805,7 +785,6 @@ const {
   handleDragOverNode,
   handleDragLeaveNode,
   handleDropOnNode,
-  handleDropToRoot,
   handleExecuteReparentDirectly,
 } = useTreeDragDrop({
   virtualAllTags,
@@ -824,7 +803,6 @@ const {
   cloudTags,
   heatBadgeCount,
   totalHeatQuotes,
-  cloudStats,
   computeCloudFontSize,
   formatPercent,
   getHeatTierClass,
@@ -843,6 +821,24 @@ const displayTreeNodes = computed(() => {
   const rootNodes = TagTreeService.buildTree(matches.map(m => m.tag), sortMode.value);
   return TagTreeService.flattenTree(rootNodes);
 });
+
+function handleSearchEnter(e: KeyboardEvent) {
+  if (e.isComposing) return;
+  if (displayTreeNodes.value.length === 0) {
+    if (canCreateTag.value) {
+      triggerCreateTag();
+    }
+    return;
+  }
+  if (canCreateTag.value && !hasExactMatch.value) {
+    triggerCreateTag();
+  }
+}
+
+function triggerCreateTag() {
+  if (!canCreateTag.value) return;
+  emit('create-tag', normalizedKeyword.value);
+}
 
 const selectedTagSet = computed(() => new Set(props.selectedTags || []));
 
@@ -884,7 +880,7 @@ function isNodeVisible(node: ITagItem): boolean {
 function toggleCollapseAll() {
   allCollapsed.value = !allCollapsed.value;
   if (allCollapsed.value) {
-    virtualAllTags.value.forEach(t => {
+    virtualAllTags.value.forEach((t) => {
       if (hasSubTags(t.label)) {
         collapsedSet.value.add(t.label);
       }

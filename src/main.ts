@@ -1,5 +1,6 @@
 import type { Plugin } from 'siyuan';
-import { createApp, type App as VueApp } from 'vue';
+import { createApp } from 'vue';
+import type { App as VueApp } from 'vue';
 import App from './App.vue';
 import { vTooltip } from './utils/tooltip';
 
@@ -47,79 +48,36 @@ export function unmountPanel(host: HTMLElement): void {
 }
 
 /**
+ * 查找思源笔记原生标签管家 Dock item 按钮
+ * @returns 命中的 Dock item 元素；未找到或非浏览器环境时返回 null
+ */
+function findDockItem(dockType: string): HTMLElement | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const selectors = [
+    `span.dock__item[data-type*="${dockType}"]`,
+    `span.dock__item[data-type*="iconTagManager"]`,
+    `[data-type*="${dockType}"]`,
+  ];
+  for (const selector of selectors) {
+    const el = document.querySelector(selector) as HTMLElement | null;
+    if (el) {
+      return el;
+    }
+  }
+  return null;
+}
+
+/**
  * 切换思源笔记原生标签管家 Dock 侧栏展开/折叠
  */
 export function toggleTagManagerDock(dockType: string = DOCK_TYPE): boolean {
-  if (typeof document === 'undefined') {
+  const el = findDockItem(dockType);
+  if (!el) {
     return false;
   }
-
-  // 1. 尝试在侧栏查找 Dock item 按钮触发原生点击
-  const selectors = [
-    `span.dock__item[data-type*="${dockType}"]`,
-    `span.dock__item[data-type*="iconTagManager"]`,
-    `[data-type*="${dockType}"]`,
-  ];
-
-  for (const selector of selectors) {
-    const el = document.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      el.click();
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * 检查思源笔记原生标签管家 Dock 侧栏当前是否处于展开/激活状态
- */
-export function isTagManagerDockActive(dockType: string = DOCK_TYPE): boolean {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  const selectors = [
-    `span.dock__item[data-type*="${dockType}"]`,
-    `span.dock__item[data-type*="iconTagManager"]`,
-    `[data-type*="${dockType}"]`,
-  ];
-
-  for (const selector of selectors) {
-    const el = document.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      return el.classList.contains('dock__item--active');
-    }
-  }
-
-  return false;
-}
-
-/**
- * 确保打开思源笔记原生标签管家 Dock 侧栏（若已处于激活状态则保持现状，绝不缩回折叠）
- */
-export function openTagManagerDock(dockType: string = DOCK_TYPE): boolean {
-  if (typeof document === 'undefined') {
-    return false;
-  }
-
-  const selectors = [
-    `span.dock__item[data-type*="${dockType}"]`,
-    `span.dock__item[data-type*="iconTagManager"]`,
-    `[data-type*="${dockType}"]`,
-  ];
-
-  for (const selector of selectors) {
-    const el = document.querySelector(selector) as HTMLElement | null;
-    if (el) {
-      if (!el.classList.contains('dock__item--active')) {
-        el.click();
-      }
-      return true;
-    }
-  }
-
-  return false;
+  el.click();
+  return true;
 }
 

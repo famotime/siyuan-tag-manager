@@ -80,8 +80,8 @@ describe('标签文本统一工具', () => {
 
   describe('escapeSqlLiteral · SQL 字面量单引号转义', () => {
     it('单引号翻倍', () => {
-      expect(escapeSqlLiteral("it's")).toBe("it''s");
-      expect(escapeSqlLiteral("a'b'c")).toBe("a''b''c");
+      expect(escapeSqlLiteral('it\'s')).toBe('it\'\'s');
+      expect(escapeSqlLiteral('a\'b\'c')).toBe('a\'\'b\'\'c');
     });
 
     it('无单引号原样返回', () => {
@@ -97,7 +97,7 @@ describe('标签文本统一工具', () => {
 
   describe('与既有规范实现的一致性', () => {
     it('FilterEngine.escapeSql 的引号部分与 escapeSqlLiteral 一致', () => {
-      const sample = "o'brien";
+      const sample = 'o\'brien';
       expect(TagFilterEngine.escapeSql(sample)).toBe(escapeSqlLiteral(sample));
     });
 

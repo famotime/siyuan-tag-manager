@@ -135,8 +135,8 @@ export class TagDropService {
       if (docId) {
         // 高亮元素优先选择内部的标签展示区或标题区，使视觉更聚焦
         const highlightEl =
-          headerContainer.querySelector?.<HTMLElement>('.b3-chips__doctag, .protyle-title') ||
-          headerContainer;
+          headerContainer.querySelector?.<HTMLElement>('.b3-chips__doctag, .protyle-title')
+          || headerContainer;
         return { el: highlightEl, docId };
       }
     }
@@ -225,9 +225,9 @@ export class TagDropService {
 
     const handleDragOver = (e: DragEvent) => {
       const tag =
-        e.dataTransfer?.getData('application/siyuan-tag') ||
-        this.draggingTag ||
-        stripTagHash(e.dataTransfer?.getData('text/plain') || '');
+        e.dataTransfer?.getData('application/siyuan-tag')
+        || this.draggingTag
+        || stripTagHash(e.dataTransfer?.getData('text/plain') || '');
 
       if (!tag) return;
 
@@ -267,9 +267,9 @@ export class TagDropService {
 
     const handleDrop = async (e: DragEvent) => {
       const tag =
-        e.dataTransfer?.getData('application/siyuan-tag') ||
-        this.draggingTag ||
-        stripTagHash(e.dataTransfer?.getData('text/plain') || '');
+        e.dataTransfer?.getData('application/siyuan-tag')
+        || this.draggingTag
+        || stripTagHash(e.dataTransfer?.getData('text/plain') || '');
 
       const target = e.target as HTMLElement | null;
 

@@ -14,15 +14,15 @@ export class TagVisualService {
   public static hexToRgb(hex: string): { r: number; g: number; b: number } | null {
     const cleanHex = hex.replace('#', '').trim();
     if (cleanHex.length === 3) {
-      const r = parseInt(cleanHex[0] + cleanHex[0], 16);
-      const g = parseInt(cleanHex[1] + cleanHex[1], 16);
-      const b = parseInt(cleanHex[2] + cleanHex[2], 16);
+      const r = Number.parseInt(cleanHex[0] + cleanHex[0], 16);
+      const g = Number.parseInt(cleanHex[1] + cleanHex[1], 16);
+      const b = Number.parseInt(cleanHex[2] + cleanHex[2], 16);
       return { r, g, b };
     }
     if (cleanHex.length === 6) {
-      const r = parseInt(cleanHex.substring(0, 2), 16);
-      const g = parseInt(cleanHex.substring(2, 4), 16);
-      const b = parseInt(cleanHex.substring(4, 6), 16);
+      const r = Number.parseInt(cleanHex.substring(0, 2), 16);
+      const g = Number.parseInt(cleanHex.substring(2, 4), 16);
+      const b = Number.parseInt(cleanHex.substring(4, 6), 16);
       return { r, g, b };
     }
     return null;

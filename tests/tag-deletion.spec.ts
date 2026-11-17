@@ -103,12 +103,12 @@ describe('TagDeletionService 标签删除与格式化清洗测试', () => {
 
     it('strip_hash 模式下分别更新正文段落块与文档属性', async () => {
       const mockSqlQuery = vi.fn().mockImplementation((sql: string) => {
-        if (sql.includes("s.type LIKE '%tag%'")) {
+        if (sql.includes('s.type LIKE \'%tag%\'')) {
           return Promise.resolve([
             { id: 'b_1', type: 'p', markdown: '这是 #待办# 内容' },
           ]);
         }
-        if (sql.includes("type = 'd'")) {
+        if (sql.includes('type = \'d\'')) {
           return Promise.resolve([
             { id: 'doc_1', ial: 'tags="待办,重要"' },
           ]);
@@ -139,7 +139,7 @@ describe('TagDeletionService 标签删除与格式化清洗测试', () => {
 
     it('批量更新时个别块失败不阻断后续块，并汇总记录错误', async () => {
       const mockSqlQuery = vi.fn().mockImplementation((sql: string) => {
-        if (sql.includes("s.type LIKE '%tag%'")) {
+        if (sql.includes('s.type LIKE \'%tag%\'')) {
           return Promise.resolve([
             { id: 'b_fail', type: 'p', markdown: '异常 #测试#' },
             { id: 'b_ok', type: 'p', markdown: '正常 #测试#' },

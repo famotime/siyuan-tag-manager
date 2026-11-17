@@ -4,7 +4,7 @@ import { TagCompanionCache } from './TagCompanionCache';
 
 /**
  * 伴生标签推荐决策引擎
- * 
+ *
  * 核心职责：
  * 1. 结合当前编辑块上下文与已有打标标签，执行聚焦基准提取；
  * 2. 严格排除当前块内已存在的全部标签；

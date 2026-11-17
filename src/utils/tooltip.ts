@@ -1,4 +1,4 @@
-import type { Directive, DirectiveBinding } from 'vue';
+import type { Directive } from 'vue';
 
 let tooltipEl: HTMLDivElement | null = null;
 let showTimer: any = null;

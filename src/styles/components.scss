@@ -526,12 +526,12 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 }
 
 .tm-row-menu-item.is-danger {
-  color: #dc3545;
+  color: var(--tm-badge-danger-text, #b91c1c);
 }
 
 .tm-row-menu-item.is-danger:hover {
-  background: rgba(220, 53, 69, 0.1);
-  color: #dc3545;
+  background: var(--tm-badge-danger-bg, rgba(220, 53, 69, 0.1));
+  color: var(--tm-badge-danger-text, #b91c1c);
 }
 
 /* 智能视图栏 */
@@ -660,7 +660,7 @@ body.theme--dark .tm-tree-node.is-selected:hover {
       color: #fff;
     }
     &.tm-mode-btn--exc {
-      background: #dc3545;
+      background: var(--b3-theme-error, #dc3545);
       color: #fff;
     }
   }
@@ -686,8 +686,8 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 }
 
 .tm-clear-filter-btn:hover:not(:disabled) {
-  color: #dc3545;
-  background: rgba(220, 53, 69, 0.08);
+  color: var(--tm-badge-danger-text, #b91c1c);
+  background: var(--tm-badge-danger-bg, rgba(220, 53, 69, 0.08));
 }
 
 .tm-clear-filter-btn:disabled {
@@ -880,9 +880,9 @@ body.theme--dark .tm-tree-node.is-selected:hover {
 }
 
 .tm-quick-tag.is-excluded {
-  background: #dc3545;
+  background: var(--b3-theme-error, #dc3545);
   color: #fff;
-  border-color: #dc3545;
+  border-color: var(--b3-theme-error, #dc3545);
 }
 
 .tm-quick-expand-btn {
@@ -950,9 +950,9 @@ body.theme--dark .tm-tree-node.is-selected:hover {
   border: 1px solid var(--tm-badge-danger-border, rgba(197, 34, 31, 0.25));
 
   &:hover {
-    background: #dc3545;
+    background: var(--b3-theme-error, #dc3545);
     color: #fff;
-    border-color: #dc3545;
+    border-color: var(--b3-theme-error, #dc3545);
   }
 }
 

@@ -44,19 +44,20 @@ export class TagDocConverterService {
 
   /**
    * 自动调用思源 API 创建文档
+   * @param requestFn 可注入传输函数，契约为“code!=0 抛错、成功返回解包后的 data”
    */
   public static async createDocFromTag(
     label: string,
     blocks: ITagMatchedBlock[],
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; docId?: string; error?: string }> {
-    // 默认传输统一走 TagApiClient（含鉴权头，修复本方法历史上缺失 Authorization 的缺陷）
-    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
+    // 默认传输统一走 TagApiClient.request（含鉴权头、code 校验与解包）
+    const post = requestFn || ((url: string, data: any) => TagApiClient.request(url, data));
 
     try {
       // 1. 获取笔记本列表，选用第一个打开的笔记本
       const nbRes = await post('/api/notebook/lsNotebooks', {});
-      const notebooks = nbRes?.data?.notebooks || [];
+      const notebooks = nbRes?.notebooks || [];
       const activeNotebook = notebooks.find((n: any) => !n.closed) || notebooks[0];
 
       if (!activeNotebook) {
@@ -67,17 +68,17 @@ export class TagDocConverterService {
       const docPath = `/${cleanLabel}`;
       const md = this.generateDocMarkdown(cleanLabel, blocks);
 
-      // 2. 调用 /api/doc/createDocWithMd 创建文档
-      const createRes = await post('/api/filetree/createDocWithMd', {
+      // 2. 调用 /api/filetree/createDocWithMd 创建文档（code!=0 时由传输层抛错进入 catch）
+      const docId = await post('/api/filetree/createDocWithMd', {
         notebook: activeNotebook.id,
         path: docPath,
         markdown: md,
       });
 
-      if (createRes?.code === 0 && createRes?.data) {
-        return { success: true, docId: createRes.data };
+      if (docId) {
+        return { success: true, docId };
       }
-      return { success: false, error: createRes?.msg || '创建文档失败' };
+      return { success: false, error: '创建文档失败' };
     } catch (err: any) {
       return { success: false, error: err.message || String(err) };
     }

@@ -107,7 +107,8 @@
 import { computed, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type { ITagItem } from '../../types/tag';
-import { TagRefPromoteService, type IRefToTagCandidate } from '../../services/TagRefPromoteService';
+import { TagRefPromoteService } from '../../services/TagRefPromoteService';
+import type { IRefToTagCandidate } from '../../services/TagRefPromoteService';
 import { TagGroupService } from '../../services/TagGroupService';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
@@ -117,7 +118,7 @@ const props = withDefaults(
   }>(),
   {
     allTags: () => [],
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -139,7 +140,7 @@ const isAllSelected = computed(
 
 function toggleSelectAll(e: Event) {
   const checked = (e.target as HTMLInputElement).checked;
-  candidates.value.forEach(c => {
+  candidates.value.forEach((c) => {
     c.selected = checked;
   });
 }
