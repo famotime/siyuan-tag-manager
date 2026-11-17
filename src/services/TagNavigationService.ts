@@ -16,6 +16,9 @@ export interface IBlockCenterOptions {
  * 负责打标块点击跳转时打开对应文档页签，并将打标位置精准展示在文档显示区域的屏幕正中（而非窗口底部）
  */
 export class TagNavigationService {
+  /** 跳转会话序号：新跳转会作废在途的旧轮询链，防止旧目标在定位完成后把视口拉回 */
+  private static jumpSeq = 0;
+
   /**
    * 跳转至指定块，并将该块在文档显示区域内垂直居中展示
    * @param rootId 文档根块 ID
@@ -63,6 +66,7 @@ export class TagNavigationService {
 
   /**
    * 将指定块在文档显示区域（Protyle 内容视口）垂直居中显示
+   * 带取消令牌：连续快速跳转时，仅最新一次跳转的轮询链生效
    */
   public static centerBlockInView(blockId: string, options: IBlockCenterOptions = {}): void {
     if (typeof document === 'undefined') return;
@@ -72,9 +76,12 @@ export class TagNavigationService {
     const behavior = options.behavior ?? 'smooth';
     const highlightDuration = options.highlightDuration ?? 2000;
 
+    const seq = ++TagNavigationService.jumpSeq;
     let retries = 0;
 
     const attempt = () => {
+      // 已被更新的跳转取代：整条旧轮询链立即终止
+      if (seq !== TagNavigationService.jumpSeq) return;
       retries++;
       const targetEl = this.findTargetElement(blockId);
 
@@ -85,6 +92,7 @@ export class TagNavigationService {
         // 在 250ms 后进行二次校验复调，消除异步渲染或大文档排版回流可能产生的细微偏移
         if (retries <= 3) {
           setTimeout(() => {
+            if (seq !== TagNavigationService.jumpSeq) return;
             const el = this.findTargetElement(blockId);
             if (el) {
               this.scrollElementToCenter(el, 'auto');

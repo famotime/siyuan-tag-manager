@@ -39,6 +39,8 @@ export function useTreeDragDrop(options: {
   const dragOverTagLabel = ref<string | null>(null);
   const dragIndicator = ref<ITreeDragIndicator | null>(null);
   const isDraggingOverScrollerBlank = ref(false);
+  // 拖拽会话序号：dragend 早于 startTagDrag 的延迟态更新时，作废该次更新避免幽灵拖拽态残留
+  let dragSession = 0;
 
   const reparentConfirmState = ref<IReparentConfirmState>({
     visible: false,
@@ -63,8 +65,12 @@ export function useTreeDragDrop(options: {
     }
 
     // 异步延迟更新 draggingTagLabel，避免同步修改响应式状态导致 DOM 重新渲染和布局突变（Layout Shift）打断 Chromium 原生拖拽启动
+    const session = ++dragSession;
     setTimeout(() => {
-      draggingTagLabel.value = label;
+      // 极速拖拽松手时 dragend 可能已先行清理，过期会话不得复活拖拽态
+      if (session === dragSession) {
+        draggingTagLabel.value = label;
+      }
     }, 0);
   }
 
@@ -80,6 +86,7 @@ export function useTreeDragDrop(options: {
   });
 
   function handleDragEnd() {
+    dragSession++;
     draggingTagLabel.value = null;
     dragOverTagLabel.value = null;
     dragIndicator.value = null;

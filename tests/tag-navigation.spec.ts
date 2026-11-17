@@ -140,4 +140,41 @@ describe('TagNavigationService 块跳转与屏幕正中居中定位测试', () =
     expect(mockEl.classList.contains('protyle-wysiwyg--hl')).toBe(false);
     expect(mockEl.classList.contains('tm-block-jump-highlight')).toBe(false);
   });
+
+  it('连续快速跳转时旧轮询链被作废，不再轮询旧目标', () => {
+    // node 环境下补一个最小 document，centerBlockInView 才会进入轮询调度
+    const originalDocument = (globalThis as any).document;
+    (globalThis as any).document = {};
+    const findSpy = vi.spyOn(TagNavigationService, 'findTargetElement').mockReturnValue(null);
+    const scrollSpy = vi.spyOn(TagNavigationService, 'scrollElementToCenter').mockReturnValue(true);
+    const highlightSpy = vi.spyOn(TagNavigationService, 'highlightElement').mockImplementation(() => {});
+
+    try {
+      // 第一次跳转：元素未出现，进入轮询
+      TagNavigationService.centerBlockInView('block-a', { maxRetries: 10, interval: 80 });
+      vi.advanceTimersByTime(50);
+
+      // 第二次跳转启动，作废旧链
+      TagNavigationService.centerBlockInView('block-b', { maxRetries: 10, interval: 80 });
+      vi.advanceTimersByTime(600);
+
+      // 旧目标仅被首触查询一次，之后的重试时间点全部作废
+      const oldCalls = findSpy.mock.calls.filter(call => call[0] === 'block-a');
+      expect(oldCalls.length).toBe(1);
+      // 新目标持续轮询
+      expect(findSpy.mock.calls.filter(call => call[0] === 'block-b').length).toBeGreaterThan(1);
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      // 元素出现后，仅新链完成定位与高亮
+      findSpy.mockReturnValue({ clientHeight: 40, offsetHeight: 40 } as any);
+      vi.advanceTimersByTime(200);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect(highlightSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      findSpy.mockRestore();
+      scrollSpy.mockRestore();
+      highlightSpy.mockRestore();
+      (globalThis as any).document = originalDocument;
+    }
+  });
 });

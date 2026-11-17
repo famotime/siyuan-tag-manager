@@ -218,6 +218,29 @@ describe('useTreeDragDrop 拖拽层级重构', () => {
     expect(e.dataTransfer?.setData).toHaveBeenCalledWith('text/plain', '#vue# ');
   });
 
+  it('startTagDrag 的延迟态更新在 dragend 先行清理后不复活拖拽态', () => {
+    vi.useFakeTimers();
+    try {
+      const { startTagDrag, handleDragEnd, draggingTagLabel, isDraggingSubTag } = setup();
+
+      // 极速松手：dragend 先于 setTimeout(0) 延迟更新发生
+      startTagDrag('tool/vue', makeDragEvent());
+      handleDragEnd();
+      vi.runAllTimers();
+      expect(draggingTagLabel.value).toBeNull();
+      expect(isDraggingSubTag.value).toBe(false);
+
+      // 正常路径：延迟更新先于 dragend 生效
+      startTagDrag('tool/vue', makeDragEvent());
+      vi.runAllTimers();
+      expect(draggingTagLabel.value).toBe('tool/vue');
+      handleDragEnd();
+      expect(draggingTagLabel.value).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('handleDragEnd 清空全部拖拽状态', () => {
     const { startTagDrag, handleDragEnd, draggingTagLabel, dragIndicator, dragOverTagLabel } = setup();
     startTagDrag('vue', makeDragEvent());
