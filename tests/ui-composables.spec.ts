@@ -257,6 +257,70 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(savedData).toBeDefined();
     });
 
+    it('migrateTagReferences 合并语义：目标元数据已存在时保留目标样式并合并别名', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { useTagData } = await import('../src/composables/useTagData');
+      usePlugin({ loadData: async () => null, saveData: async () => {} } as any);
+
+      const { metadataMap, migrateTagReferences } = useTagData();
+      metadataMap.value.set('ai', {
+        label: 'ai',
+        backgroundColor: '#111111',
+        aliases: ['人工智能'],
+        updatedAt: 1,
+      });
+      metadataMap.value.set('AI', {
+        label: 'AI',
+        textColor: '#ffffff',
+        aliases: ['AI'],
+        updatedAt: 2,
+      });
+
+      migrateTagReferences('ai', 'AI');
+
+      expect(metadataMap.value.has('ai')).toBe(false);
+      const merged = metadataMap.value.get('AI');
+      // 目标已有字段优先，源标签独有字段并入
+      expect(merged?.backgroundColor).toBe('#111111');
+      expect(merged?.textColor).toBe('#ffffff');
+      expect(merged?.aliases).toEqual(expect.arrayContaining(['AI', '人工智能']));
+    });
+
+    it('migrateTagReferences 迁移后自定义标签与标签组去重且大小写不敏感', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { useTagData } = await import('../src/composables/useTagData');
+      const { savedViews } = await import('../src/composables/useTagFilter');
+      usePlugin({ loadData: async () => null, saveData: async () => {} } as any);
+
+      const { customTags, tagGroups, migrateTagReferences } = useTagData();
+      customTags.value = ['ai', 'AI', 'other'];
+      tagGroups.value = [
+        { id: 'g1', name: '智能', tags: ['ai', 'AI', 'other'] },
+        { id: 'g2', name: '子级', tags: ['ai/llm', 'other'] },
+      ];
+      savedViews.value = [
+        {
+          id: 'v1',
+          title: 'AI 视图',
+          includeTags: ['ai', 'ai/llm'],
+          excludeTags: [],
+          optionalTags: [],
+          displayMode: 'card',
+          createdAt: 1,
+        } as any,
+      ];
+
+      migrateTagReferences('ai', 'AI');
+
+      // customTags：ai 与 AI 迁移后合并为单一大写项
+      expect(customTags.value).toEqual(['AI', 'other']);
+      // tagGroups：组内去重，子标签级联迁移
+      expect(tagGroups.value[0].tags).toEqual(['AI', 'other']);
+      expect(tagGroups.value[1].tags).toEqual(['AI/llm', 'other']);
+      // 智能视图同步迁移
+      expect(savedViews.value[0].includeTags).toEqual(['AI', 'AI/llm']);
+    });
+
     it('handleRemoveTag 在删除确认后调用 TagDeletionService 并清理元数据与自定义标签', async () => {
       const { usePlugin } = await import('../src/main');
       const { TagDeletionService } = await import('../src/services/TagDeletionService');

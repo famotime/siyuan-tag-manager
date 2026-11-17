@@ -317,6 +317,8 @@ const {
   handleConvertToDoc,
   handleBatchReparent,
   handleRenameTag,
+  migrateTagReferences,
+  persistConfig,
 } = useTagData();
 
 // 弹窗编排状态与全局 Escape 关闭链（抽离至 useModalOrchestration）
@@ -692,6 +694,10 @@ async function confirmMerge(payload: { targetLabel: string; setAsAlias: boolean 
   try {
     const res = await TagApiClient.executeMergePlan(plan);
     if (res.success) {
+      // 合并成功：按统一身份迁移协议把源标签的元数据/标签组/智能视图引用迁到目标
+      migrateTagReferences(sourceLabel, targetLabel);
+      migrateActiveFilter(sourceLabel, targetLabel);
+      await persistConfig(savedViews.value);
       showMessage(`成功合并标签 "${sourceLabel}" 到 "${targetLabel}"`, 3000, 'info');
       mergeModal.value.visible = false;
       await refreshAllData();
@@ -723,7 +729,16 @@ async function executeBatchTag(payload?: { docIds: string[]; tags: string[] }) {
 }
 
 function onAutoResolveIssue(issue: ITagHealthIssue) {
-  autoResolveIssue(issue, allTags.value, () => {
+  autoResolveIssue(issue, allTags.value, async () => {
+    // 一键修复合并成功：按统一身份迁移协议迁移全部被吸收标签的本地引用
+    const related = issue.relatedLabels || [];
+    for (const rel of related) {
+      migrateTagReferences(rel, issue.primaryLabel);
+    }
+    if (related.length > 0) {
+      migrateFilterByMoves(related.map(l => ({ oldLabel: l, newLabel: issue.primaryLabel })));
+      await persistConfig(savedViews.value);
+    }
     refreshAllData();
   });
 }
@@ -813,6 +828,10 @@ async function handleAutoNormalizeTag(label: string, target?: string) {
   if (!norm || norm === label) return;
   try {
     await TagApiClient.renameTag(label, norm);
+    // 规范化同样改变标签身份：按统一协议迁移本地元数据/标签组/智能视图引用
+    migrateTagReferences(label, norm);
+    migrateActiveFilter(label, norm);
+    await persistConfig(savedViews.value);
     showMessage(`已成功将标签 "#${label}#" 规范化为 "#${norm}#"`, 3000, 'info');
     await refreshAllData();
   } catch (err: any) {

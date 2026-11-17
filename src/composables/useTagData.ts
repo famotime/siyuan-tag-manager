@@ -390,6 +390,96 @@ export function useTagData() {
   }
 
   /**
+   * 统一的标签身份迁移协议：将 oldLabel 及其全部子标签在本地状态中的引用迁移到 newLabel。
+   * 覆盖元数据（目标已存在时保留目标样式并合并别名）、自定义标签、标签组（组内去重）、
+   * 智能视图四类状态并重放全局 CSS。供内核重命名/合并/规范化等一切改名路径复用，避免协议分叉。
+   * 注意：本函数只迁移内存态，不持久化；调用方负责 persistConfig。
+   */
+  function migrateTagReferences(oldLabel: string, newLabel: string) {
+    if (!oldLabel || !newLabel || oldLabel === newLabel) return;
+
+    const oldPrefix = `${oldLabel}/`;
+    const newPrefix = `${newLabel}/`;
+
+    // 1. 元数据迁移（含全部子标签；目标键已存在时合并别名并保留目标样式字段）
+    const metasToMigrate: Array<{ oldKey: string; newKey: string; meta: ITagMetadata }> = [];
+    for (const [key, meta] of metadataMap.value.entries()) {
+      if (key === oldLabel) {
+        metasToMigrate.push({ oldKey: key, newKey: newLabel, meta });
+      } else if (key.startsWith(oldPrefix)) {
+        metasToMigrate.push({
+          oldKey: key,
+          newKey: `${newPrefix}${key.slice(oldPrefix.length)}`,
+          meta,
+        });
+      }
+    }
+    for (const item of metasToMigrate) {
+      const existing = metadataMap.value.get(item.newKey);
+      metadataMap.value.delete(item.oldKey);
+      metadataMap.value.set(item.newKey, existing
+        ? {
+            ...item.meta,
+            ...existing,
+            label: item.newKey,
+            aliases: Array.from(new Set([...(existing.aliases || []), ...(item.meta.aliases || [])])),
+            updatedAt: Date.now(),
+          }
+        : { ...item.meta, label: item.newKey, updatedAt: Date.now() });
+    }
+
+    // 2. 自定义标签迁移（大小写不敏感去重，避免迁移产生重复项）
+    const seenCustom = new Set<string>();
+    customTags.value = customTags.value
+      .map((tag) => {
+        if (tag === oldLabel) return newLabel;
+        if (tag.startsWith(oldPrefix)) return `${newPrefix}${tag.slice(oldPrefix.length)}`;
+        return tag;
+      })
+      .filter((tag) => {
+        const lower = tag.toLowerCase();
+        if (seenCustom.has(lower)) return false;
+        seenCustom.add(lower);
+        return true;
+      });
+
+    // 3. 标签组迁移（组内大小写不敏感去重）
+    tagGroups.value = tagGroups.value.map((g) => {
+      let changed = false;
+      const seenInGroup = new Set<string>();
+      const nextTags: string[] = [];
+      for (const t of g.tags) {
+        let next = t;
+        if (t === oldLabel) {
+          next = newLabel;
+          changed = true;
+        } else if (t.startsWith(oldPrefix)) {
+          next = `${newPrefix}${t.slice(oldPrefix.length)}`;
+          changed = true;
+        }
+        const lower = next.toLowerCase();
+        if (seenInGroup.has(lower)) {
+          changed = true;
+          continue;
+        }
+        seenInGroup.add(lower);
+        nextTags.push(next);
+      }
+      return changed ? { ...g, tags: nextTags } : g;
+    });
+
+    // 4. 智能视图迁移
+    migrateSavedViewsTags(oldLabel, newLabel);
+
+    // 5. 重放全局标签样式
+    const metaList = Array.from(metadataMap.value.values());
+    TagVisualService.applyStyles(TagVisualService.generateCssRules(metaList));
+    if (typeof document !== 'undefined') {
+      TagDomDecorator.decorateElement(document);
+    }
+  }
+
+  /**
    * 执行标签重命名并全面迁移关联元数据（含所有子标签、自定义标签、标签组）
    */
   async function handleRenameTag(
@@ -405,74 +495,10 @@ export function useTagData() {
       // 1. 调用内核原生重命名接口（思源内核会自动级联处理全库中下属所有子标签）
       await TagApiClient.renameTag(oldLabel, newLabel);
 
-      // 2. 迁移该标签及其所有子标签的元数据（metadataMap）
-      const oldPrefix = `${oldLabel}/`;
-      const newPrefix = `${newLabel}/`;
-      const metasToMigrate: Array<{ oldKey: string; newKey: string; meta: ITagMetadata }> = [];
+      // 2. 按统一身份迁移协议迁移元数据/自定义标签/标签组/智能视图并重放 CSS
+      migrateTagReferences(oldLabel, newLabel);
 
-      for (const [key, meta] of metadataMap.value.entries()) {
-        if (key === oldLabel) {
-          metasToMigrate.push({
-            oldKey: key,
-            newKey: newLabel,
-            meta: { ...meta, label: newLabel, updatedAt: Date.now() },
-          });
-        } else if (key.startsWith(oldPrefix)) {
-          const subSuffix = key.slice(oldPrefix.length);
-          const migratedKey = `${newPrefix}${subSuffix}`;
-          metasToMigrate.push({
-            oldKey: key,
-            newKey: migratedKey,
-            meta: { ...meta, label: migratedKey, updatedAt: Date.now() },
-          });
-        }
-      }
-
-      for (const item of metasToMigrate) {
-        metadataMap.value.delete(item.oldKey);
-        metadataMap.value.set(item.newKey, item.meta);
-      }
-
-      // 3. 迁移侧面板独立自定义标签（customTags）
-      customTags.value = customTags.value.map((tag) => {
-        if (tag === oldLabel) return newLabel;
-        if (tag.startsWith(oldPrefix)) {
-          return `${newPrefix}${tag.slice(oldPrefix.length)}`;
-        }
-        return tag;
-      });
-
-      // 4. 迁移标签组（tagGroups）中的标签引用
-      tagGroups.value = tagGroups.value.map((g) => {
-        let changed = false;
-        const nextTags = g.tags.map((t) => {
-          if (t === oldLabel) {
-            changed = true;
-            return newLabel;
-          }
-          if (t.startsWith(oldPrefix)) {
-            changed = true;
-            return `${newPrefix}${t.slice(oldPrefix.length)}`;
-          }
-          return t;
-        });
-        if (changed) {
-          return { ...g, tags: nextTags };
-        }
-        return g;
-      });
-
-      // 5. 迁移智能视图（savedViews）中的筛选标签，避免重命名后旧视图查询失效
-      migrateSavedViewsTags(oldLabel, newLabel);
-
-      // 6. 应用最新 CSS 样式并持久化存储配置
-      const metaList = Array.from(metadataMap.value.values());
-      const css = TagVisualService.generateCssRules(metaList);
-      TagVisualService.applyStyles(css);
-      if (typeof document !== 'undefined') {
-        TagDomDecorator.decorateElement(document);
-      }
-
+      // 3. 应用样式后持久化存储配置
       await persistConfig(savedViews);
       // 数据刷新统一由调用层（App.refreshAllData）收口；失败路径保留刷新以回滚展示真实内核状态
       // 标签名已变更：标记伴生推荐共现索引待重建
@@ -522,5 +548,7 @@ export function useTagData() {
     handleConvertToDoc,
     handleBatchReparent,
     handleRenameTag,
+    migrateTagReferences,
+    persistConfig,
   };
 }
