@@ -80,6 +80,7 @@
           :tag-groups="tagGroups"
           :get-tag-style="getTagStyle"
           :get-tag-icon="getTagIcon"
+          :register-escape-closer="registerEscapeCloser"
           @tag-click="onTagClick"
           @quick-filter="onQuickFilter"
           @clear-selected="clearFilterTags"
@@ -237,7 +238,7 @@
       :message="confirmDialog.message"
       :confirm-text="confirmDialog.confirmText"
       :danger="confirmDialog.danger"
-      @close="confirmDialog.visible = false"
+      @close="closeConfirmDialog"
       @confirm="handleConfirmDialog"
     />
   </div>
@@ -334,7 +335,9 @@ const {
   openRowMenu,
   closeRowMenu,
   openConfirmDialog,
+  closeConfirmDialog,
   handleConfirmDialog,
+  registerEscapeCloser,
   handleGlobalKeydown,
 } = useModalOrchestration({
   onEscapeFallback: () => closePanel(),

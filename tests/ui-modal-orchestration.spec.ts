@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { ref } from 'vue';
 import { useModalOrchestration } from '../src/composables/useModalOrchestration';
 
 /**
@@ -113,5 +114,91 @@ describe('useModalOrchestration 弹窗编排', () => {
     expect(m.reparentModal.value.visible).toBe(false);
     expect(m.companionModalVisible.value).toBe(false);
     expect(m.settingsModalVisible.value).toBe(false);
+  });
+
+  it('registerEscapeCloser 动态项先于固定链与回退生效，并可注销', () => {
+    const onEscapeFallback = vi.fn();
+    const m = useModalOrchestration({ onEscapeFallback });
+    const treeDialogVisible = ref(false);
+
+    const unregister = m.registerEscapeCloser({
+      isVisible: () => treeDialogVisible.value,
+      close: () => { treeDialogVisible.value = false; },
+    });
+    treeDialogVisible.value = true;
+    m.styleModal.value.visible = true; // 固定链中位于动态项之后
+
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(treeDialogVisible.value).toBe(false);
+    expect(m.styleModal.value.visible).toBe(true); // 动态项拦截，固定链未继续
+    expect(onEscapeFallback).not.toHaveBeenCalled();
+
+    m.styleModal.value.visible = true;
+    unregister();
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.styleModal.value.visible).toBe(false); // 注销后动态项不再拦截
+  });
+
+  it('canClose 守卫为 false 时吞掉 Esc：不关闭该弹窗也不回退', () => {
+    const onEscapeFallback = vi.fn();
+    const m = useModalOrchestration({ onEscapeFallback });
+    const dialog = ref({ visible: false, executing: false });
+
+    m.registerEscapeCloser({
+      isVisible: () => dialog.value.visible,
+      canClose: () => !dialog.value.executing,
+      close: () => { dialog.value.visible = false; },
+    });
+
+    dialog.value = { visible: true, executing: true };
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(dialog.value.visible).toBe(true);
+    expect(onEscapeFallback).not.toHaveBeenCalled();
+
+    dialog.value = { visible: true, executing: false };
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(dialog.value.visible).toBe(false);
+  });
+
+  it('执行中的 batch/merge/rename 弹窗受 canClose 保护，完成后可被 Esc 关闭', () => {
+    const onEscapeFallback = vi.fn();
+    const m = useModalOrchestration({ onEscapeFallback });
+
+    m.batchModal.value.visible = true;
+    m.batchModal.value.executing = true;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.batchModal.value.visible).toBe(true);
+    expect(onEscapeFallback).not.toHaveBeenCalled();
+
+    m.batchModal.value.executing = false;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.batchModal.value.visible).toBe(false);
+
+    m.mergeModal.value.visible = true;
+    m.mergeModal.value.executing = true;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.mergeModal.value.visible).toBe(true);
+    m.mergeModal.value.executing = false;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.mergeModal.value.visible).toBe(false);
+
+    m.renameModal.value.visible = true;
+    m.renameModal.value.executing = true;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.renameModal.value.visible).toBe(true);
+    m.renameModal.value.executing = false;
+    m.handleGlobalKeydown(makeKey('Escape'));
+    expect(m.renameModal.value.visible).toBe(false);
+  });
+
+  it('closeConfirmDialog 关闭时置空 onConfirm 回调（取消语义无残留）', () => {
+    const m = useModalOrchestration({ onEscapeFallback: vi.fn() });
+    m.openConfirmDialog({ title: 't', message: 'm', onConfirm: vi.fn() });
+    expect(m.confirmDialog.value.visible).toBe(true);
+    expect(m.confirmDialog.value.onConfirm).not.toBeNull();
+
+    m.closeConfirmDialog();
+    expect(m.confirmDialog.value.visible).toBe(false);
+    expect(m.confirmDialog.value.onConfirm).toBeNull();
   });
 });

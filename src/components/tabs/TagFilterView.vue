@@ -147,7 +147,7 @@
               :class="{ 'has-create-hint': Boolean(searchKeyword.trim()) }"
               placeholder="搜索标签并回车添加（支持拼音首字母如 ytb）..."
               @keydown.enter.prevent="handleSearchEnter"
-              @keydown.esc="searchKeyword = ''"
+              @keydown.esc.stop="searchKeyword = ''"
             />
             <span
               v-if="searchKeyword.trim()"

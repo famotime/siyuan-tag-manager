@@ -11,6 +11,7 @@
           placeholder="搜索标签（支持拼音首字母如 ytb、别名）..."
           @focus="refreshActiveContext"
           @keydown.enter.prevent="handleSearchEnter"
+          @keydown.esc.stop="searchKeyword = ''"
         />
         <span
           v-if="canCreateTag && displayTreeNodes.length === 0"
@@ -323,7 +324,7 @@
                   class="b3-text-field tm-inline-rename-input"
                   :placeholder="node.name"
                   @keydown.enter.prevent="submitInlineRename(node)"
-                  @keydown.esc.prevent="cancelInlineRename"
+                  @keydown.esc.stop.prevent="cancelInlineRename"
                   @blur="handleInlineRenameBlur(node)"
                 />
                 <button
@@ -651,6 +652,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import type { ITagItem, ITagGroup } from '../../types/tag';
+import type { IEscapeCloserEntry } from '../../composables/useModalOrchestration';
 import { TagTreeService } from '../../services/TagTreeService';
 import type { TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
@@ -670,10 +672,13 @@ const props = withDefaults(
     getTagIcon: (label: string) => string;
     selectedTags?: string[];
     tagGroups?: ITagGroup[];
+    /** 注册本组件内部维护的局部可关闭面（拖拽确认框/级联重命名框/行内编辑态）到全局 Escape 关闭链 */
+    registerEscapeCloser?: (entry: IEscapeCloserEntry) => () => void;
   }>(),
   {
     selectedTags: () => [],
     tagGroups: () => [],
+    registerEscapeCloser: undefined,
   },
 );
 
@@ -792,6 +797,32 @@ const {
   onBatchReparent: (moves) => {
     emit('batch-reparent', moves);
   },
+});
+
+// 本组件局部维护的可关闭面挂入全局 Escape 关闭链（否则按 Esc 会命中回退逻辑折叠整个面板）
+let unregisterEscapeClosers: Array<() => void> = [];
+
+onMounted(() => {
+  if (!props.registerEscapeCloser) return;
+  unregisterEscapeClosers = [
+    props.registerEscapeCloser({
+      isVisible: () => reparentConfirmState.value.visible,
+      close: () => { reparentConfirmState.value.visible = false; },
+    }),
+    props.registerEscapeCloser({
+      isVisible: () => cascadeRenameConfirmState.value.visible,
+      close: () => { cascadeRenameConfirmState.value.visible = false; },
+    }),
+    props.registerEscapeCloser({
+      isVisible: () => editingLabel.value !== null,
+      close: cancelInlineRename,
+    }),
+  ];
+});
+
+onUnmounted(() => {
+  unregisterEscapeClosers.forEach(fn => fn());
+  unregisterEscapeClosers = [];
 });
 
 // 标签热度双模可视化（范围过滤与字号/分级/占比换算抽离至 useHeatVisualization）
