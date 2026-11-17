@@ -164,9 +164,10 @@ async function scanAllRefs() {
     return;
   }
   scanning.value = true;
-  scanned.value = true;
   try {
     const list = await TagRefPromoteService.scanRefsToTags(props.allTags, { limit: 100 });
+    // 仅在扫描成功后进入“已完成”态：失败时保持原状，避免错误被误显示为空成功
+    scanned.value = true;
     candidates.value = list;
     if (list.length === 0) {
       showMessage('扫描完成，未发现可转化为标签的未打标引用', 3000, 'info');

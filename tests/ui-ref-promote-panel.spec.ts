@@ -26,7 +26,7 @@ const FIXTURE_CANDIDATES: IRefToTagCandidate[] = [
   },
 ];
 
-async function setupPanel(emitSpy?: (event: string, payload: any) => void) {
+async function setupPanel(emitSpy?: (event: string, payload: any) => void, props: Record<string, any> = {}) {
   const { _createSSRApp, h } = await import('vue');
   const { renderToString } = await import('vue/server-renderer');
 
@@ -34,7 +34,7 @@ async function setupPanel(emitSpy?: (event: string, payload: any) => void) {
   const app = createTestApp({
     setup() {
       ctx = (TagRefPromotePanel as any).setup(
-        { allTags: [] },
+        { allTags: [], ...props },
         {
           emit: emitSpy || (() => {}),
           expose: () => {},
@@ -143,5 +143,28 @@ describe('TagRefPromotePanel 引用诊断子组件', () => {
 
     ctx.toggleSelectAll({ target: { checked: false } } as unknown as Event);
     expect(ctx.isAllSelected.value).toBe(false);
+  });
+
+  it('scanAllRefs 成功后进入完成态并写入候选', async () => {
+    const scanSpy = vi.spyOn(TagRefPromoteService, 'scanRefsToTags').mockResolvedValue(FIXTURE_CANDIDATES);
+    const ctx = await setupPanel(undefined, { allTags: [{ label: 'Vue' }] as any });
+
+    await ctx.scanAllRefs();
+
+    expect(ctx.scanned.value).toBe(true);
+    expect(ctx.scanning.value).toBe(false);
+    expect(ctx.candidates.value).toHaveLength(2);
+    scanSpy.mockRestore();
+  });
+
+  it('scanAllRefs 失败时保持未完成态，不落入空成功分支', async () => {
+    const scanSpy = vi.spyOn(TagRefPromoteService, 'scanRefsToTags').mockRejectedValue(new Error('boom'));
+    const ctx = await setupPanel(undefined, { allTags: [{ label: 'Vue' }] as any });
+
+    await ctx.scanAllRefs();
+
+    expect(ctx.scanned.value).toBe(false); // 修复点：失败不得置位 scanned
+    expect(ctx.scanning.value).toBe(false);
+    scanSpy.mockRestore();
   });
 });
