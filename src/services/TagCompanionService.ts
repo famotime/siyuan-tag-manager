@@ -32,7 +32,14 @@ export interface ICompanionTargetContext {
 export class TagCompanionService {
   private static config: ITagCompanionConfig = { ...DEFAULT_COMPANION_CONFIG };
   private static currentTarget: ICompanionTargetContext | null = null;
+  /** 标签悬浮触发防抖定时器（mouseOver 路径专用） */
   private static hoverTimer: any = null;
+  /** 光标停留检测定时器（selectionchange 路径专用，与悬浮路径分离避免互相清除） */
+  private static cursorIdleTimer: any = null;
+  /** 推荐触发序号：hide/新触发会使在途异步触发的展示作废，防止气泡复活 */
+  private static triggerSeq = 0;
+  /** 采纳串行化标志：避免并发点击导致 advance 双重推进 */
+  private static isAccepting = false;
   private static isInitialized = false;
 
   private static cleanupListeners: Array<() => void> = [];
@@ -308,11 +315,22 @@ export class TagCompanionService {
       if (TagCompanionOverlay.contains(related)) return;
       if (related?.closest?.('span[data-type~="tag"], [data-tag], .b3-chip')) return;
 
-      if (this.hoverTimer) {
-        clearTimeout(this.hoverTimer);
-        this.hoverTimer = null;
-      }
+      this.cancelPendingTriggers();
     };
+  }
+
+  /**
+   * 取消所有尚未触发的防抖定时器（悬浮与光标停留两个来源统一回收）
+   */
+  private static cancelPendingTriggers(): void {
+    if (this.hoverTimer) {
+      clearTimeout(this.hoverTimer);
+      this.hoverTimer = null;
+    }
+    if (this.cursorIdleTimer) {
+      clearTimeout(this.cursorIdleTimer);
+      this.cursorIdleTimer = null;
+    }
   }
 
   /**
@@ -329,13 +347,10 @@ export class TagCompanionService {
         return;
       }
 
-      if (this.hoverTimer) {
-        clearTimeout(this.hoverTimer);
-        this.hoverTimer = null;
-      }
+      this.cancelPendingTriggers();
 
       // 静止 300ms 后触发检测
-      this.hoverTimer = setTimeout(() => {
+      this.cursorIdleTimer = setTimeout(() => {
         if (this.isNativeHintActive()) return;
         this.checkCursorFocus();
       }, this.config.hoverDelayMs);
@@ -505,12 +520,17 @@ export class TagCompanionService {
     targetLabel: string,
     caretRect: DOMRect,
   ): Promise<void> {
+    const seq = ++this.triggerSeq;
     if (this.isNativeHintActive()) return;
 
-    // 确保索引缓存已预热
-    if (!TagCompanionCache.isReady()) {
+    // 索引未就绪或已标记失效（打标操作后）时重建，保证推荐基于最新共现数据
+    if (!TagCompanionCache.isReady() || TagCompanionCache.isDirty()) {
       await TagCompanionCache.ensureIndexLoaded(undefined, this.config.minSimilarity);
     }
+
+    // 复验：等待索引构建期间可能已被新触发取代、被用户隐退或配置关闭
+    if (seq !== this.triggerSeq) return;
+    if (!this.config.enabled || this.isNativeHintActive()) return;
 
     // 提取当前目标上下文中已存在的全部标签 (文档级或块级)
     const existingTags = this.extractExistingTags(targetCtx);
@@ -560,10 +580,9 @@ export class TagCompanionService {
    * 隐藏气泡
    */
   public static hide(): void {
-    if (this.hoverTimer) {
-      clearTimeout(this.hoverTimer);
-      this.hoverTimer = null;
-    }
+    this.cancelPendingTriggers();
+    // 作废在途的异步触发：索引重建完成后不得复活已关闭的气泡
+    this.triggerSeq++;
 
     TagCompanionOverlay.hide();
     this.currentTarget = null;
@@ -574,36 +593,53 @@ export class TagCompanionService {
    */
   public static async acceptCandidate(item: ITagCompanionCandidate, index: number): Promise<void> {
     if (!this.currentTarget || !item?.label) return;
+    if (this.isAccepting) return;
 
+    // 捕获目标引用：写入过程中的 hide() 会置空 currentTarget，写入路径仍需完成
+    const target = this.currentTarget;
+    this.isAccepting = true;
     TagCompanionOverlay.markAccepted(item.label);
-
-    if (this.currentTarget.isDoc) {
-      // 1. 文档级标签：调用内核 addTagToDocument 增加属性
-      try {
-        await TagApiClient.addTagToDocument(this.currentTarget.id, item.label);
-        showMessage(`已为当前文档添加标签 #${item.label}#`, 3000, 'info');
-        TagCompanionOverlay.appendDocChipToHeader(this.currentTarget.targetElement, item.label);
-      } catch (err: any) {
-        showMessage(`为文档添加标签失败: ${err.message || err}`, 4000, 'error');
+    try {
+      if (target.isDoc) {
+        // 1. 文档级标签：调用内核 addTagToDocument 增加属性
+        try {
+          await TagApiClient.addTagToDocument(target.id, item.label);
+          showMessage(`已为当前文档添加标签 #${item.label}#`, 3000, 'info');
+          TagCompanionOverlay.appendDocChipToHeader(target.targetElement, item.label);
+        } catch (err: any) {
+          showMessage(`为文档添加标签失败: ${err.message || err}`, 4000, 'error');
+          TagCompanionOverlay.unmarkAccepted(item.label);
+          return;
+        }
+      } else {
+        // 2. 正文段落块：执行块尾追加打标（失败显式反馈并回滚视觉态）
+        const ok = await TagBlockAppender.applyTagToBlockEnd(
+          target.id,
+          item.label,
+          undefined,
+          target.protyle,
+        );
+        if (!ok) {
+          showMessage(`为块追加标签失败: #${item.label}#`, 4000, 'error');
+          TagCompanionOverlay.unmarkAccepted(item.label);
+          return;
+        }
       }
-    } else {
-      // 2. 正文段落块：执行块尾追加打标
-      await TagBlockAppender.applyTagToBlockEnd(
-        this.currentTarget.id,
-        item.label,
-        undefined,
-        this.currentTarget.protyle,
-      );
-    }
 
-    // 推进聚焦指针
-    TagCompanionOverlay.advance(index);
+      // 打标成功：共现图谱已变化，标记推荐索引待重建
+      TagCompanionCache.markDirty();
 
-    // 若全部项已被采纳，平滑隐退
-    if (this.getState().activeIndex >= this.getState().candidates.length) {
-      setTimeout(() => {
-        this.hide();
-      }, 350);
+      // 推进聚焦指针
+      TagCompanionOverlay.advance(index);
+
+      // 若全部项已被采纳，平滑隐退
+      if (this.getState().activeIndex >= this.getState().candidates.length) {
+        setTimeout(() => {
+          this.hide();
+        }, 350);
+      }
+    } finally {
+      this.isAccepting = false;
     }
   }
 

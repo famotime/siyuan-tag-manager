@@ -17,6 +17,7 @@ import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
 import { TagCreationService } from '../services/TagCreationService';
 import { TagCompanionService } from '../services/TagCompanionService';
+import { TagCompanionCache } from '../services/TagCompanionCache';
 import { TagDeletionService } from '../services/TagDeletionService';
 import { TagConfigStore } from '../services/TagConfigStore';
 import { savedViews as sharedSavedViews } from './useTagFilter';
@@ -228,6 +229,10 @@ export function useTagData() {
 
       await persistConfig();
 
+      if (result.success) {
+        // 标签已从全库移除：标记伴生推荐共现索引待重建
+        TagCompanionCache.markDirty();
+      }
       if (result.errors.length > 0) {
         showMessage(`已删除标签 "${label}"，但有 ${result.errors.length} 处更新遇到异常`, 4000, 'error');
       } else if (result.affectedBlocks > 0) {
@@ -371,6 +376,8 @@ export function useTagData() {
       }
       await persistConfig();
       await refreshTags();
+      // 层级已变更：标记伴生推荐共现索引待重建
+      TagCompanionCache.markDirty();
       showMessage(`已成功更新 ${moves.length} 项标签层级！`, 3000, 'info');
       return { success: true };
     } catch (err: any) {
@@ -468,6 +475,8 @@ export function useTagData() {
 
       await persistConfig(savedViews);
       // 数据刷新统一由调用层（App.refreshAllData）收口；失败路径保留刷新以回滚展示真实内核状态
+      // 标签名已变更：标记伴生推荐共现索引待重建
+      TagCompanionCache.markDirty();
 
       return { success: true };
     } catch (err: any) {

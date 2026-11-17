@@ -16,6 +16,8 @@ export class TagCompanionCache {
   private static allNodes: Array<{ label: string; count: number }> = [];
   private static ready = false;
   private static dirty = false;
+  /** 每次失效标记自增，用于识别“构建期间到达的 markDirty”，防止被在途构建错误清零 */
+  private static dirtyGeneration = 0;
   private static lastBuiltTime = 0;
   private static isBuilding = false;
 
@@ -152,7 +154,8 @@ export class TagCompanionCache {
   }
 
   /**
-   * 确保索引已预热加载（若未初始化或标记为脏，异步静默重建）
+   * 确保索引已预热加载（若未初始化、标记为脏时，异步静默重建；
+   * 由消费方在 `!isReady() || isDirty()` 时调用，使 dirty 标志形成闭环）
    */
   public static async ensureIndexLoaded(
     client: typeof TagApiClient = TagApiClient,
@@ -162,6 +165,8 @@ export class TagCompanionCache {
     if (this.ready && !this.dirty) return;
 
     this.isBuilding = true;
+    // 抓取开始前的失效代数：抓取期间新增的 markDirty 不属于本次快照
+    const generationAtFetch = this.dirtyGeneration;
     try {
       const { graph } = await TagCooccurrenceService.fetchCooccurrenceGraph(
         (url: string, data: any) => client.request(url, data),
@@ -173,6 +178,10 @@ export class TagCompanionCache {
       // 静默容错，避免阻塞前台编辑器
     } finally {
       this.isBuilding = false;
+      // 抓取快照之后发生的打标变更不属于本次构建结果，恢复脏标记等待下次重建
+      if (this.dirtyGeneration !== generationAtFetch) {
+        this.dirty = true;
+      }
     }
   }
 
@@ -181,6 +190,7 @@ export class TagCompanionCache {
    */
   public static markDirty(): void {
     this.dirty = true;
+    this.dirtyGeneration++;
   }
 
   public static isDirty(): boolean {
@@ -202,6 +212,7 @@ export class TagCompanionCache {
     this.invertedIndex.clear();
     this.ready = false;
     this.dirty = false;
+    this.dirtyGeneration = 0;
     this.lastBuiltTime = 0;
     this.isBuilding = false;
   }

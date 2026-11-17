@@ -2,6 +2,7 @@ import type { ITagItem } from '../types/tag';
 import { TagBatchService } from './TagBatchService';
 import { TagGovernanceService } from './TagGovernanceService';
 import { TagApiClient } from './TagApiClient';
+import { TagCompanionCache } from './TagCompanionCache';
 import { parseIalTags, escapeSqlLiteral } from '../utils/tagText';
 
 export type RefMatchReason =
@@ -286,6 +287,11 @@ export class TagRefPromoteService {
       } catch (err: any) {
         errors.push(`为文档 ${item.docId} 打标失败: ${err.message || err}`);
       }
+    }
+
+    // 标签数据已变更：标记伴生推荐共现索引待重建
+    if (updatedCount > 0) {
+      TagCompanionCache.markDirty();
     }
 
     return {

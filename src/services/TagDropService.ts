@@ -1,6 +1,7 @@
 import { showMessage } from 'siyuan';
 import { TagApiClient } from './TagApiClient';
 import { TagBatchService } from './TagBatchService';
+import { TagCompanionCache } from './TagCompanionCache';
 import { stripTagHash } from '../utils/tagText';
 
 /**
@@ -192,6 +193,7 @@ export class TagDropService {
     if (docTarget) {
       try {
         await client.addTagToDocument(docTarget.docId, tag);
+        TagCompanionCache.markDirty();
         return { success: true, isDoc: true, blockId: docTarget.docId };
       } catch (err: any) {
         return { success: false, isDoc: true, blockId: docTarget.docId, error: err.message || String(err) };
@@ -206,6 +208,7 @@ export class TagDropService {
         const updatedMd = TagBatchService.appendMarkdownTag(md, tag);
         if (updatedMd !== md) {
           await client.updateBlock(blockTarget.blockId, updatedMd);
+          TagCompanionCache.markDirty();
         }
         return { success: true, isDoc: false, blockId: blockTarget.blockId };
       } catch (err: any) {

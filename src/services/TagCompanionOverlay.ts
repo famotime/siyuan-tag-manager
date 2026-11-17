@@ -118,6 +118,16 @@ export class TagCompanionOverlay {
     }
   }
 
+  /**
+   * 回滚已标记的采纳态（写入内核失败时调用，保持视觉状态与实际一致）
+   */
+  public static unmarkAccepted(label: string): void {
+    const idx = this.state.acceptedLabels.indexOf(label);
+    if (idx !== -1) {
+      this.state.acceptedLabels.splice(idx, 1);
+    }
+  }
+
   public static advance(index: number): void {
     this.state.activeIndex = index + 1;
   }

@@ -1,9 +1,10 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import type { ITagGraphData } from '../src/services/TagCooccurrenceService';
 import { TagCompanionCache } from '../src/services/TagCompanionCache';
 import { TagCompanionRecommender } from '../src/services/TagCompanionRecommender';
 import { TagBlockAppender } from '../src/services/TagBlockAppender';
 import { TagCompanionService } from '../src/services/TagCompanionService';
+import { TagCompanionOverlay } from '../src/services/TagCompanionOverlay';
 import type { ITagCompanionContext } from '../src/types/companion';
 
 describe('伴生标签智能推荐服务与算法测试', () => {
@@ -79,6 +80,43 @@ describe('伴生标签智能推荐服务与算法测试', () => {
 
       TagCompanionCache.markDirty();
       expect(TagCompanionCache.isDirty()).toBe(true);
+    });
+
+    it('markDirty 后 ensureIndexLoaded 消费脏标记完成重建闭环', async () => {
+      const { TagCooccurrenceService } = await import('../src/services/TagCooccurrenceService');
+      const spy = vi.spyOn(TagCooccurrenceService, 'fetchCooccurrenceGraph')
+        .mockResolvedValue({ graph: mockGraphData, combinations: [], spansCount: 5 });
+      try {
+        TagCompanionCache.markDirty();
+        expect(TagCompanionCache.isDirty()).toBe(true);
+
+        await TagCompanionCache.ensureIndexLoaded();
+        expect(TagCompanionCache.isDirty()).toBe(false);
+        expect(TagCompanionCache.isReady()).toBe(true);
+        expect(spy).toHaveBeenCalledTimes(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('构建期间到达的 markDirty 不会被本次构建错误清零', async () => {
+      const { TagCooccurrenceService } = await import('../src/services/TagCooccurrenceService');
+      let resolveFetch!: (value: any) => void;
+      const spy = vi.spyOn(TagCooccurrenceService, 'fetchCooccurrenceGraph')
+        .mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
+      try {
+        const building = TagCompanionCache.ensureIndexLoaded();
+
+        // 抓取快照之后发生打标变更
+        TagCompanionCache.markDirty();
+        resolveFetch({ graph: mockGraphData, combinations: [], spansCount: 5 });
+        await building;
+
+        expect(TagCompanionCache.isReady()).toBe(true);
+        expect(TagCompanionCache.isDirty()).toBe(true); // 保留脏标记等待下次重建
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 
@@ -213,24 +251,104 @@ describe('伴生标签智能推荐服务与算法测试', () => {
     });
 
     it('能够触发展示并支持递进式采纳推进 activeIndex 指针', async () => {
-      TagCompanionService.init();
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const originalGet = TagApiClient.getBlockMarkdown;
+      const originalUpdate = TagApiClient.updateBlock;
+      // 模拟块级写入成功，验证采纳推进与索引失效标记
+      TagApiClient.getBlockMarkdown = async () => '正文内容';
+      TagApiClient.updateBlock = async () => {};
+      const dirtySpy = vi.spyOn(TagCompanionCache, 'markDirty');
 
-      const candidates = [
-        { label: '前端工程化', weight: 8, jaccard: 0.72, percentage: 72 },
-        { label: 'TypeScript', weight: 7, jaccard: 0.63, percentage: 63 },
-      ];
+      try {
+        TagCompanionService.init();
 
-      const rect = { left: 100, top: 100, bottom: 120, right: 150 } as DOMRect;
-      TagCompanionService.show(candidates, rect, 'mock-block-id');
+        const candidates = [
+          { label: '前端工程化', weight: 8, jaccard: 0.72, percentage: 72 },
+          { label: 'TypeScript', weight: 7, jaccard: 0.63, percentage: 63 },
+        ];
 
-      // 采纳首项
-      await TagCompanionService.acceptCandidate(candidates[0], 0);
+        const rect = { left: 100, top: 100, bottom: 120, right: 150 } as DOMRect;
+        TagCompanionService.show(candidates, rect, 'mock-block-id');
 
-      // 再次采纳次项
-      await TagCompanionService.acceptCandidate(candidates[1], 1);
+        // 采纳首项：块级写入成功 -> 指针推进 + 索引标记失效
+        await TagCompanionService.acceptCandidate(candidates[0], 0);
+        expect(TagCompanionOverlay.getState().activeIndex).toBe(1);
+        expect(dirtySpy).toHaveBeenCalled();
 
-      TagCompanionService.hide();
-      TagCompanionService.destroy();
+        // 再次采纳次项
+        await TagCompanionService.acceptCandidate(candidates[1], 1);
+        expect(TagCompanionOverlay.getState().activeIndex).toBe(2);
+
+        TagCompanionService.hide();
+      } finally {
+        TagApiClient.getBlockMarkdown = originalGet;
+        TagApiClient.updateBlock = originalUpdate;
+        dirtySpy.mockRestore();
+        TagCompanionService.destroy();
+      }
+    });
+
+    it('块级采纳失败时回滚已采纳视觉态且不推进指针', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const originalGet = TagApiClient.getBlockMarkdown;
+      const originalUpdate = TagApiClient.updateBlock;
+      TagApiClient.getBlockMarkdown = async () => '正文内容';
+      TagApiClient.updateBlock = async () => {
+        throw new Error('kernel write failed');
+      };
+
+      try {
+        TagCompanionService.init();
+        const candidates = [{ label: 'React', weight: 5, jaccard: 0.6, percentage: 60 }];
+        TagCompanionService.show(candidates, { left: 0, top: 0, bottom: 0, right: 0 } as DOMRect, 'block-id');
+
+        await TagCompanionService.acceptCandidate(candidates[0], 0);
+
+        expect(TagCompanionOverlay.getState().activeIndex).toBe(0); // 未推进
+        expect(TagCompanionOverlay.getState().acceptedLabels).not.toContain('React'); // 视觉态回滚
+      } finally {
+        TagApiClient.getBlockMarkdown = originalGet;
+        TagApiClient.updateBlock = originalUpdate;
+        TagCompanionService.hide();
+        TagCompanionService.destroy();
+      }
+    });
+
+    it('并发采纳被串行化：首次完成前的后续调用被忽略', async () => {
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const originalGet = TagApiClient.getBlockMarkdown;
+      const originalUpdate = TagApiClient.updateBlock;
+      let resolveUpdate!: () => void;
+      TagApiClient.getBlockMarkdown = async () => '正文内容';
+      TagApiClient.updateBlock = async () => {
+        await new Promise<void>((resolve) => { resolveUpdate = resolve; });
+      };
+
+      try {
+        TagCompanionService.init();
+        const candidates = [
+          { label: 'A', weight: 3, jaccard: 0.5, percentage: 50 },
+          { label: 'B', weight: 2, jaccard: 0.4, percentage: 40 },
+        ];
+        TagCompanionService.show(candidates, { left: 0, top: 0, bottom: 0, right: 0 } as DOMRect, 'block-id');
+
+        const first = TagCompanionService.acceptCandidate(candidates[0], 0);
+        const second = TagCompanionService.acceptCandidate(candidates[1], 1);
+        // 等待首个采纳推进到挂起的 updateBlock，再放行以验证串行锁
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        resolveUpdate();
+        await Promise.all([first, second]);
+
+        // 第二次调用在串行锁下被忽略：指针仅推进一次
+        expect(TagCompanionOverlay.getState().activeIndex).toBe(1);
+        expect(TagCompanionOverlay.getState().acceptedLabels).toContain('A');
+        expect(TagCompanionOverlay.getState().acceptedLabels).not.toContain('B');
+      } finally {
+        TagApiClient.getBlockMarkdown = originalGet;
+        TagApiClient.updateBlock = originalUpdate;
+        TagCompanionService.hide();
+        TagCompanionService.destroy();
+      }
     });
 
     it('能够精准识别单井号未闭合输入态以避让原生联想菜单', () => {
