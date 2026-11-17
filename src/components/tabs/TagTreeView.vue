@@ -674,11 +674,17 @@ const props = withDefaults(
     tagGroups?: ITagGroup[];
     /** 注册本组件内部维护的局部可关闭面（拖拽确认框/级联重命名框/行内编辑态）到全局 Escape 关闭链 */
     registerEscapeCloser?: (entry: IEscapeCloserEntry) => () => void;
+    /** 批量层级重构异步执行器（宿主注入以获得可等待的 Promise；未注入时回退 emit('batch-reparent')） */
+    reparentExecutor?: (moves: Array<{ oldLabel: string; newLabel: string }>) => Promise<unknown> | void;
+    /** 重命名异步执行器（宿主注入以获得可等待的 Promise；未注入时回退 emit('rename-tag')） */
+    renameExecutor?: (oldLabel: string, newLabel: string) => Promise<unknown> | void;
   }>(),
   {
     selectedTags: () => [],
     tagGroups: () => [],
     registerEscapeCloser: undefined,
+    reparentExecutor: undefined,
+    renameExecutor: undefined,
   },
 );
 
@@ -712,7 +718,10 @@ const {
   handleInlineRenameBlur,
 } = useInlineRename({
   allTags: () => props.allTags,
-  onRenameTag: (oldLabel, newLabel) => emit('rename-tag', oldLabel, newLabel),
+  onRenameTag: (oldLabel, newLabel) =>
+    props.renameExecutor
+      ? props.renameExecutor(oldLabel, newLabel)
+      : emit('rename-tag', oldLabel, newLabel),
 });
 
 // 搜索与排序
@@ -794,9 +803,10 @@ const {
 } = useTreeDragDrop({
   virtualAllTags,
   collapsedSet,
-  onBatchReparent: (moves) => {
-    emit('batch-reparent', moves);
-  },
+  onBatchReparent: (moves) =>
+    props.reparentExecutor
+      ? props.reparentExecutor(moves)
+      : emit('batch-reparent', moves),
 });
 
 // 本组件局部维护的可关闭面挂入全局 Escape 关闭链（否则按 Esc 会命中回退逻辑折叠整个面板）

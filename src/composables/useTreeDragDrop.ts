@@ -30,8 +30,8 @@ export function useTreeDragDrop(options: {
   virtualAllTags: Ref<ITagItem[]>;
   /** 折叠集合（落位执行后需展开目标祖先链） */
   collapsedSet: Ref<Set<string>>;
-  /** 执行批量层级重构回调（组件层转发为 emit('batch-reparent')） */
-  onBatchReparent: (moves: Array<{ oldLabel: string; newLabel: string }>) => void;
+  /** 执行批量层级重构回调（组件层转发为 emit('batch-reparent') 或注入的异步执行器），可返回 Promise 供确认框等待 */
+  onBatchReparent: (moves: Array<{ oldLabel: string; newLabel: string }>) => void | Promise<unknown>;
 }) {
   const { virtualAllTags, collapsedSet, onBatchReparent } = options;
 
@@ -247,12 +247,18 @@ export function useTreeDragDrop(options: {
     openReparentConfirm(src, null);
   }
 
+  /**
+   * 确认并执行暂存的层级重构（真实等待异步完成）：
+   * isExecutingReparent 在回调 Promise 落定前保持 true，防止重复提交；
+   * 确认框在执行完成前不关闭，成功后才展开目标祖先链
+   */
   async function handleExecuteReparentDirectly() {
     if (reparentConfirmState.value.moves.length === 0 || isExecutingReparent.value) return;
     isExecutingReparent.value = true;
     try {
-      onBatchReparent(reparentConfirmState.value.moves);
-      if (reparentConfirmState.value.targetParentLabel) {
+      const res = await Promise.resolve(onBatchReparent(reparentConfirmState.value.moves));
+      const success = !res || (res as { success?: boolean }).success !== false;
+      if (success && reparentConfirmState.value.targetParentLabel) {
         // 确保目标标签及其所有祖先层级均从折叠集合中移除，使其在树中展开立即可见
         const parts = reparentConfirmState.value.targetParentLabel.split('/');
         for (let i = 1; i <= parts.length; i++) {
@@ -260,6 +266,7 @@ export function useTreeDragDrop(options: {
           collapsedSet.value.delete(parentPath);
         }
       }
+      // 无论成败，执行已结束（失败由执行层提示并刷新），关闭确认框避免基于陈旧状态重试
       reparentConfirmState.value.visible = false;
     } finally {
       isExecutingReparent.value = false;

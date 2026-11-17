@@ -81,6 +81,8 @@
           :get-tag-style="getTagStyle"
           :get-tag-icon="getTagIcon"
           :register-escape-closer="registerEscapeCloser"
+          :reparent-executor="applyReparentMoves"
+          :rename-executor="onTreeRenameTag"
           @tag-click="onTagClick"
           @quick-filter="onQuickFilter"
           @clear-selected="clearFilterTags"

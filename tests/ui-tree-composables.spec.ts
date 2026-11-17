@@ -80,9 +80,34 @@ describe('useInlineRename 行内就地重命名', () => {
     expect(cascadeRenameConfirmState.value.childCount).toBe(1);
     expect(onRenameTag).not.toHaveBeenCalled();
 
-    confirmCascadeRename();
+    await confirmCascadeRename();
     expect(onRenameTag).toHaveBeenCalledWith('ai/llm', 'ai/ML');
     expect(cascadeRenameConfirmState.value.visible).toBe(false);
+  });
+
+  it('提交期间 isSubmittingRename 保持为真阻止重复提交，完成后清理编辑态', async () => {
+    let resolveRename!: () => void;
+    const tags: ITagItem[] = [{ name: 'vue', label: 'vue', count: 1, depth: 0 }];
+    const onRenameTag = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveRename = resolve; }));
+    const composable = useInlineRename({ allTags: () => tags, onRenameTag });
+
+    composable.editingLabel.value = 'vue';
+    composable.inlineRenameValue.value = 'VueNext';
+
+    const first = composable.submitInlineRename(tags[0]);
+    // 等待提交进入挂起的异步回调
+    await Promise.resolve();
+    expect(composable.isSubmittingRename.value).toBe(true);
+
+    // 挂起期间的重复提交被忽略
+    await composable.submitInlineRename(tags[0]);
+    expect(onRenameTag).toHaveBeenCalledTimes(1);
+    expect(composable.editingLabel.value).toBe('vue'); // 编辑态保持到回调完成
+
+    resolveRename();
+    await first;
+    expect(composable.isSubmittingRename.value).toBe(false);
+    expect(composable.editingLabel.value).toBeNull();
   });
 
   it('handleInlineRenameBlur 提交中或级联确认中不取消编辑', () => {
@@ -237,7 +262,7 @@ describe('useTreeDragDrop 拖拽层级重构', () => {
     expect(reparentConfirmState.value.visible).toBe(false);
   });
 
-  it('handleExecuteReparentDirectly 提交暂存变动并展开目标祖先链', () => {
+  it('handleExecuteReparentDirectly 提交暂存变动并展开目标祖先链', async () => {
     const { reparentConfirmState, handleExecuteReparentDirectly, onBatchReparent, collapsedSet } = setup();
     collapsedSet.value = new Set(['ai', 'ai/llm']);
     reparentConfirmState.value = {
@@ -247,11 +272,62 @@ describe('useTreeDragDrop 拖拽层级重构', () => {
       moves: [{ oldLabel: 'a', newLabel: 'ai/llm/gpt/a' }],
       quoteCount: 1,
     };
-    handleExecuteReparentDirectly();
+    await handleExecuteReparentDirectly();
     expect(onBatchReparent).toHaveBeenCalledWith([{ oldLabel: 'a', newLabel: 'ai/llm/gpt/a' }]);
     expect(collapsedSet.value.has('ai')).toBe(false);
     expect(collapsedSet.value.has('ai/llm')).toBe(false);
     expect(reparentConfirmState.value.visible).toBe(false);
+  });
+
+  it('执行期间 isExecutingReparent 保持为真，确认框等待异步完成后才关闭', async () => {
+    let resolveReparent!: () => void;
+    const virtualAllTags = ref<ITagItem[]>(mockTags);
+    const collapsedSet = ref<Set<string>>(new Set());
+    const onBatchReparent = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveReparent = resolve; }));
+    const composable = useTreeDragDrop({ virtualAllTags, collapsedSet, onBatchReparent });
+
+    composable.reparentConfirmState.value = {
+      visible: true,
+      srcLabel: 'x',
+      targetParentLabel: 'react',
+      moves: [{ oldLabel: 'a', newLabel: 'react/a' }],
+      quoteCount: 1,
+    };
+
+    const first = composable.handleExecuteReparentDirectly();
+    // 等待执行进入挂起的异步回调
+    await Promise.resolve();
+    expect(composable.isExecutingReparent.value).toBe(true);
+    expect(composable.reparentConfirmState.value.visible).toBe(true); // 执行中确认框保持打开
+
+    // 挂起期间的重复触发被忽略
+    await composable.handleExecuteReparentDirectly();
+    expect(onBatchReparent).toHaveBeenCalledTimes(1);
+
+    resolveReparent();
+    await first;
+    expect(composable.isExecutingReparent.value).toBe(false);
+    expect(composable.reparentConfirmState.value.visible).toBe(false);
+    expect(collapsedSet.value.has('react')).toBe(false); // 成功后展开目标祖先
+  });
+
+  it('执行失败时确认框关闭但不展开目标祖先链', async () => {
+    const virtualAllTags = ref<ITagItem[]>(mockTags);
+    const collapsedSet = ref<Set<string>>(new Set(['react']));
+    const onBatchReparent = vi.fn().mockResolvedValue({ success: false, error: 'kernel error' });
+    const composable = useTreeDragDrop({ virtualAllTags, collapsedSet, onBatchReparent });
+
+    composable.reparentConfirmState.value = {
+      visible: true,
+      srcLabel: 'x',
+      targetParentLabel: 'react',
+      moves: [{ oldLabel: 'a', newLabel: 'react/a' }],
+      quoteCount: 1,
+    };
+
+    await composable.handleExecuteReparentDirectly();
+    expect(composable.reparentConfirmState.value.visible).toBe(false);
+    expect(collapsedSet.value.has('react')).toBe(true); // 失败不展开
   });
 });
 

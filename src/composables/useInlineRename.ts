@@ -10,8 +10,8 @@ import { TagGovernanceService } from '../services/TagGovernanceService';
 export function useInlineRename(options: {
   /** 全库标签列表（getter 形式以保持响应性） */
   allTags: () => ITagItem[];
-  /** 提交重命名回调（组件层转发为 emit('rename-tag')） */
-  onRenameTag: (oldLabel: string, newLabel: string) => void;
+  /** 提交重命名回调（组件层转发为 emit('rename-tag') 或注入的异步执行器），可返回 Promise 供提交守卫等待 */
+  onRenameTag: (oldLabel: string, newLabel: string) => void | Promise<unknown>;
 }) {
   const editingLabel = ref<string | null>(null);
   const inlineRenameValue = ref('');
@@ -46,6 +46,10 @@ export function useInlineRename(options: {
     isSubmittingRename.value = false;
   }
 
+  /**
+   * 提交行内重命名（真实等待异步完成）：
+   * isSubmittingRename 在回调 Promise 落定前保持 true，防止重复提交与失焦误取消
+   */
   async function submitInlineRename(node: ITagItem) {
     if (isSubmittingRename.value) return;
     const newName = inlineRenameValue.value.trim();
@@ -93,20 +97,28 @@ export function useInlineRename(options: {
 
     isSubmittingRename.value = true;
     try {
-      options.onRenameTag(node.label, newFullLabel);
+      await Promise.resolve(options.onRenameTag(node.label, newFullLabel));
       cancelInlineRename();
     } finally {
       isSubmittingRename.value = false;
     }
   }
 
-  function confirmCascadeRename() {
+  async function confirmCascadeRename() {
+    if (isSubmittingRename.value) return;
     const { oldLabel, newLabel } = cascadeRenameConfirmState.value;
-    cascadeRenameConfirmState.value.visible = false;
-    if (oldLabel && newLabel) {
-      options.onRenameTag(oldLabel, newLabel);
-      cancelInlineRename();
+    if (!oldLabel || !newLabel) {
+      cascadeRenameConfirmState.value.visible = false;
+      return;
     }
+    isSubmittingRename.value = true;
+    try {
+      await Promise.resolve(options.onRenameTag(oldLabel, newLabel));
+      cancelInlineRename();
+    } finally {
+      isSubmittingRename.value = false;
+    }
+    cascadeRenameConfirmState.value.visible = false;
   }
 
   function handleInlineRenameBlur(node: ITagItem) {
