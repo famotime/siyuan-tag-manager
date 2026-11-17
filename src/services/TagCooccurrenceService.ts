@@ -34,6 +34,46 @@ export interface ITagCooccurrencePair {
  */
 export class TagCooccurrenceService {
   /**
+   * 获取全库标签共现网络图谱数据
+   * （自 TagApiClient 迁入：SQL 编排与图谱构建属领域逻辑，传输经参数注入）
+   * @param transport POST 传输函数（推荐注入 TagApiClient.request）
+   */
+  public static async fetchCooccurrenceGraph(
+    transport: (url: string, data: any) => Promise<any>,
+  ): Promise<{
+    graph: any;
+    combinations: ITagCombination[];
+    spansCount: number;
+  }> {
+    const sql = `SELECT s.block_id, s.content `
+      + `FROM spans s `
+      + `INNER JOIN blocks b ON s.block_id = b.id `
+      + `WHERE s.type LIKE '%tag%' AND s.content != '' `
+      + `ORDER BY s.block_id `
+      + `LIMIT 9999;`;
+
+    const rows: Array<{ block_id: string; content: string }> = await transport('/api/query/sql', { stmt: sql });
+    const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);
+
+    // 统计各标签总引用数（以块为粒度去重累加，与 block_count 保持一致）
+    const tagCounts = new Map<string, number>();
+    for (const tags of blockMap.values()) {
+      for (const t of new Set(tags)) {
+        tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+      }
+    }
+
+    const graph = TagCooccurrenceService.buildCooccurrenceGraph(blockMap, tagCounts, 1);
+    const combinations = TagCooccurrenceService.findTagCombinations(blockMap, 2, 5);
+
+    return {
+      graph,
+      combinations,
+      spansCount: rows?.length || 0,
+    };
+  }
+
+  /**
    * 基于块级标签映射数据构建共现图谱网络
    * @param blockTagsMap Map<blockId, tagLabels[]> 包含各个块命中的所有标签
    * @param tagCounts Map<tagLabel, count> 各标签的全局引用频次

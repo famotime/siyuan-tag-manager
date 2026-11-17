@@ -109,6 +109,80 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(repeatRes.error).toContain('已存在');
     });
 
+    it('refreshTags 启动时能够从持久化配置回填 savedViews（修复保存视图重启丢失）', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagData } = await import('../src/composables/useTagData');
+      const { savedViews } = await import('../src/composables/useTagFilter');
+
+      vi.spyOn(TagApiClient, 'fetchAllTags').mockResolvedValue([]);
+      const persistedView = {
+        id: 'view_test_1',
+        title: '回归验证视图',
+        includeTags: ['vue'],
+        excludeTags: [],
+        optionalTags: [],
+        displayMode: 'card',
+        createdAt: 1700000000000,
+      };
+      const mockPlugin = {
+        loadData: async () => ({ savedViews: [persistedView] }),
+        saveData: async () => {},
+      } as any;
+      usePlugin(mockPlugin);
+
+      // 启动前清空共享状态，确保回填确实来自持久化配置
+      savedViews.value = [];
+      await useTagData().refreshTags();
+
+      expect(savedViews.value).toHaveLength(1);
+      expect(savedViews.value[0].id).toBe('view_test_1');
+      expect(savedViews.value[0].title).toBe('回归验证视图');
+      expect(savedViews.value[0].includeTags).toEqual(['vue']);
+    });
+
+    it('persistConfig 无参调用时以共享 savedViews 状态写盘而非空数组覆盖', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { useTagData } = await import('../src/composables/useTagData');
+      const { savedViews } = await import('../src/composables/useTagFilter');
+
+      vi.spyOn(TagApiClient, 'fetchAllTags').mockResolvedValue([]);
+      const existingView = {
+        id: 'view_keep_1',
+        title: '不应被清空的视图',
+        includeTags: ['keep'],
+        excludeTags: [],
+        optionalTags: [],
+        displayMode: 'card',
+        createdAt: 1700000000000,
+      };
+      savedViews.value = [existingView as any];
+
+      let savedData: any = null;
+      const mockPlugin = {
+        loadData: async () => ({}),
+        saveData: async (_file: string, data: any) => {
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      // 模拟历史缺陷触发路径：handleRemoveTag 内部的无参 persistConfig
+      // 删除不存在标签时 executeDeleteTag 走 remove_all 之外的查询分支，此处直接用删除流程驱动
+      const { TagDeletionService } = await import('../src/services/TagDeletionService');
+      vi.spyOn(TagDeletionService, 'executeDeleteTag').mockResolvedValue({
+        success: true,
+        affectedBlocks: 0,
+        errors: [],
+      });
+
+      await useTagData().handleRemoveTag('vue');
+
+      expect(savedData?.savedViews).toHaveLength(1);
+      expect(savedData?.savedViews[0].id).toBe('view_keep_1');
+    });
+
     it('handleRenameTag 能够正确重命名标签并级联迁移子标签元数据与标签组', async () => {
       const { usePlugin } = await import('../src/main');
       const { TagApiClient } = await import('../src/services/TagApiClient');
@@ -244,7 +318,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
         { id: 'b1', docTitle: 'Doc1', content: '#Vue# #React#', markdown: '', type: 'p', rootId: 'r1', updated: '2026-09-27' },
       ];
       let queriedOptions: any = null;
-      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+      vi.spyOn(TagFilterEngine, 'queryMatchedBlocks').mockImplementation(async (opts) => {
         queriedOptions = opts;
         return mockBlocks as any;
       });
@@ -279,7 +353,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;
-      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+      vi.spyOn(TagFilterEngine, 'queryMatchedBlocks').mockImplementation(async (opts) => {
         queriedOptions = opts;
         return [] as any;
       });
@@ -305,7 +379,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;
-      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+      vi.spyOn(TagFilterEngine, 'queryMatchedBlocks').mockImplementation(async (opts) => {
         queriedOptions = opts;
         return [] as any;
       });
@@ -338,7 +412,7 @@ describe('UI Composables 与状态管理规范化测试', () => {
       const { useTagFilter } = await import('../src/composables/useTagFilter');
 
       let queriedOptions: any = null;
-      vi.spyOn(TagApiClient, 'queryMatchedBlocks').mockImplementation(async (opts) => {
+      vi.spyOn(TagFilterEngine, 'queryMatchedBlocks').mockImplementation(async (opts) => {
         queriedOptions = opts;
         return [] as any;
       });

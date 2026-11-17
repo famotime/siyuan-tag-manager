@@ -1,6 +1,7 @@
 import type { Plugin } from 'siyuan';
 import { createApp, type App as VueApp } from 'vue';
 import App from './App.vue';
+import { vTooltip } from './utils/tooltip';
 
 export const DOCK_TYPE = 'tag-manager-dock';
 
@@ -16,8 +17,6 @@ export function usePlugin(pluginProps?: Plugin): Plugin {
   return plugin;
 }
 
-import { vTooltip } from './utils/tooltip';
-
 const mounts = new WeakMap<HTMLElement, VueApp>();
 
 /**
@@ -30,7 +29,6 @@ export function mountPanel(host: HTMLElement): void {
   host.classList.add('siyuan-tag-manager-host');
   const app = createApp(App);
   app.directive('tooltip', vTooltip);
-  app.provide('plugin', usePlugin());
   app.mount(host);
   mounts.set(host, app);
 }

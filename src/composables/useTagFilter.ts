@@ -4,6 +4,7 @@ import type { ITagMatchedBlock, ISmartTagView, IFilterSelectionState, TagFilterC
 import { TagApiClient } from '../services/TagApiClient';
 import { TagFilterEngine } from '../services/TagFilterEngine';
 import { TagNavigationService } from '../services/TagNavigationService';
+import { TagConfigStore } from '../services/TagConfigStore';
 import { usePlugin } from '../main';
 
 // 共享的筛选状态
@@ -15,11 +16,16 @@ const activeFilter = ref<IFilterSelectionState>({
 
 const matchedBlocks = ref<ITagMatchedBlock[]>([]);
 const queryLoading = ref(false);
-const savedViews = ref<ISmartTagView[]>([]);
+// 模块级共享状态：由 useTagData.refreshTags 从持久化配置回填（导出以避免跨 composable 循环依赖）
+export const savedViews = ref<ISmartTagView[]>([]);
 const selectedSmartViewId = ref('');
 
 export function useTagFilter() {
+  // 竞态防护：仅接受最新一次查询的结果，先发后至的旧响应直接丢弃
+  let querySeq = 0;
+
   async function runQuery() {
+    const seq = ++querySeq;
     if (
       activeFilter.value.includeTags.length === 0 &&
       activeFilter.value.excludeTags.length === 0 &&
@@ -31,27 +37,26 @@ export function useTagFilter() {
 
     queryLoading.value = true;
     try {
-      matchedBlocks.value = await TagApiClient.queryMatchedBlocks({
-        includeTags: activeFilter.value.includeTags,
-        excludeTags: activeFilter.value.excludeTags,
-        optionalTags: activeFilter.value.optionalTags,
-        limit: 40,
-      });
+      const blocks = await TagFilterEngine.queryMatchedBlocks(
+        {
+          includeTags: activeFilter.value.includeTags,
+          excludeTags: activeFilter.value.excludeTags,
+          optionalTags: activeFilter.value.optionalTags,
+          limit: 40,
+        },
+        (url: string, data: any) => TagApiClient.request(url, data),
+      );
+      if (seq !== querySeq) return;
+      matchedBlocks.value = blocks;
     } catch (err: any) {
-      showMessage(`查询块记录失败: ${err.message || err}`, 4000, 'error');
+      if (seq === querySeq) {
+        showMessage(`查询块记录失败: ${err.message || err}`, 4000, 'error');
+      }
     } finally {
-      queryLoading.value = false;
+      if (seq === querySeq) {
+        queryLoading.value = false;
+      }
     }
-  }
-
-  function handleQuickFilter(label: string, append = false) {
-    selectedSmartViewId.value = '';
-    if (append) {
-      activeFilter.value = TagFilterEngine.toggleFilterSelection(activeFilter.value, label);
-    } else {
-      activeFilter.value = TagFilterEngine.resolveFilterSelection(activeFilter.value, label, false);
-    }
-    runQuery();
   }
 
   function handleTagClick(label: string, event?: MouseEvent) {
@@ -66,21 +71,19 @@ export function useTagFilter() {
   }
 
   function switchFilterMode(targetMode: 'include' | 'optional') {
+    // 两分支的正向标签合并去重计算完全一致，提取到分支外
+    const allPositive = Array.from(new Set([
+      ...activeFilter.value.includeTags,
+      ...(activeFilter.value.optionalTags || []),
+    ])).filter(Boolean);
+
     if (targetMode === 'optional') {
-      const allPositive = Array.from(new Set([
-        ...activeFilter.value.includeTags,
-        ...(activeFilter.value.optionalTags || []),
-      ])).filter(Boolean);
       activeFilter.value = {
         includeTags: [],
         optionalTags: allPositive,
         excludeTags: [...activeFilter.value.excludeTags],
       };
     } else {
-      const allPositive = Array.from(new Set([
-        ...activeFilter.value.includeTags,
-        ...(activeFilter.value.optionalTags || []),
-      ])).filter(Boolean);
       activeFilter.value = {
         includeTags: allPositive,
         optionalTags: [],
@@ -145,19 +148,14 @@ export function useTagFilter() {
     savedViews.value.push(newView);
     selectedSmartViewId.value = newView.id;
 
-    const plugin = usePlugin();
-    await plugin.saveData('tag-manager-config.json', {
+    // 读-合并-写持久化，避免整文件覆盖丢失标签分组等其他配置
+    await TagConfigStore.updateConfig({
       metadataList,
       savedViews: savedViews.value,
     });
 
     showMessage(`已保存智能视图 "${newView.title}"`, 3000, 'info');
     return true;
-  }
-
-  function highlightTags(text: string): string {
-    if (!text) return '';
-    return text.replace(/#([^#]+)#/g, '<span class="tm-matched-tag">#$1#</span>');
   }
 
   function jumpToBlock(rootId: string, blockId: string) {
@@ -177,7 +175,6 @@ export function useTagFilter() {
     savedViews,
     selectedSmartViewId,
     runQuery,
-    handleQuickFilter,
     handleTagClick,
     switchFilterMode,
     toggleTagFilter,
@@ -187,7 +184,6 @@ export function useTagFilter() {
     clearFilterTags,
     applySmartView,
     saveSmartView,
-    highlightTags,
     jumpToBlock,
   };
 }

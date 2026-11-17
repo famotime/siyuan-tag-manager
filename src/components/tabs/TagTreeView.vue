@@ -145,34 +145,6 @@
       </div>
 
       <div v-show="panoramaExpanded" class="tm-panorama-body fn__flex-1 fn__flex-column" style="display: flex; min-height: 0; overflow: hidden; background: var(--b3-theme-background);">
-        <!-- 待保存变动操作条 -->
-        <div v-if="stagedMoves.length > 0" class="tm-staged-banner">
-          <div class="tm-staged-info">
-            <SyLineIcon name="alert-triangle" :size="12" />
-            <span>已暂存 <strong>{{ stagedMoves.length }}</strong> 项层级调整</span>
-          </div>
-          <div class="tm-staged-actions">
-            <button
-              class="b3-button b3-button--cancel tm-btn-xs"
-              style="padding: 2px 8px; font-size: 11px;"
-              @click="handleDiscardStaged"
-            >
-              <SyLineIcon name="undo" :size="10" />
-              <span>放弃</span>
-            </button>
-            <button
-              class="b3-button b3-button--primary tm-btn-xs"
-              style="padding: 2px 8px; font-size: 11px;"
-              :disabled="isSavingStaged"
-              @click="handleConfirmSaveStaged"
-            >
-              <SyLineIcon name="check" :size="10" />
-              <span>{{ isSavingStaged ? '正在保存...' : '保存修改' }}</span>
-            </button>
-          </div>
-        </div>
-
-
         <!-- 多选状态控制横条 -->
         <div v-if="selectedTags && selectedTags.length > 0" class="tm-selection-bar" style="margin: 4px 8px;">
           <div class="tm-selection-info">
@@ -335,7 +307,6 @@
                   <SyLineIcon v-else name="hash" :size="12" class="tm-default-hash" />
                   {{ node.name }}
                 </span>
-                <span v-if="isTagStaged(node.label)" class="tm-staged-tag-badge" v-tooltip="'层级调整已暂存，点击上方保存修改生效'">待保存</span>
                 <span class="tm-node-count" v-tooltip="formatNodeTooltip(node)">{{ node.count }}</span>
               </div>
 
@@ -448,7 +419,7 @@
       <div class="tm-accordion-header" @click="heatExpanded = !heatExpanded">
         <div class="tm-accordion-title">
           <SyLineIcon :name="heatExpanded ? 'chevron-down' : 'chevron-right'" :size="11" />
-          <SyLineIcon name="flame" :size="13" class="tm-accordion-icon" style="color: #f43f5e;" />
+          <SyLineIcon name="flame" :size="13" class="tm-accordion-icon tm-heat-icon" />
           <span>标签热度</span>
           <span class="tm-accordion-badge">{{ heatBadgeCount }}</span>
         </div>
@@ -585,7 +556,7 @@
                   'is-top-3': idx === 2,
                 }"
               >
-                {{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}` }}
+                {{ `#${idx + 1}` }}
               </span>
               <span class="tm-rank-name" :style="getTagStyle(tag.label)">#{{ tag.label }}#</span>
             </div>
@@ -679,14 +650,15 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
-import { showMessage } from 'siyuan';
 import type { ITagItem, ITagGroup } from '../../types/tag';
 import { TagTreeService, type TagSortMode } from '../../services/TagTreeService';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import { TagCreationService } from '../../services/TagCreationService';
 import { TagGroupService } from '../../services/TagGroupService';
-import { TagDropService } from '../../services/TagDropService';
-import { TagGovernanceService } from '../../services/TagGovernanceService';
+import { useInlineRename } from '../../composables/useInlineRename';
+import { useTreeDragDrop } from '../../composables/useTreeDragDrop';
+import { useScrollPersistence } from '../../composables/useScrollPersistence';
+import { useHeatVisualization } from '../../composables/useHeatVisualization';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = withDefaults(
@@ -721,109 +693,22 @@ const emit = defineEmits<{
   (e: 'rename-tag', oldLabel: string, newLabel: string): void;
 }>();
 
-// 行内就地重命名状态与方法
-const editingLabel = ref<string | null>(null);
-const inlineRenameValue = ref('');
-const inlineInputRef = ref<HTMLInputElement | null>(null);
-const isSubmittingRename = ref(false);
-
-// 级联重命名子标签模态对话框状态
-const cascadeRenameConfirmState = ref<{
-  visible: boolean;
-  oldLabel: string;
-  newLabel: string;
-  childCount: number;
-}>({
-  visible: false,
-  oldLabel: '',
-  newLabel: '',
-  childCount: 0,
+// 行内就地重命名（状态、校验与级联确认抽离至 useInlineRename）
+const {
+  editingLabel,
+  inlineRenameValue,
+  inlineInputRef,
+  isSubmittingRename,
+  cascadeRenameConfirmState,
+  startInlineRename,
+  cancelInlineRename,
+  submitInlineRename,
+  confirmCascadeRename,
+  handleInlineRenameBlur,
+} = useInlineRename({
+  allTags: () => props.allTags,
+  onRenameTag: (oldLabel, newLabel) => emit('rename-tag', oldLabel, newLabel),
 });
-
-function startInlineRename(node: ITagItem) {
-  editingLabel.value = node.label;
-  inlineRenameValue.value = node.name;
-  nextTick(() => {
-    inlineInputRef.value?.focus();
-    inlineInputRef.value?.select();
-  });
-}
-
-function cancelInlineRename() {
-  editingLabel.value = null;
-  inlineRenameValue.value = '';
-  isSubmittingRename.value = false;
-}
-
-async function submitInlineRename(node: ITagItem) {
-  if (isSubmittingRename.value) return;
-  const newName = inlineRenameValue.value.trim();
-  if (!newName) {
-    showMessage('标签名称不能为空', 3000, 'error');
-    return;
-  }
-  if (newName === node.name) {
-    cancelInlineRename();
-    return;
-  }
-  if (newName.includes('/')) {
-    showMessage('节点名称不能包含层级斜杠 "/"，如需调整层级请使用拖拽或层级配置', 3000, 'error');
-    return;
-  }
-
-  const check = TagGovernanceService.isValidLabel(newName);
-  if (!check.valid) {
-    showMessage(check.error || '标签名称格式不合法', 3000, 'error');
-    return;
-  }
-
-  const lastSlashIndex = node.label.lastIndexOf('/');
-  const newFullLabel = lastSlashIndex >= 0
-    ? `${node.label.slice(0, lastSlashIndex)}/${newName}`
-    : newName;
-
-  if (props.allTags.some(t => t.label.toLowerCase() === newFullLabel.toLowerCase())) {
-    showMessage(`标签 "#${newFullLabel}#" 已存在于标签库中`, 3000, 'error');
-    return;
-  }
-
-  const subTagPrefix = `${node.label}/`;
-  const childTags = props.allTags.filter(t => t.label.startsWith(subTagPrefix));
-  if (childTags.length > 0) {
-    // 唤起自定义 DOM 模态对话框，彻底杜绝 Electron 原生 confirm 引起的鼠标光标指针丢失问题
-    cascadeRenameConfirmState.value = {
-      visible: true,
-      oldLabel: node.label,
-      newLabel: newFullLabel,
-      childCount: childTags.length,
-    };
-    return;
-  }
-
-  isSubmittingRename.value = true;
-  try {
-    emit('rename-tag', node.label, newFullLabel);
-    cancelInlineRename();
-  } finally {
-    isSubmittingRename.value = false;
-  }
-}
-
-function confirmCascadeRename() {
-  const { oldLabel, newLabel } = cascadeRenameConfirmState.value;
-  cascadeRenameConfirmState.value.visible = false;
-  if (oldLabel && newLabel) {
-    emit('rename-tag', oldLabel, newLabel);
-    cancelInlineRename();
-  }
-}
-
-function handleInlineRenameBlur(node: ITagItem) {
-  if (isSubmittingRename.value || cascadeRenameConfirmState.value.visible) return;
-  if (inlineRenameValue.value.trim() === node.name || !inlineRenameValue.value.trim()) {
-    cancelInlineRename();
-  }
-}
 
 // 搜索与排序
 const searchKeyword = ref('');
@@ -836,120 +721,25 @@ const groupsExpanded = ref(false);
 const panoramaExpanded = ref(true); // 标签全景默认展开
 const heatExpanded = ref(false);     // 标签热度默认折叠
 
-// 热度可视化模式与范围
-const visMode = ref<'cloud' | 'rank'>('cloud');
-const heatScope = ref<'top20' | 'top50' | 'all'>('all');
-
 const activeContext = ref<{ docId?: string; docTitle?: string; blockId?: string }>({});
-
-// 拖拽层级重构与指示线状态
-export interface ITreeDragIndicator {
-  nodeLabel: string;
-  position: 'before' | 'inside' | 'after';
-  mode: 'root' | 'child'; // root: 拖出为独立根标签; child: 归为子标签
-}
-
-const stagedRenames = ref<Map<string, string>>(new Map());
-const isSavingStaged = ref(false);
-const draggingTagLabel = ref<string | null>(null);
-const dragOverTagLabel = ref<string | null>(null);
-const dragIndicator = ref<ITreeDragIndicator | null>(null);
 const highlightedTagLabel = ref<string | null>(null);
-
-// 拖拽落位即时确认对话框状态
-interface IReparentConfirmState {
-  visible: boolean;
-  srcLabel: string;
-  targetParentLabel: string | null;
-  moves: Array<{ oldLabel: string; newLabel: string }>;
-  quoteCount: number;
-}
-
-const reparentConfirmState = ref<IReparentConfirmState>({
-  visible: false,
-  srcLabel: '',
-  targetParentLabel: null,
-  moves: [],
-  quoteCount: 0,
-});
-const isExecutingReparent = ref(false);
-
-async function handleExecuteReparentDirectly() {
-  if (reparentConfirmState.value.moves.length === 0 || isExecutingReparent.value) return;
-  isExecutingReparent.value = true;
-  try {
-    emit('batch-reparent', reparentConfirmState.value.moves);
-    if (reparentConfirmState.value.targetParentLabel) {
-      // 确保目标标签及其所有祖先层级均从折叠集合中移除，使其在树中展开立即可见
-      const parts = reparentConfirmState.value.targetParentLabel.split('/');
-      for (let i = 1; i <= parts.length; i++) {
-        const parentPath = parts.slice(0, i).join('/');
-        collapsedSet.value.delete(parentPath);
-      }
-    }
-    stagedRenames.value.clear();
-    reparentConfirmState.value.visible = false;
-  } finally {
-    isExecutingReparent.value = false;
-  }
-}
 
 function refreshActiveContext() {
   activeContext.value = TagGroupService.getActiveContext();
 }
 
-// 保持全景浏览位置逻辑
-const scrollerRef = ref<HTMLElement | null>(null);
-
-function handleScrollerScroll(e: Event) {
-  const target = e.target as HTMLElement;
-  if (target) {
-    TagTreeService.saveScrollPosition(target.scrollTop);
-  }
-}
-
-function handleNodeTagClick(label: string, event: MouseEvent) {
-  if (scrollerRef.value) {
-    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop, label);
-  } else {
-    TagTreeService.saveScrollPosition(-1, label);
-  }
-  emit('tag-click', label, event);
-}
-
-function handleSwitchToFilter() {
-  if (scrollerRef.value) {
-    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
-  }
-  emit('switch-to-filter');
-}
-
-function restoreScrollPosition() {
-  const { scrollTop, lastClickedTag } = TagTreeService.getSavedScrollPosition();
-  if (scrollTop <= 0 && !lastClickedTag) return;
-
-  const performRestore = () => {
-    if (!scrollerRef.value) return;
-    if (scrollTop > 0) {
-      scrollerRef.value.scrollTop = scrollTop;
-    } else if (lastClickedTag) {
-      const targetEl = scrollerRef.value.querySelector(
-        `.tm-tree-node[data-node-tag="${lastClickedTag}"]`
-      ) as HTMLElement | null;
-      if (targetEl) {
-        targetEl.scrollIntoView({ block: 'nearest' });
-      }
-    }
-  };
-
-  nextTick(() => {
-    performRestore();
-    // 延迟帧双重校验，确保复杂 DOM 树渲染/布局完成后的绝对像素对齐
-    requestAnimationFrame(() => {
-      performRestore();
-    });
-  });
-}
+// 保持全景浏览位置（保存/恢复逻辑抽离至 useScrollPersistence，生命周期钩子在此注册）
+const {
+  scrollerRef,
+  handleScrollerScroll,
+  handleNodeTagClick,
+  handleSwitchToFilter,
+  restoreScrollPosition,
+  saveCurrentPosition,
+} = useScrollPersistence({
+  onTagClick: (label, event) => emit('tag-click', label, event),
+  onSwitchToFilter: () => emit('switch-to-filter'),
+});
 
 onMounted(() => {
   refreshActiveContext();
@@ -961,15 +751,11 @@ onActivated(() => {
 });
 
 onDeactivated(() => {
-  if (scrollerRef.value) {
-    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
-  }
+  saveCurrentPosition();
 });
 
 onUnmounted(() => {
-  if (scrollerRef.value) {
-    TagTreeService.saveScrollPosition(scrollerRef.value.scrollTop);
-  }
+  saveCurrentPosition();
 });
 
 const normalizedKeyword = computed(() => TagCreationService.cleanTag(searchKeyword.value));
@@ -997,26 +783,55 @@ function triggerCreateTag() {
   emit('create-tag', normalizedKeyword.value);
 }
 
-// 暂存重命名列表
-const stagedMoves = computed(() => {
-  return Array.from(stagedRenames.value.entries()).map(([oldLabel, newLabel]) => ({
-    oldLabel,
-    newLabel,
-  }));
+// 虚拟标签列表（历史上曾叠加暂存重命名预览；拖拽重构改为即时确认后恒等于全库列表，
+// 保留计算属性以维持 useTreeDragDrop / useHeatVisualization 的下游接口稳定）
+const virtualAllTags = computed<ITagItem[]>(() => props.allTags);
+
+// 拖拽层级重构（指示线三段定位、空白区拖出为根、落位确认抽离至 useTreeDragDrop）
+const {
+  draggingTagLabel,
+  dragOverTagLabel,
+  dragIndicator,
+  isDraggingOverScrollerBlank,
+  reparentConfirmState,
+  isExecutingReparent,
+  isDraggingSubTag,
+  draggingLeafName,
+  startTagDrag,
+  handleDragEnd,
+  handleScrollerDragOver,
+  handleScrollerDragLeave,
+  handleScrollerDrop,
+  handleDragOverNode,
+  handleDragLeaveNode,
+  handleDropOnNode,
+  handleDropToRoot,
+  handleExecuteReparentDirectly,
+} = useTreeDragDrop({
+  virtualAllTags,
+  collapsedSet,
+  onBatchReparent: (moves) => {
+    emit('batch-reparent', moves);
+  },
 });
 
-// 应用暂存状态后的虚拟标签列表（即时反映在全景树与云图中）
-const virtualAllTags = computed(() => {
-  return TagTreeService.applyStagedRenames(props.allTags, stagedRenames.value);
-});
-
-function isTagStaged(label: string): boolean {
-  if (stagedRenames.value.has(label)) return true;
-  for (const newLabel of stagedRenames.value.values()) {
-    if (newLabel === label || label.startsWith(`${newLabel}/`)) return true;
-  }
-  return false;
-}
+// 标签热度双模可视化（范围过滤与字号/分级/占比换算抽离至 useHeatVisualization）
+const {
+  visMode,
+  heatScope,
+  activeTagCount,
+  zeroCountTagCount,
+  cloudTags,
+  heatBadgeCount,
+  totalHeatQuotes,
+  cloudStats,
+  computeCloudFontSize,
+  formatPercent,
+  getHeatTierClass,
+  getHeatTooltip,
+  getRankBarColor,
+  getRankBarWidth,
+} = useHeatVisualization({ virtualAllTags, heatExpanded });
 
 // 多叉树节点构建并拍平为列表
 const displayTreeNodes = computed(() => {
@@ -1086,325 +901,14 @@ function formatNodeTooltip(node: ITagItem): string {
   return `全库共 ${node.count} 处引用`;
 }
 
-// ==========================================
-// 拖拽层级重构与正文打标处理
-// ==========================================
-
+// 树节点与热度词云的统一拖拽启动包装（模板调用点保持稳定）
 function handleDragStart(node: ITagItem, e: DragEvent) {
-  TagDropService.setDraggingTag(node.label);
-
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'copyMove';
-    e.dataTransfer.setData('application/siyuan-tag', node.label);
-    e.dataTransfer.setData('text/plain', `#${node.label}# `);
-  }
-
-  // 异步延迟更新 draggingTagLabel，避免同步修改响应式状态导致 DOM 重新渲染和布局突变（Layout Shift）打断 Chromium 原生拖拽启动
-  setTimeout(() => {
-    draggingTagLabel.value = node.label;
-  }, 0);
-}
-
-const isDraggingSubTag = computed(() => {
-  const current = draggingTagLabel.value || TagDropService.getDraggingTag();
-  return Boolean(current && current.includes('/'));
-});
-
-const draggingLeafName = computed(() => {
-  const current = draggingTagLabel.value || TagDropService.getDraggingTag();
-  if (!current) return '';
-  return current.split('/').pop() || current;
-});
-
-const isDraggingOverScrollerBlank = ref(false);
-
-function handleDragEnd() {
-  draggingTagLabel.value = null;
-  dragOverTagLabel.value = null;
-  dragIndicator.value = null;
-  isDraggingOverScrollerBlank.value = false;
-  TagDropService.setDraggingTag(null);
-}
-
-function handleScrollerDragOver(e: DragEvent) {
-  if (!isDraggingSubTag.value) return;
-  const target = e.target as HTMLElement | null;
-  const isOverNode = Boolean(target?.closest('.tm-tree-node'));
-  if (!isOverNode) {
-    e.preventDefault();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'move';
-    }
-    isDraggingOverScrollerBlank.value = true;
-  } else {
-    isDraggingOverScrollerBlank.value = false;
-  }
-}
-
-function handleScrollerDragLeave(e: DragEvent) {
-  const related = e.relatedTarget as HTMLElement | null;
-  const current = e.currentTarget as HTMLElement | null;
-  if (!current || !related || !current.contains(related)) {
-    isDraggingOverScrollerBlank.value = false;
-  }
-}
-
-function handleScrollerDrop(e: DragEvent) {
-  if (!isDraggingSubTag.value) return;
-  const target = e.target as HTMLElement | null;
-  const isOverNode = Boolean(target?.closest('.tm-tree-node'));
-  if (!isOverNode) {
-    e.preventDefault();
-    e.stopPropagation();
-    isDraggingOverScrollerBlank.value = false;
-    dragIndicator.value = null;
-    handleDropToRoot(e);
-  }
-}
-
-function handleDragOverNode(node: ITagItem, e: DragEvent) {
-  const currentDragging = draggingTagLabel.value || TagDropService.getDraggingTag();
-  if (!currentDragging || currentDragging === node.label) return;
-  // 禁止拖拽到自身或自身的子孙节点
-  if (node.label.startsWith(`${currentDragging}/`)) return;
-
-  e.preventDefault();
-  if (e.dataTransfer) {
-    e.dataTransfer.dropEffect = 'move';
-  }
-
-  const targetEl = (e.currentTarget as HTMLElement) || (e.target as HTMLElement)?.closest('.tm-tree-node');
-  if (!targetEl) return;
-  const rect = targetEl.getBoundingClientRect();
-  const height = rect.height || 28;
-  const offsetY = e.clientY - rect.top;
-  const ratio = Math.max(0, Math.min(1, offsetY / height));
-  const offsetX = e.clientX - rect.left;
-
-  const isSubTag = Boolean(currentDragging.includes('/'));
-
-  // 三段式指示线定位：
-  // 1. 上边缘 (ratio < 0.28) 或 靠左拉出 (isSubTag && offsetX < 28) -> 显示上方指示线，拖出为独立根标签
-  // 2. 下边缘 (ratio > 0.72) -> 显示下方指示线，拖出为独立根标签
-  // 3. 悬停在节点主体 (0.28 <= ratio <= 0.72) -> 目标节点高亮，归为该节点的子标签
-  if (ratio < 0.28 || (isSubTag && offsetX < 28)) {
-    dragIndicator.value = {
-      nodeLabel: node.label,
-      position: 'before',
-      mode: 'root',
-    };
-    dragOverTagLabel.value = null;
-  } else if (ratio > 0.72) {
-    dragIndicator.value = {
-      nodeLabel: node.label,
-      position: 'after',
-      mode: 'root',
-    };
-    dragOverTagLabel.value = null;
-  } else {
-    dragIndicator.value = {
-      nodeLabel: node.label,
-      position: 'inside',
-      mode: 'child',
-    };
-    dragOverTagLabel.value = node.label;
-  }
-}
-
-function handleDragLeaveNode(node: ITagItem, e: DragEvent) {
-  // 仅在真正离开节点边界且未进入其子元素时重置
-  const related = e.relatedTarget as HTMLElement | null;
-  const currentTarget = e.currentTarget as HTMLElement | null;
-  if (!currentTarget || !related || !currentTarget.contains(related)) {
-    if (dragIndicator.value?.nodeLabel === node.label) {
-      dragIndicator.value = null;
-    }
-    if (dragOverTagLabel.value === node.label) {
-      dragOverTagLabel.value = null;
-    }
-  }
-}
-
-function handleDropOnNode(targetNode: ITagItem, e: DragEvent) {
-  const src =
-    draggingTagLabel.value ||
-    TagDropService.getDraggingTag() ||
-    e.dataTransfer?.getData('application/siyuan-tag') ||
-    e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
-
-  const indicator = dragIndicator.value;
-  dragIndicator.value = null;
-  dragOverTagLabel.value = null;
-  isDraggingOverScrollerBlank.value = false;
-
-  if (!src || src === targetNode.label) return;
-  if (targetNode.label.startsWith(`${src}/`)) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  // 根据指示线显示状态精准判定：
-  // 若处于上下边缘指示线，执行拖出为独立根标签；
-  // 若处于节点主体，执行归为该节点的子标签
-  const isRootMode = indicator ? indicator.mode === 'root' && indicator.position !== 'inside' : false;
-  const targetParent = isRootMode ? null : targetNode.label;
-
-  // 计算重构变动路径
-  const moves = TagTreeService.calculateReparentMoves(src, targetParent, virtualAllTags.value);
-  if (moves.length === 0) return;
-
-  const srcTagItem = virtualAllTags.value.find(t => t.label === src);
-  const quoteCount = srcTagItem?.count || 0;
-
-  // 立即呼出直观确认对话框
-  reparentConfirmState.value = {
-    visible: true,
-    srcLabel: src,
-    targetParentLabel: targetParent,
-    moves,
-    quoteCount,
-  };
-}
-
-function handleDropToRoot(e: DragEvent) {
-  const src =
-    draggingTagLabel.value ||
-    TagDropService.getDraggingTag() ||
-    e.dataTransfer?.getData('application/siyuan-tag') ||
-    e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
-
-  dragIndicator.value = null;
-  dragOverTagLabel.value = null;
-  isDraggingOverScrollerBlank.value = false;
-  if (!src) return;
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  const moves = TagTreeService.calculateReparentMoves(src, null, virtualAllTags.value);
-  if (moves.length === 0) return;
-
-  const srcTagItem = virtualAllTags.value.find(t => t.label === src);
-  const quoteCount = srcTagItem?.count || 0;
-
-  reparentConfirmState.value = {
-    visible: true,
-    srcLabel: src,
-    targetParentLabel: null,
-    moves,
-    quoteCount,
-  };
-}
-
-async function handleConfirmSaveStaged() {
-  if (stagedMoves.value.length === 0 || isSavingStaged.value) return;
-  isSavingStaged.value = true;
-  try {
-    emit('batch-reparent', stagedMoves.value);
-    stagedRenames.value.clear();
-  } finally {
-    isSavingStaged.value = false;
-  }
-}
-
-function handleDiscardStaged() {
-  stagedRenames.value.clear();
+  startTagDrag(node.label, e);
 }
 
 // ==========================================
-// 标签热度双模可视化计算与交互
+// 热度词云与全景树的联动交互（计算部分抽离至 useHeatVisualization）
 // ==========================================
-
-const activeTagCount = computed(() => virtualAllTags.value.filter(t => t.count > 0).length);
-const zeroCountTagCount = computed(() => virtualAllTags.value.filter(t => t.count === 0).length);
-
-const cloudTags = computed(() => {
-  if (heatScope.value === 'top20') {
-    return [...virtualAllTags.value].filter(t => t.count > 0).sort((a, b) => b.count - a.count).slice(0, 20);
-  }
-  if (heatScope.value === 'top50') {
-    return [...virtualAllTags.value].filter(t => t.count > 0).sort((a, b) => b.count - a.count).slice(0, 50);
-  }
-  // 全部：展示全库所有标签（包含 0 次引用），按引用数降序，数量与全景树完全一致
-  return [...virtualAllTags.value].sort((a, b) => {
-    if (b.count !== a.count) {
-      return b.count - a.count;
-    }
-    return a.label.localeCompare(b.label, 'zh-CN');
-  });
-});
-
-const heatBadgeCount = computed(() => {
-  if (heatScope.value === 'all' || !heatExpanded.value) {
-    return virtualAllTags.value.length;
-  }
-  return cloudTags.value.length;
-});
-
-const totalHeatQuotes = computed(() => {
-  return virtualAllTags.value.reduce((acc, t) => acc + (t.count || 0), 0);
-});
-
-const cloudStats = computed(() => {
-  const tags = cloudTags.value;
-  if (tags.length === 0) return { min: 0, max: 0 };
-  let min = tags[0].count;
-  let max = tags[0].count;
-  for (const t of tags) {
-    if (t.count < min) min = t.count;
-    if (t.count > max) max = t.count;
-  }
-  return { min, max };
-});
-
-function computeCloudFontSize(count: number): number {
-  if (count === 0) return 11;
-  const { min, max } = cloudStats.value;
-  if (max === min) return 14;
-  const effectiveMin = Math.max(1, min);
-  const ratio = (count - effectiveMin) / Math.max(1, max - effectiveMin);
-  return Math.round(11 + ratio * 11); // 11px ~ 22px
-}
-
-function formatPercent(count: number): string {
-  if (totalHeatQuotes.value === 0 || count === 0) return '0%';
-  const pct = (count / totalHeatQuotes.value) * 100;
-  return pct >= 10 ? `${pct.toFixed(0)}%` : `${pct.toFixed(1)}%`;
-}
-
-function getHeatTierClass(count: number): string {
-  if (count === 0) return 'tier-zero';
-  const { min, max } = cloudStats.value;
-  if (max === min) return 'tier-medium';
-  const effectiveMin = Math.max(1, min);
-  const ratio = (count - effectiveMin) / Math.max(1, max - effectiveMin);
-  if (ratio >= 0.8) return 'tier-extreme';
-  if (ratio >= 0.55) return 'tier-high';
-  if (ratio >= 0.3) return 'tier-medium';
-  if (ratio >= 0.12) return 'tier-low';
-  return 'tier-minimal';
-}
-
-function getHeatTooltip(tag: ITagItem): string {
-  if (tag.count === 0) {
-    return '全库 0 处引用 · 待打标 (点击在树中定位，可拖拽至正文打标)';
-  }
-  return `全库 ${tag.count} 处引用 · 占 ${formatPercent(tag.count)} (点击在树中定位，可拖拽至正文打标)`;
-}
-
-function getRankBarColor(index: number): string {
-  if (index === 0) return 'var(--tm-badge-danger-text, #f43f5e)';
-  if (index === 1) return 'var(--tm-badge-warning-text, #f59e0b)';
-  if (index === 2) return 'var(--tm-badge-success-text, #10b981)';
-  return 'var(--b3-theme-primary)';
-}
-
-function getRankBarWidth(count: number): number {
-  if (count === 0) return 0;
-  const { max } = cloudStats.value;
-  if (!max) return 0;
-  return Math.min(100, Math.max(10, Math.round((count / max) * 100)));
-}
 
 function handleCloudTagClick(label: string) {
   // 1. 确保“标签全景”折叠条展开
@@ -1436,15 +940,6 @@ function handleCloudTagClick(label: string) {
 }
 
 function handleCloudDragStart(tag: ITagItem, e: DragEvent) {
-  TagDropService.setDraggingTag(tag.label);
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'copyMove';
-    e.dataTransfer.setData('application/siyuan-tag', tag.label);
-    e.dataTransfer.setData('text/plain', `#${tag.label}# `);
-  }
-
-  setTimeout(() => {
-    draggingTagLabel.value = tag.label;
-  }, 0);
+  startTagDrag(tag.label, e);
 }
 </script>

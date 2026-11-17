@@ -57,6 +57,8 @@ export default defineConfig(({
       {
         name: 'copy-to-siyuan-workspace',
         closeBundle() {
+          // vitest 以 mode='test' 加载本配置，测试进程结束不应触发构建产物同步副作用
+          if (mode === 'test') return;
           if (devDistDir && devDistDir !== './dist' && !isWatch) {
             try {
               cpSync('./dist', devDistDir, { recursive: true });

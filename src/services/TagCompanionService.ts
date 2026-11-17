@@ -1,4 +1,3 @@
-import { createApp, reactive, type App as VueApp } from 'vue';
 import { showMessage } from 'siyuan';
 import type {
   ITagCompanionCandidate,
@@ -9,11 +8,11 @@ import type {
 import { DEFAULT_COMPANION_CONFIG } from '../types/companion';
 import { TagCompanionCache } from './TagCompanionCache';
 import { TagCompanionRecommender } from './TagCompanionRecommender';
+import { TagCompanionOverlay } from './TagCompanionOverlay';
 import { TagBlockAppender } from './TagBlockAppender';
 import { TagDomDecorator } from './TagDomDecorator';
 import { TagApiClient } from './TagApiClient';
 import { TagDropService } from './TagDropService';
-import TagCompanionBar from '../components/dialogs/TagCompanionBar.vue';
 
 export type { ICompanionBarState };
 
@@ -26,19 +25,12 @@ export interface ICompanionTargetContext {
 
 /**
  * 伴生标签推荐触发与交互调度服务
+ *
+ * 职责边界：全局事件检测（键盘输入态、鼠标悬浮、光标停留）、推荐编排与采纳写回。
+ * 浮条视图挂载、气泡定位与 chip 注入委托给 TagCompanionOverlay。
  */
 export class TagCompanionService {
   private static config: ITagCompanionConfig = { ...DEFAULT_COMPANION_CONFIG };
-  private static app: VueApp | null = null;
-  private static container: HTMLElement | null = null;
-  private static state: ICompanionBarState = reactive({
-    visible: false,
-    candidates: [],
-    activeIndex: 0,
-    position: { top: 0, left: 0 },
-    acceptedLabels: [],
-  });
-
   private static currentTarget: ICompanionTargetContext | null = null;
   private static hoverTimer: any = null;
   private static isInitialized = false;
@@ -65,8 +57,15 @@ export class TagCompanionService {
     // 1. 预热图谱内存倒排索引
     TagCompanionCache.ensureIndexLoaded(undefined, this.config.minSimilarity).catch(() => {});
 
-    // 2. 挂载全局气泡容器
-    this.mountBarComponent();
+    // 2. 挂载全局气泡容器（视图层职责委托 TagCompanionOverlay）
+    TagCompanionOverlay.mount(
+      (item: ITagCompanionCandidate, idx: number) => {
+        this.acceptCandidate(item, idx);
+      },
+      () => {
+        this.hide();
+      },
+    );
 
     // 3. 注册事件监听器 (含输入态、鼠标悬浮、光标移入及按键采纳)
     this.bindGlobalListeners();
@@ -93,7 +92,7 @@ export class TagCompanionService {
   }
 
   public static getState(): ICompanionBarState {
-    return this.state;
+    return TagCompanionOverlay.getState();
   }
 
   /**
@@ -116,7 +115,16 @@ export class TagCompanionService {
   }
 
   /**
+   * 从目标元素提取所在编辑器 Protyle 实例
+   */
+  private static extractProtyle(el: HTMLElement): any {
+    const protyleEl = el.closest<HTMLElement>('.protyle');
+    return (protyleEl as any)?.protyle || null;
+  }
+
+  /**
    * 解析目标属于文档级还是段落块级
+   * （文档级与块级目标解析统一委托 TagDropService 的共享解析器，消除重复 DOM 遍历逻辑）
    */
   public static resolveTarget(targetEl: HTMLElement): ICompanionTargetContext | null {
     if (!targetEl) return null;
@@ -124,30 +132,23 @@ export class TagCompanionService {
     // 1. 优先检查是否位于文档头部标签区域或标题区
     const docTarget = TagDropService.resolveDocTarget(targetEl);
     if (docTarget) {
-      const protyleEl = targetEl.closest<HTMLElement>('.protyle');
-      const protyle = (protyleEl as any)?.protyle || null;
       return {
         isDoc: true,
         id: docTarget.docId,
         targetElement: docTarget.el,
-        protyle,
+        protyle: this.extractProtyle(docTarget.el),
       };
     }
 
     // 2. 检查是否位于编辑器正文段落块内部
-    const blockEl = targetEl.closest<HTMLElement>('.protyle-wysiwyg [data-node-id]');
-    if (blockEl) {
-      const blockId = blockEl.getAttribute('data-node-id');
-      if (blockId) {
-        const protyleEl = blockEl.closest<HTMLElement>('.protyle');
-        const protyle = (protyleEl as any)?.protyle || null;
-        return {
-          isDoc: false,
-          id: blockId,
-          targetElement: blockEl,
-          protyle,
-        };
-      }
+    const blockTarget = TagDropService.resolveBlockTarget(targetEl);
+    if (blockTarget) {
+      return {
+        isDoc: false,
+        id: blockTarget.blockId,
+        targetElement: blockTarget.el,
+        protyle: this.extractProtyle(blockTarget.el),
+      };
     }
 
     return null;
@@ -177,44 +178,26 @@ export class TagCompanionService {
       .filter(Boolean);
   }
 
-  /**
-   * 挂载 Vue 气泡组件 (通过响应式 state 代理直连)
-   */
-  private static mountBarComponent(): void {
-    if (this.container || typeof document === 'undefined') return;
-
-    this.container = document.createElement('div');
-    this.container.id = 'siyuan-tag-manager-companion-root';
-    document.body.appendChild(this.container);
-
-    this.app = createApp(TagCompanionBar, {
-      state: this.state,
-      onSelect: (item: ITagCompanionCandidate, idx: number) => {
-        this.acceptCandidate(item, idx);
-      },
-      onClose: () => {
-        this.hide();
-      },
-    });
-
-    this.app.mount(this.container);
-  }
+  // ==========================================
+  // 全局事件监听（按职责拆分为独立的 handler 构建器）
+  // ==========================================
 
   /**
-   * 注册全局捕获监听
+   * 按键采纳与隐退处理（捕获阶段优先拦截 Tab）
    */
-  private static bindGlobalListeners(): void {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!this.state.visible || !this.currentTarget) return;
+  private static buildAcceptKeyHandler(): (e: KeyboardEvent) => void {
+    return (e: KeyboardEvent) => {
+      if (!TagCompanionService.getState().visible || !this.currentTarget) return;
 
       if (e.key === 'Tab' && !e.shiftKey) {
         // 递进式采纳当前聚焦项
         e.preventDefault();
         e.stopPropagation();
 
-        const currentCandidate = this.state.candidates[this.state.activeIndex];
+        const state = this.getState();
+        const currentCandidate = state.candidates[state.activeIndex];
         if (currentCandidate) {
-          this.acceptCandidate(currentCandidate, this.state.activeIndex);
+          this.acceptCandidate(currentCandidate, state.activeIndex);
         }
         return;
       }
@@ -236,9 +219,13 @@ export class TagCompanionService {
         this.hide();
       }
     };
+  }
 
-    // 1. 键盘按键与输入法完成监听 (闭合 # 瞬发)
-    const handleKeyUp = (e: KeyboardEvent) => {
+  /**
+   * 键盘抬起监听（英数 # 与全角 ＃ 的闭合 # 瞬发检测）
+   */
+  private static buildInputCompletionHandler(): (e: KeyboardEvent) => void {
+    return (e: KeyboardEvent) => {
       if (!this.config.enabled) return;
       if (e.key === 'Escape' || e.key === 'Tab') return;
 
@@ -256,9 +243,13 @@ export class TagCompanionService {
         this.checkInputCompletion(target);
       }
     };
+  }
 
-    // 2. 输入事件监听 (捕获富文本异步解析及输入法上屏)
-    const handleInput = (e: Event) => {
+  /**
+   * 输入事件监听（捕获富文本异步解析及输入法上屏）
+   */
+  private static buildRichInputHandler(): (e: Event) => void {
+    return (e: Event) => {
       if (!this.config.enabled) return;
       const target = e.target as HTMLElement | null;
       if (!target || !target.closest?.('.protyle-wysiwyg')) return;
@@ -271,9 +262,13 @@ export class TagCompanionService {
         this.checkInputCompletion(target);
       }, 50);
     };
+  }
 
-    // 3. 鼠标悬浮于标签监听 (鼠标悬浮即时触发，支持正文与文档顶部)
-    const handleMouseOver = (e: MouseEvent) => {
+  /**
+   * 鼠标悬浮于标签监听（悬浮即时触发，支持正文与文档顶部）
+   */
+  private static buildTagHoverHandler(): (e: MouseEvent) => void {
+    return (e: MouseEvent) => {
       if (!this.config.enabled) return;
       if (this.isNativeHintActive()) return;
 
@@ -302,10 +297,15 @@ export class TagCompanionService {
         this.triggerRecommendation(targetCtx, targetLabel, rect);
       }, 180);
     };
+  }
 
-    const handleMouseOut = (e: MouseEvent) => {
+  /**
+   * 鼠标移出标签监听（进入浮条或其他标签时保留悬浮计时）
+   */
+  private static buildTagHoverOutHandler(): (e: MouseEvent) => void {
+    return (e: MouseEvent) => {
       const related = e.relatedTarget as HTMLElement | null;
-      if (this.container && this.container.contains(related)) return;
+      if (TagCompanionOverlay.contains(related)) return;
       if (related?.closest?.('span[data-type~="tag"], [data-tag], .b3-chip')) return;
 
       if (this.hoverTimer) {
@@ -313,9 +313,13 @@ export class TagCompanionService {
         this.hoverTimer = null;
       }
     };
+  }
 
-    // 4. 光标移动/停留检测 (双重模式 300ms 防抖)
-    const handleSelectionChange = () => {
+  /**
+   * 光标移动/停留检测（双重模式 300ms 防抖）
+   */
+  private static buildCursorIdleHandler(): () => void {
+    return () => {
       if (!this.config.enabled || this.config.triggerMode !== 'dual') {
         return;
       }
@@ -336,11 +340,34 @@ export class TagCompanionService {
         this.checkCursorFocus();
       }, this.config.hoverDelayMs);
     };
+  }
 
-    const handleDismiss = () => {
-      if (this.state.visible) {
+  /**
+   * 滚动/失焦/外部按下时的即时隐退
+   */
+  private static buildDismissHandler(): () => void {
+    return () => {
+      if (this.getState().visible) {
         this.hide();
       }
+    };
+  }
+
+  /**
+   * 注册全局捕获监听
+   */
+  private static bindGlobalListeners(): void {
+    const handleKeyDown = this.buildAcceptKeyHandler();
+    const handleKeyUp = this.buildInputCompletionHandler();
+    const handleInput = this.buildRichInputHandler();
+    const handleMouseOver = this.buildTagHoverHandler();
+    const handleMouseOut = this.buildTagHoverOutHandler();
+    const handleSelectionChange = this.buildCursorIdleHandler();
+    const handleDismiss = this.buildDismissHandler();
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (TagCompanionOverlay.contains(target)) return;
+      handleDismiss();
     };
 
     // 捕获阶段监听以优先拦截 Tab
@@ -352,11 +379,7 @@ export class TagCompanionService {
     document.addEventListener('selectionchange', handleSelectionChange);
     window.addEventListener('scroll', handleDismiss, true);
     window.addEventListener('blur', handleDismiss);
-    document.addEventListener('mousedown', (e) => {
-      const target = e.target as HTMLElement | null;
-      if (this.container && this.container.contains(target)) return;
-      handleDismiss();
-    });
+    document.addEventListener('mousedown', handleMouseDown);
 
     this.cleanupListeners.push(() => {
       window.removeEventListener('keydown', handleKeyDown, true);
@@ -367,6 +390,7 @@ export class TagCompanionService {
       document.removeEventListener('selectionchange', handleSelectionChange);
       window.removeEventListener('scroll', handleDismiss, true);
       window.removeEventListener('blur', handleDismiss);
+      document.removeEventListener('mousedown', handleMouseDown);
     });
   }
 
@@ -510,7 +534,7 @@ export class TagCompanionService {
   }
 
   /**
-   * 显示气泡并定位
+   * 显示气泡并定位（定位计算委托 TagCompanionOverlay）
    */
   public static show(
     candidates: ITagCompanionCandidate[],
@@ -529,27 +553,7 @@ export class TagCompanionService {
       this.currentTarget = target;
     }
 
-    this.state.candidates = candidates;
-    this.state.activeIndex = 0;
-    this.state.acceptedLabels = [];
-
-    // 计算定位坐标 (紧随光标/标签正下方)
-    let left = rect.left;
-    let top = rect.bottom + 6;
-
-    if (typeof window !== 'undefined') {
-      const popoverWidth = 360;
-      const popoverHeight = 36;
-      if (left + popoverWidth > window.innerWidth - 16) {
-        left = Math.max(16, window.innerWidth - popoverWidth - 16);
-      }
-      if (top + popoverHeight > window.innerHeight - 16) {
-        top = Math.max(16, rect.top - popoverHeight - 6);
-      }
-    }
-
-    this.state.position = { top, left };
-    this.state.visible = true;
+    TagCompanionOverlay.present(candidates, rect);
   }
 
   /**
@@ -561,9 +565,7 @@ export class TagCompanionService {
       this.hoverTimer = null;
     }
 
-    this.state.visible = false;
-    this.state.candidates = [];
-    this.state.activeIndex = 0;
+    TagCompanionOverlay.hide();
     this.currentTarget = null;
   }
 
@@ -573,16 +575,14 @@ export class TagCompanionService {
   public static async acceptCandidate(item: ITagCompanionCandidate, index: number): Promise<void> {
     if (!this.currentTarget || !item?.label) return;
 
-    if (!this.state.acceptedLabels.includes(item.label)) {
-      this.state.acceptedLabels.push(item.label);
-    }
+    TagCompanionOverlay.markAccepted(item.label);
 
     if (this.currentTarget.isDoc) {
       // 1. 文档级标签：调用内核 addTagToDocument 增加属性
       try {
         await TagApiClient.addTagToDocument(this.currentTarget.id, item.label);
         showMessage(`已为当前文档添加标签 #${item.label}#`, 3000, 'info');
-        this.appendDocChipToHeader(this.currentTarget.targetElement, item.label);
+        TagCompanionOverlay.appendDocChipToHeader(this.currentTarget.targetElement, item.label);
       } catch (err: any) {
         showMessage(`为文档添加标签失败: ${err.message || err}`, 4000, 'error');
       }
@@ -597,46 +597,14 @@ export class TagCompanionService {
     }
 
     // 推进聚焦指针
-    this.state.activeIndex = index + 1;
+    TagCompanionOverlay.advance(index);
 
     // 若全部项已被采纳，平滑隐退
-    if (this.state.activeIndex >= this.state.candidates.length) {
+    if (this.getState().activeIndex >= this.getState().candidates.length) {
       setTimeout(() => {
         this.hide();
       }, 350);
     }
-  }
-
-  /**
-   * 向文档头部标签展示区增量注入新 Chip DOM 以提供即时视觉反馈
-   */
-  private static appendDocChipToHeader(anchorEl: HTMLElement, label: string): void {
-    if (typeof document === 'undefined') return;
-
-    const protyleEl = anchorEl.closest<HTMLElement>('.protyle') || document.body;
-    const doctagContainer = protyleEl.querySelector<HTMLElement>('.b3-chips__doctag');
-    if (!doctagContainer) return;
-
-    // 检查是否已有该 chip
-    const existing = Array.from(doctagContainer.querySelectorAll('.b3-chip')).find(
-      c => (c.getAttribute('data-tag') || c.textContent?.trim()) === label
-    );
-    if (existing) return;
-
-    const newChip = document.createElement('span');
-    newChip.className = 'b3-chip';
-    newChip.setAttribute('data-tag', label);
-    newChip.setAttribute('data-type', 'open-search');
-    newChip.innerHTML = `<span class="b3-chip__text">${label}</span>`;
-
-    const addBtn = doctagContainer.querySelector('.b3-chip--add, .b3-chips__add, button, [data-type="add-tag"]');
-    if (addBtn) {
-      doctagContainer.insertBefore(newChip, addBtn);
-    } else {
-      doctagContainer.appendChild(newChip);
-    }
-
-    TagDomDecorator.decorateElement(doctagContainer);
   }
 
   /**
@@ -650,19 +618,7 @@ export class TagCompanionService {
     }
     this.cleanupListeners = [];
 
-    if (this.app) {
-      try {
-        this.app.unmount();
-      } catch {}
-      this.app = null;
-    }
-
-    if (this.container) {
-      try {
-        this.container.remove();
-      } catch {}
-      this.container = null;
-    }
+    TagCompanionOverlay.unmount();
 
     this.isInitialized = false;
   }

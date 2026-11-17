@@ -2,13 +2,6 @@ import type { IColorPreset } from '../styles/palette';
 
 export type TabType = 'tree' | 'filter' | 'graph' | 'hygiene';
 
-export interface ITabItem {
-  id: TabType;
-  name: string;
-  iconName: string;
-  badge?: number;
-}
-
 export interface IRowMenuState {
   visible: boolean;
   label: string;
@@ -54,7 +47,6 @@ export interface IBatchModalState {
   docIdsText: string;
   tagsText: string;
   targetDocs?: IBatchDocItem[];
-  selectedGroupIds?: string[];
   executing: boolean;
   includeSubDocs?: boolean;
 }
@@ -72,6 +64,5 @@ export interface IRenameModalState {
   oldLabel: string;
   newLabel: string;
   executing: boolean;
-  error?: string;
 }
 

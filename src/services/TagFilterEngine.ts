@@ -5,6 +5,16 @@ import type {
   ITagMatchedBlock,
   ITagMatchedDocGroup,
 } from '../types/tag';
+import { escapeSqlLiteral, parseIalTags } from '../utils/tagText';
+
+export interface IQueryBlockOptions {
+  includeTags?: string[];
+  excludeTags?: string[];
+  optionalTags?: string[];
+  notebookIds?: string[];
+  limit?: number;
+  offset?: number;
+}
 
 /**
  * 标签布尔筛选与 SQL 查询组装引擎
@@ -15,8 +25,8 @@ export class TagFilterEngine {
    */
   public static escapeSql(str: string): string {
     if (!str) return '';
-    // 转义反斜杠和单引号
-    return str.replace(/\\/g, '\\\\').replace(/'/g, "''");
+    // 转义反斜杠；单引号翻倍统一委托 utils/tagText 规范实现
+    return escapeSqlLiteral(str.replace(/\\/g, '\\\\'));
   }
 
   /**
@@ -337,6 +347,43 @@ export class TagFilterEngine {
       excludeTags: [],
       optionalTags: mode === 'optional' ? validTags : [],
     };
+  }
+
+  /**
+   * 执行多维布尔筛选查询，获取命中的块列表
+   * （自 TagApiClient 迁入：SQL 构建与结果映射属领域编排，传输经参数注入）
+   * @param options 多维布尔筛选条件
+   * @param transport POST 传输函数（推荐注入 TagApiClient.request）
+   */
+  public static async queryMatchedBlocks(
+    options: IQueryBlockOptions,
+    transport: (url: string, data: any) => Promise<any>,
+  ): Promise<ITagMatchedBlock[]> {
+    const sql = TagFilterEngine.buildQuerySql(options);
+    const rows: any[] = await transport('/api/query/sql', { stmt: sql });
+
+    return (rows || []).map(r => {
+      let content = r.content || '';
+      // 若为文档级根块 (type === 'd')，且正文中未包含 #tag# 文本，从 ial 中提取 tags 属性展示
+      if (r.type === 'd' && r.ial) {
+        const tagsAttr = parseIalTags(r.ial);
+        if (tagsAttr) {
+          const docTags = tagsAttr.split(',').map((t: string) => `#${t.trim()}#`).join(' ');
+          content = docTags ? `${content ? content + ' · ' : ''}${docTags}` : content;
+        }
+      }
+
+      return {
+        id: r.id,
+        rootId: r.rootId,
+        docTitle: r.docTitle || '未命名文档',
+        content,
+        markdown: r.markdown || '',
+        type: r.type,
+        updated: r.updated || '',
+        matchedTags: [...(options.includeTags || []), ...(options.optionalTags || [])],
+      };
+    });
   }
 
   /**

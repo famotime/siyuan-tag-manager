@@ -26,6 +26,7 @@ import {
 import { TagDropService } from '@/services/TagDropService';
 import { TagCompanionService } from '@/services/TagCompanionService';
 import { TagCompanionCache } from '@/services/TagCompanionCache';
+import { TAG_MANAGER_CONFIG_STORAGE } from '@/services/TagConfigStore';
 import type { ITagDeleteConfig, TTagDeleteMode } from '@/types/tag';
 import { DEFAULT_TAG_DELETE_CONFIG } from '@/types/tag';
 
@@ -34,7 +35,7 @@ const TAG_MANAGER_ICON_SVG = `<symbol id="iconTagManager" viewBox="0 0 1024 1024
   <path fill="currentColor" d="M938.666667 470.186667l-384-384C531.626667 63.146667 500.906667 51.2 469.333333 51.2H170.666667C104.533333 51.2 51.2 104.533333 51.2 170.666667v298.666666c0 31.573333 11.946667 62.293333 34.986667 85.333334l384 384c46.933333 46.933333 123.733333 46.933333 170.666666 0l297.813334-297.813334c46.933333-46.933333 46.933333-123.733333 0-170.666666zM277.333333 341.333333c-35.413333 0-64-28.586667-64-64s28.586667-64 64-64 64 28.586667 64 64-28.586667 64-64 64z"/>
 </symbol>`;
 
-const STORAGE_NAME = 'tag-manager-config.json';
+const STORAGE_NAME = TAG_MANAGER_CONFIG_STORAGE;
 
 let PluginInfo = {
   version: '0.9.0',

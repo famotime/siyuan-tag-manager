@@ -1,5 +1,7 @@
 import { TagGovernanceService } from './TagGovernanceService';
 import { TagGroupService } from './TagGroupService';
+import { TagApiClient } from './TagApiClient';
+import { stripTagHash } from '../utils/tagText';
 import type { ITagItem } from '../types/tag';
 
 export interface ITagCreationContext {
@@ -28,12 +30,8 @@ export class TagCreationService {
    * 去除首尾空白、首尾的井号 #、多余斜杠等
    */
   public static cleanTag(input: string): string {
-    if (!input) return '';
-    let val = input.trim();
-    // 去除开头和结尾的所有 # 符号
-    val = val.replace(/^#+|#+$/g, '').trim();
-    // 使用 TagGovernanceService 统一规范化斜杠
-    return TagGovernanceService.normalizeLabel(val);
+    // 统一剥离首尾井号与空白（utils/tagText 全库规范实现），再规范化斜杠
+    return TagGovernanceService.normalizeLabel(stripTagHash(input));
   }
 
   /**
@@ -83,14 +81,7 @@ export class TagCreationService {
     const label = validation.cleanLabel;
     const active = context || TagGroupService.getActiveContext();
 
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     // 1. 若光标位于具体内容块上：追加到该块末尾
     if (active.blockId) {

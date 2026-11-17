@@ -69,7 +69,7 @@
           :disabled="selectedParent === undefined || previewPath === sourceLabel"
           @click="handleConfirm"
         >
-          确认纳入暂存
+          确认并立即应用
         </button>
       </div>
     </div>

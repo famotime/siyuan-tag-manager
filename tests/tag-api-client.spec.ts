@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { TagApiClient } from '../src/services/TagApiClient';
+import { TagFilterEngine } from '../src/services/TagFilterEngine';
+import { TagCooccurrenceService } from '../src/services/TagCooccurrenceService';
 
 describe('TagApiClient 内核 API 适配客户端单元测试', () => {
   const originalFetch = globalThis.fetch;
@@ -159,10 +161,13 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
         }),
       } as any);
 
-      const blocks = await TagApiClient.queryMatchedBlocks({
-        includeTags: ['AI'],
-        limit: 10,
-      });
+      const blocks = await TagFilterEngine.queryMatchedBlocks(
+        {
+          includeTags: ['AI'],
+          limit: 10,
+        },
+        (url: string, data: any) => TagApiClient.request(url, data),
+      );
 
       expect(blocks).toHaveLength(1);
       expect(blocks[0].id).toBe('block-1');
@@ -188,10 +193,13 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
         }),
       } as any);
 
-      const blocks = await TagApiClient.queryMatchedBlocks({
-        includeTags: ['AI出海'],
-        limit: 10,
-      });
+      const blocks = await TagFilterEngine.queryMatchedBlocks(
+        {
+          includeTags: ['AI出海'],
+          limit: 10,
+        },
+        (url: string, data: any) => TagApiClient.request(url, data),
+      );
 
       expect(blocks).toHaveLength(1);
       expect(blocks[0].type).toBe('d');
@@ -240,7 +248,9 @@ describe('TagApiClient 内核 API 适配客户端单元测试', () => {
         });
       });
 
-      const res = await TagApiClient.fetchCooccurrenceGraph();
+      const res = await TagCooccurrenceService.fetchCooccurrenceGraph(
+        (url: string, data: any) => TagApiClient.request(url, data),
+      );
       expect(executedSql).toContain('LIMIT 9999');
       expect(res.spansCount).toBe(6);
       expect(res.graph.nodes).toHaveLength(2);

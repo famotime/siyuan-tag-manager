@@ -190,7 +190,7 @@
           </span>
 
           <div v-if="searchKeyword.trim() && displayCandidateTags.length === 0" class="tm-search-no-match">
-            <span>未找到匹配标签，按回车直接将「#{{ searchKeyword.trim().replace(/^#+|#+$/g, '') }}#」加入 {{ modeText }}</span>
+            <span>未找到匹配标签，按回车直接将「#{{ stripTagHash(searchKeyword) }}#」加入 {{ modeText }}</span>
           </div>
         </div>
         <button
@@ -285,6 +285,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import { TagFilterEngine } from '../../services/TagFilterEngine';
+import { stripTagHash } from '../../utils/tagText';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
 
 const props = defineProps<{
@@ -360,7 +361,7 @@ const quickTagsRef = ref<HTMLElement | null>(null);
 const isResizingFilterBox = ref(false);
 const expandQuickTags = ref(false);
 
-const filterBoxHeight = ref<number | null>(() => {
+const filterBoxHeight = ref<number | null>((() => {
   try {
     const saved = localStorage.getItem('siyuan_tm_filter_box_height');
     if (saved) {
@@ -369,7 +370,7 @@ const filterBoxHeight = ref<number | null>(() => {
     }
   } catch {}
   return null;
-});
+})());
 
 const filterBoxStyle = computed(() => {
   if (filterBoxHeight.value !== null) {
@@ -399,8 +400,7 @@ const isExpandedTags = computed(() => {
 });
 
 function handleSearchEnter() {
-  const raw = searchKeyword.value.trim();
-  const kw = raw.replace(/^#+|#+$/g, '').trim();
+  const kw = stripTagHash(searchKeyword.value);
   if (!kw) return;
 
   if (displayCandidateTags.value.length > 0) {
@@ -476,6 +476,13 @@ function resetFilterBoxHeight() {
 
 function highlightTags(text: string): string {
   if (!text) return '';
-  return text.replace(/#([^#]+)#/g, '<span class="tm-matched-tag">#$1#</span>');
+  // 先整体 HTML 转义再包装标签高亮 span，防止块内容中的 HTML 注入 v-html
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return escaped.replace(/#([^#]+)#/g, '<span class="tm-matched-tag">#$1#</span>');
 }
 </script>

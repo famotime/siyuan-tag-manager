@@ -1,4 +1,5 @@
 import { TagGovernanceService } from './TagGovernanceService';
+import { TagApiClient } from './TagApiClient';
 import type { ITagMatchedBlock } from '../types/tag';
 
 /**
@@ -49,14 +50,8 @@ export class TagDocConverterService {
     blocks: ITagMatchedBlock[],
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; docId?: string; error?: string }> {
-    const post = requestFn || (async (url, data) => {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      return res.json();
-    });
+    // 默认传输统一走 TagApiClient（含鉴权头，修复本方法历史上缺失 Authorization 的缺陷）
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     try {
       // 1. 获取笔记本列表，选用第一个打开的笔记本

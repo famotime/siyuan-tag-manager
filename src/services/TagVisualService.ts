@@ -61,6 +61,8 @@ export class TagVisualService {
     for (const meta of metadataList) {
       if (!meta.label) continue;
       const cleanLabel = meta.label.trim();
+      // 属性选择器值转义一次，供亮色与暗色两组规则及图标规则共用
+      const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
       const styleDeclarations: string[] = [];
 
       // 亮色/基础样式规则
@@ -81,7 +83,6 @@ export class TagVisualService {
         styleDeclarations.push('transition: all 0.2s ease;');
 
         // 支持通过 data-tag / data-content 属性匹配正文标签、文档头部标签 doctag、侧面板标签树与常用组胶囊
-        const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
         const selector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"], `
           + `span[data-type~="tag"][data-tag="${escapedLabel}"], `
           + `span[data-type~="tag"][data-content="${escapedLabel}"], `
@@ -145,7 +146,6 @@ export class TagVisualService {
 
       // 如果配置了自定义 Emoji/图标
       if (meta.icon) {
-        const escapedLabel = cleanLabel.replace(/["\\]/g, '\\$&');
         const iconSelector = `.protyle-wysiwyg span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
           + `span[data-type~="tag"][data-tag="${escapedLabel}"]::before, `
           + `span[data-type~="tag"][data-content="${escapedLabel}"]::before, `

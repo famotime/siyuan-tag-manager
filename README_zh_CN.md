@@ -201,6 +201,21 @@
 
 ---
 
+## 🛠️ 工程架构与开发
+
+代码库遵循严格的分层架构：**表现层**（Vue SFC）→ **状态编排层**（9 个可复用 Composable）→ **纯领域服务层**（21 个零 UI 依赖的 TypeScript 模块）→ **基础设施层**（`TagApiClient` 统一传输、`TagConfigStore` 配置持久化）→ **共享工具层**（`utils/tagText.ts` 为标签文本处理全库唯一实现）。
+
+```bash
+pnpm test        # Vitest 全量测试（31 套 / 328 用例）
+pnpm typecheck   # TypeScript 静态类型检查
+pnpm build       # 生产打包（dist/ + package.zip）
+pnpm dev         # 监听模式热重载构建
+```
+
+完整的模块清单、依赖治理规则与两轮重构决策记录，参见 [docs/project-structure.md](./docs/project-structure.md) 与 [docs/refactor-plan.md](./docs/refactor-plan.md)。
+
+---
+
 ## 📄 开源许可证
 
 本项目采用 [MIT License](./LICENSE) 协议开源。欢迎在 [GitHub Issues](https://github.com/famotime/siyuan-tag-manager/issues) 提出宝贵的使用反馈与场景建议！

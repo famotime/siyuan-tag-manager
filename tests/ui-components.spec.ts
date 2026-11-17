@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { renderComponent } from './helpers/ssr';
 import TagTreeView from '../src/components/tabs/TagTreeView.vue';
 import TagFilterView from '../src/components/tabs/TagFilterView.vue';
 import TagGraphView from '../src/components/tabs/TagGraphView.vue';
@@ -52,7 +53,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(typeof filter.toggleTagCondition).toBe('function');
     expect(typeof filter.removeFilterTag).toBe('function');
     expect(typeof filter.clearFilterTags).toBe('function');
-    expect(typeof filter.highlightTags).toBe('function');
   });
 
   it('useTagHygiene 提供健康体检与问题修复能力', () => {
@@ -504,22 +504,21 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     expect(html).toContain('重构合并到其他标签');
   });
 
-  it('useTagFilter 的 handleQuickFilter 在追加模式下具备与 Ctrl 点击一致的反选与后台添加能力', () => {
-    const { activeFilter, handleQuickFilter, handleTagClick } = useTagFilter();
+  it('useTagFilter 的 handleTagClick 在 Ctrl 点击（追加模式）下具备反选与后台添加能力', () => {
+    const { activeFilter, handleTagClick } = useTagFilter();
     activeFilter.value = { includeTags: [], excludeTags: [] };
 
-    // 第一次调用加入组合筛选
-    handleQuickFilter('TypeScript', true);
+    // 第一次 Ctrl 点击加入组合筛选
+    handleTagClick('TypeScript', { ctrlKey: true } as MouseEvent);
     expect(activeFilter.value.includeTags).toContain('TypeScript');
 
-    // 第二次调用切换反选移除（与 Ctrl+点击保持一致）
-    handleQuickFilter('TypeScript', true);
+    // 第二次 Ctrl 点击切换反选移除
+    handleTagClick('TypeScript', { ctrlKey: true } as MouseEvent);
     expect(activeFilter.value.includeTags).not.toContain('TypeScript');
 
-    // 验证与 handleTagClick 传入 ctrlKey 效果完全相同
+    // 多标签追加保持顺序
     handleTagClick('Rust', { ctrlKey: true } as MouseEvent);
-    expect(activeFilter.value.includeTags).toContain('Rust');
-    handleQuickFilter('Vue', true);
+    handleTagClick('Vue', { ctrlKey: true } as MouseEvent);
     expect(activeFilter.value.includeTags).toEqual(['Rust', 'Vue']);
   });
 
@@ -820,7 +819,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagBatchModal, {
+    const html = await renderComponent(TagBatchModal, {
       state: {
         visible: true,
         docIdsText: 'doc-1',
@@ -832,9 +831,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       allTags: [{ label: 'AI', count: 5 }],
       tagGroups: [],
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     // 1. 验证目标文档区域包含“包含子文档”复选框
     expect(html).toContain('包含子文档');
     expect(html).toContain('tm-checkbox-label');
@@ -855,7 +851,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [
         { label: 'tech', count: 15, depth: 0, name: 'tech' },
         { label: 'tech/vue', count: 10, depth: 1, name: 'vue' },
@@ -867,9 +863,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
 
     // 1. 验证包含三大折叠板块：常用标签组、标签全景、标签热度
     expect(html).toContain('常用标签组');
@@ -953,7 +946,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [{ label: 'test', count: 1, depth: 0, name: 'test' }],
       loading: false,
       selectedTags: [],
@@ -961,9 +954,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     expect(html).toContain('tm-sort-select');
     expect(html).not.toMatch(/class="[^"]*tm-sort-select[^"]*"[^>]*style="[^"]*padding:\s*0\s*4px/);
   });
@@ -972,7 +962,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [
         { label: 'tag1', count: 5, depth: 0, name: 'tag1' },
         { label: 'tag2', count: 0, depth: 0, name: 'tag2' },
@@ -983,9 +973,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     expect(html).toContain('tm-heat-toolbar');
     expect(html).toContain('tm-heat-toolbar-header');
     expect(html).toContain('tm-heat-toolbar-info');
@@ -996,7 +983,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [
         { label: 'parent', count: 10, depth: 0, name: 'parent' },
         { label: 'child', count: 3, depth: 0, name: 'child' },
@@ -1007,9 +994,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     expect(html).toContain('tm-tree-node');
     expect(html).toContain('tm-cloud-container');
     expect(html).toContain('tm-panorama-section');
@@ -1022,7 +1006,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [
         { label: 'parent', count: 10, depth: 0, name: 'parent' },
         { label: 'parent/child', count: 3, depth: 1, name: 'child' },
@@ -1033,9 +1017,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     // 不应再包含突兀的顶部和底部根释放占位区域
     expect(html).not.toContain('tm-sticky-root-dropzone');
     expect(html).not.toContain('tm-root-dropzone');
@@ -1049,10 +1030,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { createSSRApp } = await import('vue');
     const App = (await import('../src/App.vue')).default;
 
-    const app = createSSRApp(App);
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
+    const html = await renderComponent(App);
     expect(html).toContain('全景');
     expect(html).toContain('筛选');
     expect(html).toContain('洞察');
@@ -1072,7 +1050,7 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
     const { renderToString } = await import('vue/server-renderer');
     const { createSSRApp } = await import('vue');
 
-    const app = createSSRApp(TagTreeView, {
+    const html = await renderComponent(TagTreeView, {
       allTags: [
         { label: 'tech', count: 10, depth: 0, name: 'tech' },
         { label: 'tech/backend', count: 8, depth: 1, name: 'backend' },
@@ -1084,9 +1062,6 @@ describe('UI 模块化拆分与组件集成契约测试', () => {
       getTagStyle: () => ({}),
       getTagIcon: () => '',
     });
-    app.directive('tooltip', {});
-
-    const html = await renderToString(app);
     expect(html).toContain('data-node-tag="tech/backend/python"');
     expect(html).toContain('tm-tree-scroller');
 

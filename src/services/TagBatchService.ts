@@ -1,4 +1,7 @@
 import { TagGovernanceService } from './TagGovernanceService';
+import { TagApiClient } from './TagApiClient';
+import { showMessage } from 'siyuan';
+import { parseIalTags, escapeSqlLiteral } from '../utils/tagText';
 
 /**
  * 批量打标与属性更新服务
@@ -69,14 +72,8 @@ export class TagBatchService {
     tagsToAdd: string[],
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; updatedCount: number; errors: string[] }> {
-    const post = requestFn || (async (url, data) => {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      return res.json();
-    });
+    // 默认传输统一走 TagApiClient（含鉴权头，修复本方法历史上缺失 Authorization 的缺陷）
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     let updatedCount = 0;
     const errors: string[] = [];
@@ -109,6 +106,40 @@ export class TagBatchService {
   }
 
   /**
+   * 批量打标统一执行链路（校验 + 服务调用 + 用户提示）
+   * 由侧栏内嵌弹窗（App.vue）与独立弹窗（batchTagModalManager）共用，
+   * 消除两处逐字重复的校验、调用与文案逻辑
+   *
+   * @returns 是否执行成功（供宿主决定关闭弹窗与刷新数据）
+   */
+  public static async executeBatchTagging(
+    docIds: string[],
+    tags: string[],
+    setExecuting: (executing: boolean) => void,
+  ): Promise<boolean> {
+    if (docIds.length === 0 || tags.length === 0) {
+      showMessage('目标文档与待添加标签均不能为空', 3000, 'error');
+      return false;
+    }
+
+    setExecuting(true);
+    try {
+      const res = await this.batchTagDocuments(docIds, tags);
+      if (res.success) {
+        showMessage(`成功为 ${res.updatedCount} 篇文档更新标签`, 3000, 'info');
+        return true;
+      }
+      showMessage(`批量打标存在错误: ${res.errors.join('; ')}`, 5000, 'error');
+      return false;
+    } catch (err: any) {
+      showMessage(`批量打标失败: ${err.message || err}`, 4000, 'error');
+      return false;
+    } finally {
+      setExecuting(false);
+    }
+  }
+
+  /**
    * 模糊搜索文档候选列表
    */
   public static async searchDocs(
@@ -116,16 +147,9 @@ export class TagBatchService {
     limit = 20,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
-    const clean = keyword.replace(/'/g, "''").trim();
+    const clean = escapeSqlLiteral(keyword).trim();
     if (!clean) return [];
 
     const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND content LIKE '%${clean}%' ORDER BY updated DESC LIMIT ${limit};`;
@@ -134,11 +158,9 @@ export class TagBatchService {
       const rows = res?.data || (Array.isArray(res) ? res : []);
       return (rows || []).map((r: any) => {
         let tags: string[] = [];
-        if (r.ial) {
-          const match = String(r.ial).match(/tags="([^"]+)"/);
-          if (match && match[1]) {
-            tags = this.parseDocTags(match[1]);
-          }
+        const tagsAttr = parseIalTags(r.ial);
+        if (tagsAttr) {
+          tags = this.parseDocTags(tagsAttr);
         }
         return {
           id: r.id,
@@ -159,16 +181,9 @@ export class TagBatchService {
     limit = 50,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; title: string; tags: string[] }>> {
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
-    const clean = notebookId.replace(/'/g, "''").trim();
+    const clean = escapeSqlLiteral(notebookId).trim();
     if (!clean) return [];
 
     const sql = `SELECT id, content, ial FROM blocks WHERE type = 'd' AND box = '${clean}' ORDER BY updated DESC LIMIT ${limit};`;
@@ -177,11 +192,9 @@ export class TagBatchService {
       const rows = res?.data || (Array.isArray(res) ? res : []);
       return (rows || []).map((r: any) => {
         let tags: string[] = [];
-        if (r.ial) {
-          const match = String(r.ial).match(/tags="([^"]+)"/);
-          if (match && match[1]) {
-            tags = this.parseDocTags(match[1]);
-          }
+        const tagsAttr = parseIalTags(r.ial);
+        if (tagsAttr) {
+          tags = this.parseDocTags(tagsAttr);
         }
         return {
           id: r.id,
@@ -200,14 +213,7 @@ export class TagBatchService {
   public static async fetchNotebooks(
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; name: string }>> {
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     try {
       const res = await post('/api/notebook/lsNotebooks', {});
@@ -229,8 +235,8 @@ export class TagBatchService {
     for (const row of parentRows) {
       if (!row || !row.box || !row.path) continue;
       const prefix = row.path.replace(/\.sy$/i, '') + '/';
-      const cleanBox = String(row.box).replace(/'/g, "''");
-      const cleanPrefix = prefix.replace(/'/g, "''");
+      const cleanBox = escapeSqlLiteral(String(row.box));
+      const cleanPrefix = escapeSqlLiteral(prefix);
       conditions.push(`(box = '${cleanBox}' AND path LIKE '${cleanPrefix}%')`);
     }
 
@@ -245,16 +251,11 @@ export class TagBatchService {
     parentDocIds: string[],
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<Array<{ id: string; title: string }>> {
-    const post = requestFn || (async (url, data) => {
+    const post = requestFn || (async (url: string, data: any) => {
       if (typeof window === 'undefined' && !url.startsWith('http')) {
         return { code: 0, data: [] };
       }
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
+      return TagApiClient.postRaw(url, data);
     });
 
     const validIds = Array.from(new Set(parentDocIds.map(id => id?.trim()).filter(Boolean)));
@@ -262,7 +263,7 @@ export class TagBatchService {
 
     try {
       // 1. 查询父文档的物理路径与所属笔记本
-      const inClause = validIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+      const inClause = validIds.map(id => `'${escapeSqlLiteral(id)}'`).join(', ');
       const parentSql = `SELECT id, box, path, content FROM blocks WHERE type = 'd' AND id IN (${inClause});`;
       const parentRes = await post('/api/query/sql', { stmt: parentSql });
       const parentRows = parentRes?.data || (Array.isArray(parentRes) ? parentRes : []);

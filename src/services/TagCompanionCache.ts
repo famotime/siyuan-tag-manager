@@ -1,6 +1,7 @@
 import type { ITagGraphData } from './TagCooccurrenceService';
 import type { ITagCompanionCandidate } from '../types/companion';
 import { TagApiClient } from './TagApiClient';
+import { TagCooccurrenceService } from './TagCooccurrenceService';
 
 /**
  * 伴生标签共现网络内存倒排索引缓存池
@@ -162,7 +163,9 @@ export class TagCompanionCache {
 
     this.isBuilding = true;
     try {
-      const { graph } = await client.fetchCooccurrenceGraph();
+      const { graph } = await TagCooccurrenceService.fetchCooccurrenceGraph(
+        (url: string, data: any) => client.request(url, data),
+      );
       if (graph) {
         this.buildIndex(graph, minSimilarity);
       }

@@ -2,7 +2,6 @@ import { createApp, reactive, type App as VueApp } from 'vue';
 import TagBatchModal from '../components/dialogs/TagBatchModal.vue';
 import { TagBatchService } from '../services/TagBatchService';
 import { TagApiClient } from '../services/TagApiClient';
-import { showMessage } from 'siyuan';
 import type { IBatchBridgeDoc } from './batchTagBridge';
 import type { ITagItem, ITagGroup } from '../types/tag';
 import type { IBatchModalState } from '../types/ui';
@@ -71,29 +70,19 @@ export async function openStandaloneBatchModal(
     onClose: () => {
       closeStandaloneBatchModal();
     },
+    onSyncState: (patch: Partial<IBatchModalState>) => {
+      Object.assign(state, patch);
+    },
     onExecute: async (payload: { docIds: string[]; tags: string[] }) => {
       const docIds = payload.docIds.length > 0 ? payload.docIds : docs.map(d => d.id);
-      const tags = payload.tags;
 
-      if (docIds.length === 0 || tags.length === 0) {
-        showMessage('目标文档与待添加标签均不能为空', 3000, 'error');
-        return;
-      }
-
-      state.executing = true;
-      try {
-        const res = await TagBatchService.batchTagDocuments(docIds, tags);
-        if (res.success) {
-          showMessage(`成功为 ${res.updatedCount} 篇文档更新标签`, 3000, 'info');
-          closeStandaloneBatchModal();
-          options?.onSuccess?.();
-        } else {
-          showMessage(`批量打标存在错误: ${res.errors.join('; ')}`, 5000, 'error');
-        }
-      } catch (err: any) {
-        showMessage(`批量打标失败: ${err.message || err}`, 4000, 'error');
-      } finally {
-        state.executing = false;
+      // 校验、执行与提示统一收敛至 TagBatchService.executeBatchTagging
+      const ok = await TagBatchService.executeBatchTagging(docIds, payload.tags, (executing) => {
+        state.executing = executing;
+      });
+      if (ok) {
+        closeStandaloneBatchModal();
+        options?.onSuccess?.();
       }
     },
   });

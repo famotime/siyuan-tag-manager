@@ -1,5 +1,6 @@
 import { TagApiClient } from './TagApiClient';
 import { TagFilterEngine } from './TagFilterEngine';
+import { stripTagHash, parseIalTags } from '../utils/tagText';
 import type { ITagDeleteConfig, ITagDeleteResult } from '../types/tag';
 import { DEFAULT_TAG_DELETE_CONFIG } from '../types/tag';
 
@@ -50,7 +51,7 @@ export class TagDeletionService {
       return markdown;
     }
 
-    const cleanLabel = label.replace(/^#+|#+$/g, '').trim();
+    const cleanLabel = stripTagHash(label);
     if (!cleanLabel) {
       return markdown;
     }
@@ -83,7 +84,7 @@ export class TagDeletionService {
     if (!existingTagsAttr || !label) {
       return '';
     }
-    const cleanLabel = label.replace(/^#+|#+$/g, '').trim();
+    const cleanLabel = stripTagHash(label);
     const tags = existingTagsAttr
       .split(',')
       .map(t => t.trim())
@@ -108,7 +109,7 @@ export class TagDeletionService {
       return { success: false, affectedBlocks: 0, errors: ['待删除的标签名不能为空'] };
     }
 
-    const cleanLabel = label.replace(/^#+|#+$/g, '').trim();
+    const cleanLabel = stripTagHash(label);
     const mode = config?.mode || DEFAULT_TAG_DELETE_CONFIG.mode;
 
     // 若配置为彻底删除模式，直接委托给内核原生 removeTag 接口
@@ -163,9 +164,8 @@ export class TagDeletionService {
 
       for (const doc of docRows) {
         try {
-          const match = (doc.ial || '').match(/tags="([^"]+)"/);
-          if (match && match[1]) {
-            const rawTags = match[1];
+          const rawTags = parseIalTags(doc.ial);
+          if (rawTags) {
             const tagsList = rawTags.split(',').map(t => t.trim());
             if (tagsList.includes(cleanLabel)) {
               const cleanedTags = TagDeletionService.cleanDocTagsAttr(rawTags, cleanLabel);

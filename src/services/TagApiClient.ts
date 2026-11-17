@@ -1,15 +1,5 @@
 import { TagFilterEngine } from './TagFilterEngine';
-import { TagCooccurrenceService } from './TagCooccurrenceService';
-import type { ITagItem, ITagMatchedBlock, ITagMergePlan, ITagCombination } from '../types/tag';
-
-export interface IQueryBlockOptions {
-  includeTags?: string[];
-  excludeTags?: string[];
-  optionalTags?: string[];
-  notebookIds?: string[];
-  limit?: number;
-  offset?: number;
-}
+import type { ITagItem, ITagMergePlan } from '../types/tag';
 
 /**
  * 思源笔记内核 API 交互与适配客户端
@@ -17,9 +7,10 @@ export interface IQueryBlockOptions {
  */
 export class TagApiClient {
   /**
-   * 基础 POST 请求封装
+   * 基础 POST 传输（返回原始响应信封 {code, msg, data}，不做错误规范化）
+   * 各领域服务的默认传输实现；注入 requestFn 的测试路径遵循同一信封契约
    */
-  private static async request<T = any>(url: string, data: any): Promise<T> {
+  public static async postRaw(url: string, data: any): Promise<any> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -34,7 +25,14 @@ export class TagApiClient {
       body: JSON.stringify(data),
     });
 
-    const json = await res.json();
+    return res.json();
+  }
+
+  /**
+   * 规范化 POST 请求：code != 0 时抛出错误，成功时返回解包后的 data
+   */
+  public static async request<T = any>(url: string, data: any): Promise<T> {
+    const json = await this.postRaw(url, data);
     if (json.code !== 0) {
       throw new Error(json.msg || `Request failed with code ${json.code}`);
     }
@@ -168,73 +166,6 @@ export class TagApiClient {
       success: errors.length === 0,
       mergedCount,
       errors,
-    };
-  }
-
-  /**
-   * 执行多维布尔筛选查询，获取命中的块列表
-   */
-  public static async queryMatchedBlocks(options: IQueryBlockOptions): Promise<ITagMatchedBlock[]> {
-    const sql = TagFilterEngine.buildQuerySql(options);
-    const rows: any[] = await this.request('/api/query/sql', { stmt: sql });
-
-    return (rows || []).map(r => {
-      let content = r.content || '';
-      // 若为文档级根块 (type === 'd')，且正文中未包含 #tag# 文本，从 ial 中提取 tags 属性展示
-      if (r.type === 'd' && r.ial) {
-        const tagMatch = String(r.ial).match(/tags="([^"]+)"/);
-        if (tagMatch && tagMatch[1]) {
-          const docTags = tagMatch[1].split(',').map((t: string) => `#${t.trim()}#`).join(' ');
-          content = docTags ? `${content ? content + ' · ' : ''}${docTags}` : content;
-        }
-      }
-
-      return {
-        id: r.id,
-        rootId: r.rootId,
-        docTitle: r.docTitle || '未命名文档',
-        content,
-        markdown: r.markdown || '',
-        type: r.type,
-        updated: r.updated || '',
-        matchedTags: [...(options.includeTags || []), ...(options.optionalTags || [])],
-      };
-    });
-  }
-
-  /**
-   * 获取全库标签共现网络图谱数据
-   */
-  public static async fetchCooccurrenceGraph(): Promise<{
-    graph: any;
-    combinations: ITagCombination[];
-    spansCount: number;
-  }> {
-    const sql = `SELECT s.block_id, s.content `
-      + `FROM spans s `
-      + `INNER JOIN blocks b ON s.block_id = b.id `
-      + `WHERE s.type LIKE '%tag%' AND s.content != '' `
-      + `ORDER BY s.block_id `
-      + `LIMIT 9999;`;
-
-    const rows: Array<{ block_id: string; content: string }> = await this.request('/api/query/sql', { stmt: sql });
-    const blockMap = TagCooccurrenceService.groupSpansByBlock(rows || []);
-
-    // 统计各标签总引用数（以块为粒度去重累加，与 block_count 保持一致）
-    const tagCounts = new Map<string, number>();
-    for (const tags of blockMap.values()) {
-      for (const t of new Set(tags)) {
-        tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
-      }
-    }
-
-    const graph = TagCooccurrenceService.buildCooccurrenceGraph(blockMap, tagCounts, 1);
-    const combinations = TagCooccurrenceService.findTagCombinations(blockMap, 2, 5);
-
-    return {
-      graph,
-      combinations,
-      spansCount: rows?.length || 0,
     };
   }
 

@@ -1,6 +1,8 @@
 import type { ITagItem } from '../types/tag';
 import { TagBatchService } from './TagBatchService';
 import { TagGovernanceService } from './TagGovernanceService';
+import { TagApiClient } from './TagApiClient';
+import { parseIalTags, escapeSqlLiteral } from '../utils/tagText';
 
 export type RefMatchReason =
   | 'explicit_anchor'       // 显式引用锚文本
@@ -70,11 +72,7 @@ export class TagRefPromoteService {
       if (!docId) continue;
 
       const docTitle = row.doc_title || '未命名文档';
-      let rawTags = row.doc_ial || '';
-      const match = String(rawTags).match(/tags="([^"]+)"/);
-      if (match && match[1]) {
-        rawTags = match[1];
-      }
+      const rawTags = parseIalTags(row.doc_ial);
       const docExistingTags = new Set(
         TagBatchService.parseDocTags(rawTags).map(t => t.toLowerCase()),
       );
@@ -182,19 +180,12 @@ export class TagRefPromoteService {
   ): Promise<IRefToTagCandidate[]> {
     if (!allTags || allTags.length === 0) return [];
 
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     const limit = options?.limit || 200;
     let whereClause = "WHERE (r.content != '' OR b_def.content != '' OR b_def.name != '' OR b_def.alias != '' OR b_def_doc.name != '' OR b_def_doc.alias != '')";
     if (options?.notebookId) {
-      const cleanNb = options.notebookId.replace(/'/g, "''");
+      const cleanNb = escapeSqlLiteral(options.notebookId);
       whereClause += ` AND b_doc.box = '${cleanNb}'`;
     }
 
@@ -236,16 +227,9 @@ export class TagRefPromoteService {
   ): Promise<IRefToTagCandidate | null> {
     if (!docId || !allTags || allTags.length === 0) return null;
 
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
-    const cleanId = docId.replace(/'/g, "''");
+    const cleanId = escapeSqlLiteral(docId);
     const sql = `SELECT `
       + `r.root_id as doc_id, `
       + `b_doc.content as doc_title, `
@@ -281,14 +265,7 @@ export class TagRefPromoteService {
     candidates: Array<{ docId: string; tags: string[] }>,
     requestFn?: (url: string, data: any) => Promise<any>,
   ): Promise<{ success: boolean; updatedCount: number; errors: string[] }> {
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     let updatedCount = 0;
     const errors: string[] = [];

@@ -25,7 +25,7 @@
   - `src/composables/useTagHygiene.ts`：健康体检评分、问题识别与一键合并修复。
 - **纯领域服务层 (Services)**：
   - `src/services/TagApiClient.ts`：思源 SQL/HTTP 适配客户端（含鉴权与降级）；
-  - 其他 9 个纯 TypeScript 领域服务位于 `src/services/*.ts`，无 UI 依赖。
+  - 其他 22 个纯 TypeScript 领域服务位于 `src/services/*.ts`，无 UI 依赖。
 - **设计系统与全局样式**：
   - `src/index.scss`：主样式入口，声明双主题 WCAG AA+ 变量；
   - `src/styles/components.scss`：工作台与所有组件共用样式；
@@ -34,7 +34,7 @@
 ## 3. 开发与测试常用命令
 
 ```bash
-pnpm test        # 运行 Vitest 单元测试 (14 套用例，69 个测试)
+pnpm test        # 运行 Vitest 单元测试 (31 套用例文件，330 个测试)
 pnpm build       # 执行生产打包 (产物位于 dist/，生成 package.zip)
 pnpm typecheck   # 静态类型检查 (tsc --noEmit)
 pnpm dev         # 监听模式热重载构建
@@ -45,3 +45,16 @@ pnpm dev         # 监听模式热重载构建
 1. **图标防污染防御**：严禁直接使用 `<svg>` 或 Emoji，统一采用 `<SyLineIcon name="..." />`，其内置 `fill:none!important; stroke:currentColor` 防御思源全局 CSS 污染。
 2. **主题自适应**：所有新增颜色必须同时兼容亮色与暗色模式，引用 `src/index.scss` 声明的 `--tm-badge-*` 语义变量，确保对比度达到 WCAG AA 级以上。
 3. **测试先行**：修改 `services/` 或 `composables/` 核心逻辑时，必须先在 `tests/*.spec.ts` 补充对应场景测试。
+
+## Reference Projects
+
+重要：在涉及解析思源笔记文档块结构和内容、确认API时，务必查看developer_docs目录下开发者文档 和 siyuan-note 项目源码确认，不要凭猜测开发和测试。
+
+路径按开发机器取用其一（两套路径指向同一批参考工程，不同机器布局不同）：
+
+- siyuan-note（思源笔记源码项目）
+  - Windows 开发机：`D:\MyCodingProjects\siyuan-note`
+  - Linux 开发机：`/home/quincyzou/projects/siyuan-note`
+- `developer_docs/`：思源笔记插件开发者文档
+  - 仓库根目录，并已列入 `.gitignore`（仅本机参考，不入库、不推送）。
+- 核对内核行为时以 siyuan-note 的 Go 源码为准（`kernel/server/serve.go`、`kernel/model/assets.go`），`app/src` 为前端实现参考；developer_docs 未覆盖的细节不要凭猜测推断。

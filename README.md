@@ -195,6 +195,21 @@ Step 1: Vault Audit ───────────────> Step 2: Daily
 
 ---
 
+## 🛠️ Development & Architecture
+
+The codebase follows a strict layered architecture: **Presentation** (Vue SFCs) → **Composables** (9 reusable state/logic units) → **Domain Services** (21 pure TypeScript modules, zero UI dependency) → **Infrastructure** (`TagApiClient` transport, `TagConfigStore` persistence) → **Shared utils** (`utils/tagText.ts` as the single source for tag text handling).
+
+```bash
+pnpm test        # Vitest suite: 31 spec files / 328 tests
+pnpm typecheck   # TypeScript static check
+pnpm build       # Production bundle (dist/ + package.zip)
+pnpm dev         # Watch mode with hot rebuild
+```
+
+For the full module map, dependency rules, and refactor history, see [docs/project-structure.md](./docs/project-structure.md) and [docs/refactor-plan.md](./docs/refactor-plan.md).
+
+---
+
 ## 📄 License
 
 This project is licensed under the [MIT License](./LICENSE). Feel free to submit feedback and suggestions on [GitHub Issues](https://github.com/famotime/siyuan-tag-manager/issues)!

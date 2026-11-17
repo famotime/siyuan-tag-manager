@@ -14,7 +14,7 @@
               <label class="tm-bold-label">
                 目标文档 (已选 <strong>{{ allTargetDocs.length }}</strong> 篇<span v-if="includeSubDocs && activeSubDocs.length > 0" class="tm-subdocs-badge">含 {{ activeSubDocs.length }} 篇子文档</span>)：
               </label>
-              <label class="tm-checkbox-label" title="勾选后将已选中文档中的子文档都纳入打标范围">
+              <label class="tm-checkbox-label" v-tooltip="'勾选后将已选中文档中的子文档都纳入打标范围'">
                 <input
                   v-model="includeSubDocs"
                   type="checkbox"
@@ -56,7 +56,7 @@
               :key="doc.id"
               class="tm-selected-doc-chip"
               :class="{ 'is-sub-doc': isSubDoc(doc.id) }"
-              :title="`ID: ${doc.id}${isSubDoc(doc.id) ? ' (子文档)' : ''}`"
+              v-tooltip="`ID: ${doc.id}${isSubDoc(doc.id) ? ' (子文档)' : ''}`"
             >
               <SyLineIcon :name="isSubDoc(doc.id) ? 'corner-down-right' : 'file-text'" :size="11" />
               <span class="doc-chip-title">
@@ -65,7 +65,7 @@
               </span>
               <button
                 class="doc-chip-del"
-                :title="isSubDoc(doc.id) ? '排除此子文档' : '移除该文档'"
+                v-tooltip="isSubDoc(doc.id) ? '排除此子文档' : '移除该文档'"
                 @click="removeDoc(doc.id)"
               >
                 <SyLineIcon name="close" :size="10" />
@@ -169,7 +169,7 @@
               class="tm-batch-tag-chip"
             >
               <span>#{{ t }}#</span>
-              <button class="chip-del-btn" title="移除" @click="removeTag(t)">
+              <button class="chip-del-btn" v-tooltip="'移除'" @click="removeTag(t)">
                 <SyLineIcon name="close" :size="10" />
               </button>
             </span>
@@ -182,7 +182,7 @@
               v-for="group in tagGroups"
               :key="group.id"
               class="tm-quick-group-btn"
-              :title="`点击将「${group.name}」包含的全部 ${group.tags.length} 个标签添加至列表`"
+              v-tooltip="`点击将「${group.name}」包含的全部 ${group.tags.length} 个标签添加至列表`"
               @click="applyTagGroup(group)"
             >
               <span class="dot" :style="{ backgroundColor: group.color || 'var(--b3-theme-primary)' }"></span>
@@ -244,9 +244,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
-import { TagBatchService } from '../../services/TagBatchService';
+import { stripTagHash } from '../../utils/tagText';
+import { useDocSelection } from '../../composables/useDocSelection';
 import type { ITagItem, ITagGroup } from '../../types/tag';
-import type { IBatchModalState, IBatchDocItem } from '../../types/ui';
+import type { IBatchModalState } from '../../types/ui';
 
 const props = withDefaults(
   defineProps<{
@@ -263,214 +264,67 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'execute', payload: { docIds: string[]; tags: string[] }): void;
+  (e: 'sync-state', patch: Partial<IBatchModalState>): void;
 }>();
 
-// 文档添加模式：search | notebook | manual
-const docAddMode = ref<'search' | 'notebook' | 'manual'>('search');
-
-// 已选文档集合（根文档）
-const selectedDocs = ref<IBatchDocItem[]>([]);
-
-// 是否包含子文档
-const includeSubDocs = ref(false);
-// 扫描出的子文档列表
-const subDocs = ref<IBatchDocItem[]>([]);
-// 正在扫描子文档状态
-const loadingSubDocs = ref(false);
-// 临时排除的子文档 ID 集合
-const excludedSubDocIds = ref<Set<string>>(new Set());
-
-// 搜索文档状态
-const docSearchKeyword = ref('');
-const searchingDocs = ref(false);
-const searched = ref(false);
-const searchDocResults = ref<Array<{ id: string; title: string; tags: string[] }>>([]);
-
-// 笔记本状态
-const notebooks = ref<Array<{ id: string; name: string }>>([]);
-const selectedNotebookId = ref('');
-const loadingNotebookDocs = ref(false);
+// 文档选取子域（三种添加模式、子文档扫描与目标合并抽离至 useDocSelection）
+const {
+  docAddMode,
+  selectedDocs,
+  includeSubDocs,
+  subDocs,
+  loadingSubDocs,
+  excludedSubDocIds,
+  docSearchKeyword,
+  searchingDocs,
+  searched,
+  searchDocResults,
+  notebooks,
+  selectedNotebookId,
+  loadingNotebookDocs,
+  activeSubDocs,
+  allTargetDocs,
+  isSubDoc,
+  loadSubDocs,
+  removeDoc,
+  isDocSelected,
+  toggleDocSelection,
+  onSearchDocsInput,
+  triggerSearchDocs,
+  loadNotebooks,
+  loadDocsFromNotebook,
+  syncManualDocIds,
+  commitExecuteContext,
+} = useDocSelection({
+  getState: () => props.state,
+  onSyncState: (patch) => emit('sync-state', patch),
+});
 
 // 待添加标签状态
 const selectedTags = ref<string[]>([]);
 const newTagInput = ref('');
 
-// 实际生效的子文档列表（排除被单独移除的）
-const activeSubDocs = computed(() => {
-  if (!includeSubDocs.value) return [];
-  return subDocs.value.filter(d => !excludedSubDocIds.value.has(d.id));
-});
-
-// 全部打标目标文档（根文档 + 纳入的有效子文档，去重）
-const allTargetDocs = computed(() => {
-  if (!includeSubDocs.value) {
-    return selectedDocs.value;
-  }
-  const rootIds = new Set(selectedDocs.value.map(d => d.id));
-  const uniqueSubDocs = activeSubDocs.value.filter(d => !rootIds.has(d.id));
-  return [...selectedDocs.value, ...uniqueSubDocs];
-});
-
-function isSubDoc(id: string): boolean {
-  return activeSubDocs.value.some(d => d.id === id);
-}
-
-async function loadSubDocs() {
-  if (!includeSubDocs.value || selectedDocs.value.length === 0) {
-    subDocs.value = [];
-    return;
-  }
-  loadingSubDocs.value = true;
-  try {
-    const parentIds = selectedDocs.value.map(d => d.id);
-    const res = await TagBatchService.getSubDocs(parentIds);
-    subDocs.value = res.map(r => ({ id: r.id, title: r.title, isSubDoc: true }));
-  } catch (err) {
-    console.warn('[siyuan-tag-manager] loadSubDocs error:', err);
-    subDocs.value = [];
-  } finally {
-    loadingSubDocs.value = false;
-  }
-}
-
-watch(includeSubDocs, (val) => {
-  if (val) {
-    excludedSubDocIds.value = new Set();
-    loadSubDocs();
-  } else {
-    subDocs.value = [];
-    excludedSubDocIds.value = new Set();
-  }
-});
-
-// 当选中文档发生变动且已勾选包含子文档时，自动重新扫描子文档
-watch(
-  () => selectedDocs.value.map(d => d.id).sort().join(','),
-  () => {
-    if (includeSubDocs.value) {
-      loadSubDocs();
-    }
-  }
-);
-
-// 初始化监听外部传入的 targetDocs 或 docIdsText
+// 初始化监听外部传入的 tagsText（文档部分回填由 useDocSelection 内部 watch 负责）
 watch(
   [() => props.state.visible, () => props.state.targetDocs],
   ([vis]) => {
     if (vis) {
-      includeSubDocs.value = Boolean(props.state.includeSubDocs);
-      excludedSubDocIds.value = new Set();
-      subDocs.value = [];
-
-      if (props.state.targetDocs && props.state.targetDocs.length > 0) {
-        selectedDocs.value = [...props.state.targetDocs];
-      } else if (props.state.docIdsText) {
-        const ids = props.state.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
-        selectedDocs.value = ids.map(id => ({ id, title: id }));
-      } else {
-        selectedDocs.value = [];
-      }
-
       if (props.state.tagsText) {
         selectedTags.value = props.state.tagsText
           .split(',')
-          .map(s => s.trim().replace(/^#+|#+$/g, ''))
+          .map(s => stripTagHash(s))
           .filter(Boolean);
       } else {
         selectedTags.value = [];
-      }
-
-      if (includeSubDocs.value) {
-        loadSubDocs();
       }
     }
   },
   { immediate: true, deep: true }
 );
 
-function removeDoc(id: string) {
-  if (isSubDoc(id)) {
-    const next = new Set(excludedSubDocIds.value);
-    next.add(id);
-    excludedSubDocIds.value = next;
-  } else {
-    selectedDocs.value = selectedDocs.value.filter(d => d.id !== id);
-  }
-}
-
-function isDocSelected(id: string): boolean {
-  return selectedDocs.value.some(d => d.id === id);
-}
-
-function toggleDocSelection(doc: { id: string; title: string }) {
-  if (isDocSelected(doc.id)) {
-    removeDoc(doc.id);
-  } else {
-    selectedDocs.value.push({ id: doc.id, title: doc.title });
-  }
-}
-
-let searchTimer: any = null;
-function onSearchDocsInput() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    triggerSearchDocs();
-  }, 350);
-}
-
-async function triggerSearchDocs() {
-  const kw = docSearchKeyword.value.trim();
-  if (!kw) {
-    searchDocResults.value = [];
-    searched.value = false;
-    return;
-  }
-  searchingDocs.value = true;
-  searched.value = true;
-  try {
-    searchDocResults.value = await TagBatchService.searchDocs(kw, 30);
-  } finally {
-    searchingDocs.value = false;
-  }
-}
-
-async function loadNotebooks() {
-  if (notebooks.value.length === 0) {
-    notebooks.value = await TagBatchService.fetchNotebooks();
-  }
-}
-
-async function loadDocsFromNotebook() {
-  if (!selectedNotebookId.value) return;
-  loadingNotebookDocs.value = true;
-  try {
-    const list = await TagBatchService.getNotebookDocs(selectedNotebookId.value, 100);
-    const existing = new Set(selectedDocs.value.map(d => d.id));
-    for (const item of list) {
-      if (!existing.has(item.id)) {
-        selectedDocs.value.push({ id: item.id, title: item.title });
-        existing.add(item.id);
-      }
-    }
-  } finally {
-    loadingNotebookDocs.value = false;
-  }
-}
-
-function syncManualDocIds() {
-  const lines = props.state.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
-  const existing = new Set(selectedDocs.value.map(d => d.id));
-  for (const id of lines) {
-    if (!existing.has(id)) {
-      selectedDocs.value.push({ id, title: id });
-      existing.add(id);
-    }
-  }
-}
-
 // 标签操作
 function addTag(raw: string) {
-  const clean = raw.trim().replace(/^#+|#+$/g, '');
+  const clean = stripTagHash(raw);
   if (clean && !selectedTags.value.includes(clean)) {
     selectedTags.value.push(clean);
   }
@@ -506,10 +360,8 @@ function handleExecute() {
   const tags = [...selectedTags.value];
   if (docIds.length === 0 || tags.length === 0) return;
 
-  // 同步回文本兼容字段
-  props.state.docIdsText = docIds.join('\n');
-  props.state.tagsText = tags.join(', ');
-  props.state.includeSubDocs = includeSubDocs.value;
+  // 经 sync-state 事件回传文本兼容字段（替代直接突变 props.state 的反模式）
+  commitExecuteContext(docIds, tags);
 
   emit('execute', { docIds, tags });
 }

@@ -1,4 +1,5 @@
 import { TagApiClient } from './TagApiClient';
+import { stripTagHash } from '../utils/tagText';
 
 /**
  * 块尾部标签追加打标服务
@@ -13,7 +14,7 @@ export class TagBlockAppender {
    * 将标签规范追加至 Markdown 文本尾部
    */
   public static appendTagToMarkdown(markdown: string, tag: string): string {
-    const cleanTag = tag.replace(/^#+|#+$/g, '').trim();
+    const cleanTag = stripTagHash(tag);
     if (!cleanTag) return markdown;
 
     const trimmed = markdown.trim();
@@ -37,7 +38,7 @@ export class TagBlockAppender {
     protyle?: any,
   ): Promise<boolean> {
     if (!blockId || !tag) return false;
-    const cleanTag = tag.replace(/^#+|#+$/g, '').trim();
+    const cleanTag = stripTagHash(tag);
     if (!cleanTag) return false;
 
     // 若当前具有 Protyle 实例且提供 insert 接口，优先使用前端事务以保证 undo/redo 体验

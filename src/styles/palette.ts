@@ -18,6 +18,9 @@ export interface IColorPreset {
   isCustom?: boolean;
 }
 
+/** 标签组默认主题色（全库唯一魔法色来源，替代各处硬编码 #4285F4） */
+export const DEFAULT_GROUP_COLOR = '#4285F4';
+
 /** 推荐常用底色候选板 (柔和明亮) */
 export const RECOMMENDED_BG_COLORS: string[] = [
   '#EBF3FE', // 经典蓝底

@@ -1,6 +1,7 @@
 import { showMessage } from 'siyuan';
 import { TagApiClient } from './TagApiClient';
 import { TagBatchService } from './TagBatchService';
+import { stripTagHash } from '../utils/tagText';
 
 /**
  * 标签拖拽打标服务
@@ -226,7 +227,7 @@ export class TagDropService {
       const tag =
         e.dataTransfer?.getData('application/siyuan-tag') ||
         this.draggingTag ||
-        e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
+        stripTagHash(e.dataTransfer?.getData('text/plain') || '');
 
       if (!tag) return;
 
@@ -268,7 +269,7 @@ export class TagDropService {
       const tag =
         e.dataTransfer?.getData('application/siyuan-tag') ||
         this.draggingTag ||
-        e.dataTransfer?.getData('text/plain')?.replace(/^#|#\s*$/g, '').trim();
+        stripTagHash(e.dataTransfer?.getData('text/plain') || '');
 
       const target = e.target as HTMLElement | null;
 

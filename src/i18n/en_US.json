@@ -1,6 +1,5 @@
 {
   "dockTitle": "Tag Manager",
   "openTagManager": "Open Tag Manager Workspace",
-  "toggleDock": "Toggle Tag Manager Dock",
-  "addTopBarIcon": "Tag Manager"
+  "toggleDock": "Toggle Tag Manager Dock"
 }

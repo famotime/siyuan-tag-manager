@@ -285,13 +285,6 @@ export class TagGovernanceService {
   }
 
   /**
-   * 兼容历史命名：检测大小写与相似冲突
-   */
-  public static detectCaseConflicts(tags: ITagItem[]): ITagHealthIssue[] {
-    return this.detectSimilarConflicts(tags);
-  }
-
-  /**
    * 检测库中不合规范的标签（多余斜杠、非法字符、超长 > 15 字符、超深 >= 3 层、纯数字无语义）
    */
   public static detectInvalidNorms(tags: ITagItem[]): ITagHealthIssue[] {

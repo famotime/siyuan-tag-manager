@@ -1,6 +1,9 @@
 import type { ITagGroup } from '../types/tag';
 import { TagGovernanceService } from './TagGovernanceService';
 import { TagBatchService } from './TagBatchService';
+import { TagApiClient } from './TagApiClient';
+import { DEFAULT_GROUP_COLOR } from '../styles/palette';
+import { stripTagHash } from '../utils/tagText';
 
 /**
  * 标签组服务：负责标签套件管理与当前文档/块的一键智能打标
@@ -17,9 +20,7 @@ export class TagGroupService {
    * 规范化标签项（去除首尾空格、#与多余斜杠）
    */
   public static cleanTag(raw: string): string {
-    if (!raw) return '';
-    const withoutHash = raw.trim().replace(/^#+|#+$/g, '');
-    return TagGovernanceService.normalizeLabel(withoutHash);
+    return TagGovernanceService.normalizeLabel(stripTagHash(raw));
   }
 
   /**
@@ -42,7 +43,7 @@ export class TagGroupService {
       id: this.generateId(),
       name,
       tags: cleanTags,
-      color: data.color || '#4285F4',
+      color: data.color || DEFAULT_GROUP_COLOR,
       icon: data.icon || '',
       sortOrder: currentGroups.length,
       updatedAt: Date.now(),
@@ -200,14 +201,7 @@ export class TagGroupService {
       return { success: false, error: '待打标签列表不能为空' };
     }
 
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     try {
       const attrsRes = await post('/api/attr/getBlockAttrs', { id: docId });
@@ -240,14 +234,7 @@ export class TagGroupService {
       return { success: false, error: '待打标签列表不能为空' };
     }
 
-    const post = requestFn || (async (url, data) => {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined' && (window as any).siyuan?.config?.apiToken) {
-        headers.Authorization = `Token ${(window as any).siyuan.config.apiToken}`;
-      }
-      const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(data) });
-      return res.json();
-    });
+    const post = requestFn || ((url: string, data: any) => TagApiClient.postRaw(url, data));
 
     try {
       const mdRes = await post('/api/block/getBlockKramdown', { id: blockId });

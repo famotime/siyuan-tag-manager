@@ -137,7 +137,7 @@
           :health-result="healthResult"
           :all-tags="allTags"
           @auto-resolve="onAutoResolveIssue"
-          @remove-tag="handleRemoveTag"
+          @remove-tag="handleTreeRemoveTag"
           @open-rename="openRenameDialog"
           @auto-normalize="handleAutoNormalizeTag"
           @refresh-tags="refreshAllData"
@@ -179,6 +179,7 @@
       :all-tags="allTags"
       :tag-groups="tagGroups"
       @close="batchModal.visible = false"
+      @sync-state="(patch) => Object.assign(batchModal, patch)"
       @execute="executeBatchTag"
     />
 
@@ -238,14 +239,9 @@ import type { ITagHealthIssue, ITagMetadata, ITagGroup, ITagCombination, ITagDel
 import type { ITagCompanionConfig } from './types/companion';
 import type {
   TabType,
-  IRowMenuState,
-  IStyleModalState,
-  ISaveViewModalState,
-  IBatchModalState,
-  IMergeModalState,
-  IRenameModalState,
-  ITagGroupModalState,
 } from './types/ui';
+import type { IColorPreset } from './styles/palette';
+import { DEFAULT_GROUP_COLOR } from './styles/palette';
 
 // 核心服务与工具
 import { TagApiClient } from './services/TagApiClient';
@@ -264,6 +260,7 @@ import { batchTagBridge } from './utils/batchTagBridge';
 import { useTagData } from './composables/useTagData';
 import { useTagFilter } from './composables/useTagFilter';
 import { useTagHygiene } from './composables/useTagHygiene';
+import { useModalOrchestration } from './composables/useModalOrchestration';
 
 // 视图与弹窗子组件
 import SyLineIcon from './components/SiyuanTheme/SyLineIcon.vue';
@@ -307,8 +304,24 @@ const {
   handleRenameTag,
 } = useTagData();
 
-const companionModalVisible = ref(false);
-const settingsModalVisible = ref(false);
+// 弹窗编排状态与全局 Escape 关闭链（抽离至 useModalOrchestration）
+const {
+  companionModalVisible,
+  settingsModalVisible,
+  rowMenu,
+  styleModal,
+  saveViewModal,
+  batchModal,
+  mergeModal,
+  renameModal,
+  groupModal,
+  reparentModal,
+  openRowMenu,
+  closeRowMenu,
+  handleGlobalKeydown,
+} = useModalOrchestration({
+  onEscapeFallback: () => closePanel(),
+});
 
 async function onSaveCompanionConfig(config: ITagCompanionConfig) {
   await saveCompanionConfig(config, savedViews.value);
@@ -328,7 +341,6 @@ const {
   savedViews,
   selectedSmartViewId,
   runQuery,
-  handleQuickFilter,
   handleTagClick,
   switchFilterMode,
   toggleTagFilter,
@@ -343,69 +355,8 @@ const {
 
 const { healthResult, updateHealthResult, autoResolveIssue } = useTagHygiene();
 
-// 2. 局部视图与弹窗控制状态
+// 2. 局部视图控制状态（弹窗状态已抽离至 useModalOrchestration）
 const currentTab = ref<TabType>('tree');
-
-const rowMenu = ref<IRowMenuState>({
-  visible: false,
-  label: '',
-  top: 0,
-  left: 0,
-});
-
-const styleModal = ref<IStyleModalState>({
-  visible: false,
-  label: '',
-  presetId: '',
-  backgroundColor: '',
-  textColor: '',
-  darkBackgroundColor: '',
-  darkTextColor: '',
-  icon: '',
-  aliasesText: '',
-});
-
-const saveViewModal = ref<ISaveViewModalState>({
-  visible: false,
-  title: '',
-});
-
-const batchModal = ref<IBatchModalState>({
-  visible: false,
-  docIdsText: '',
-  tagsText: '',
-  executing: false,
-});
-
-const mergeModal = ref<IMergeModalState>({
-  visible: false,
-  sourceLabel: '',
-  targetLabel: '',
-  setAsAlias: true,
-  executing: false,
-});
-
-const renameModal = ref<IRenameModalState>({
-  visible: false,
-  oldLabel: '',
-  newLabel: '',
-  executing: false,
-});
-
-const groupModal = ref<ITagGroupModalState>({
-  visible: false,
-  isEdit: false,
-  groupId: undefined,
-  name: '',
-  color: '#4285F4',
-  icon: '',
-  tags: [],
-});
-
-const reparentModal = ref<{ visible: boolean; label: string }>({
-  visible: false,
-  label: '',
-});
 
 // 3. 图谱与时序状态
 const graphData = ref<ITagGraphData>({ nodes: [], links: [] });
@@ -481,32 +432,6 @@ function onTagClick(label: string, event: MouseEvent) {
 function onQuickFilter(label: string, append: boolean) {
   // 不立即跳转多维筛选，而是在后台增加/切换筛选项，跟按住 Ctrl 点击操作保持一致
   handleTagClick(label, { ctrlKey: true } as MouseEvent);
-}
-
-function openRowMenu(label: string, event: MouseEvent) {
-  const target = event.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const menuWidth = 180;
-  let left = rect.left - menuWidth + 24;
-  if (left < 10) left = 10;
-  let top = rect.bottom + 4;
-  const menuHeight = 130;
-  if (top + menuHeight > window.innerHeight) {
-    top = rect.top - menuHeight;
-  }
-
-  rowMenu.value = {
-    visible: true,
-    label,
-    top,
-    left,
-  };
-}
-
-function closeRowMenu() {
-  if (rowMenu.value.visible) {
-    rowMenu.value.visible = false;
-  }
 }
 
 function handleTreeRemoveTag(label: string) {
@@ -627,7 +552,7 @@ function openCreateGroupDialog() {
     isEdit: false,
     groupId: undefined,
     name: '',
-    color: '#4285F4',
+    color: DEFAULT_GROUP_COLOR,
     icon: '',
     tags: [],
   };
@@ -639,7 +564,7 @@ function openEditGroupDialog(group: ITagGroup) {
     isEdit: true,
     groupId: group.id,
     name: group.name,
-    color: group.color || '#4285F4',
+    color: group.color || DEFAULT_GROUP_COLOR,
     icon: group.icon || '',
     tags: [...group.tags],
   };
@@ -749,28 +674,16 @@ async function executeBatchTag(payload?: { docIds: string[]; tags: string[] }) {
   const docIds = payload?.docIds || batchModal.value.docIdsText.split('\n').map(s => s.trim()).filter(Boolean);
   const tags = payload?.tags || batchModal.value.tagsText.split(',').map(s => s.trim()).filter(Boolean);
 
-  if (docIds.length === 0 || tags.length === 0) {
-    showMessage('目标文档与待添加标签均不能为空', 3000, 'error');
-    return;
-  }
-
-  batchModal.value.executing = true;
-  try {
-    const res = await TagBatchService.batchTagDocuments(docIds, tags);
-    if (res.success) {
-      showMessage(`成功为 ${res.updatedCount} 篇文档更新标签`, 3000, 'info');
-      batchModal.value.visible = false;
-      batchModal.value.targetDocs = [];
-      batchModal.value.docIdsText = '';
-      batchModal.value.tagsText = '';
-      await refreshAllData();
-    } else {
-      showMessage(`批量打标存在错误: ${res.errors.join('; ')}`, 5000, 'error');
-    }
-  } catch (err: any) {
-    showMessage(`批量打标失败: ${err.message || err}`, 4000, 'error');
-  } finally {
-    batchModal.value.executing = false;
+  // 校验、执行与提示统一收敛至 TagBatchService.executeBatchTagging
+  const ok = await TagBatchService.executeBatchTagging(docIds, tags, (executing) => {
+    batchModal.value.executing = executing;
+  });
+  if (ok) {
+    batchModal.value.visible = false;
+    batchModal.value.targetDocs = [];
+    batchModal.value.docIdsText = '';
+    batchModal.value.tagsText = '';
+    await refreshAllData();
   }
 }
 
@@ -857,7 +770,9 @@ async function handleAutoNormalizeTag(label: string, target?: string) {
 async function loadGraphData() {
   loading.value = true;
   try {
-    const res = await TagApiClient.fetchCooccurrenceGraph();
+    const res = await TagCooccurrenceService.fetchCooccurrenceGraph(
+      (url: string, data: any) => TagApiClient.request(url, data),
+    );
     graphData.value = res.graph;
     tagCombinations.value = res.combinations || [];
     updateAssociatedTags();
@@ -913,7 +828,7 @@ function handleSaveAsGroup(tags: string[]) {
     isEdit: false,
     groupId: undefined,
     name: cleanTags.join(' + '),
-    color: '#4285F4',
+    color: DEFAULT_GROUP_COLOR,
     icon: '',
     tags: cleanTags,
   };
@@ -927,52 +842,20 @@ function closePanel() {
   toggleTagManagerDock();
 }
 
-function handleGlobalKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    if (rowMenu.value.visible) {
-      rowMenu.value.visible = false;
-      return;
-    }
-    if (styleModal.value.visible) {
-      styleModal.value.visible = false;
-      return;
-    }
-    if (saveViewModal.value.visible) {
-      saveViewModal.value.visible = false;
-      return;
-    }
-    if (batchModal.value.visible) {
-      batchModal.value.visible = false;
-      return;
-    }
-    if (mergeModal.value.visible) {
-      mergeModal.value.visible = false;
-      return;
-    }
-    if (companionModalVisible.value) {
-      companionModalVisible.value = false;
-      return;
-    }
-    if (settingsModalVisible.value) {
-      settingsModalVisible.value = false;
-      return;
-    }
-    closePanel();
-  }
-}
-
 let unsubBridge: (() => void) | null = null;
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown);
   unsubBridge = batchTagBridge.on((docs) => {
-    batchModal.value = {
+    // 原地合并而非整体替换，保持 state 对象引用稳定，
+    // 避免子组件捕获的 props.state 与内部 composable 的 watch 源失效
+    Object.assign(batchModal.value, {
       visible: true,
       targetDocs: [...docs],
       docIdsText: docs.map(d => d.id).join('\n'),
       tagsText: '',
       executing: false,
-    };
+    });
   });
   refreshAllData();
 });

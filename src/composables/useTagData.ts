@@ -11,13 +11,15 @@ import type { IColorPreset } from '../styles/palette';
 import type { ITagCompanionConfig } from '../types/companion';
 import { DEFAULT_COMPANION_CONFIG } from '../types/companion';
 import { TagApiClient } from '../services/TagApiClient';
+import { TagFilterEngine } from '../services/TagFilterEngine';
 import { TagVisualService } from '../services/TagVisualService';
 import { TagDomDecorator } from '../services/TagDomDecorator';
 import { TagDocConverterService } from '../services/TagDocConverterService';
 import { TagCreationService } from '../services/TagCreationService';
 import { TagCompanionService } from '../services/TagCompanionService';
 import { TagDeletionService } from '../services/TagDeletionService';
-import { usePlugin } from '../main';
+import { TagConfigStore } from '../services/TagConfigStore';
+import { savedViews as sharedSavedViews } from './useTagFilter';
 
 // 共享的标签资产与元数据状态
 const allTags = ref<ITagItem[]>([]);
@@ -32,13 +34,15 @@ const tagDeleteConfig = ref<ITagDeleteConfig>({ ...DEFAULT_TAG_DELETE_CONFIG });
 export function useTagData() {
   /**
    * 统一持久化插件配置
+   * @param savedViewsList 显式传入的智能视图快照；未传入时回退共享 savedViews 状态，
+   *                       避免历史缺陷中无参调用以空数组覆盖磁盘上已保存视图
    */
-  async function persistConfig(savedViews: any[] = []) {
-    const plugin = usePlugin();
+  async function persistConfig(savedViewsList?: any[]) {
     const metaList = Array.from(metadataMap.value.values());
-    await plugin.saveData('tag-manager-config.json', {
+    // 统一经 TagConfigStore 读-合并-写持久化，避免整文件覆盖丢失其他配置
+    await TagConfigStore.updateConfig({
       metadataList: metaList,
-      savedViews,
+      savedViews: savedViewsList ?? sharedSavedViews.value,
       tagGroups: tagGroups.value,
       customTags: customTags.value,
       customColorPresets: customColorPresets.value,
@@ -53,8 +57,7 @@ export function useTagData() {
   async function refreshTags(onLoaded?: (tags: ITagItem[]) => void) {
     loading.value = true;
     try {
-      const plugin = usePlugin();
-      const localData = await plugin.loadData('tag-manager-config.json').catch(() => null);
+      const localData = await TagConfigStore.readConfig();
       if (localData?.metadataList && Array.isArray(localData.metadataList)) {
         const map = new Map<string, ITagMetadata>();
         localData.metadataList.forEach((m: ITagMetadata) => map.set(m.label, m));
@@ -65,6 +68,11 @@ export function useTagData() {
 
       if (localData?.tagGroups && Array.isArray(localData.tagGroups)) {
         tagGroups.value = localData.tagGroups;
+      }
+
+      // 回填智能视图（历史上漏回填导致保存的视图重启后永远丢失）
+      if (localData?.savedViews && Array.isArray(localData.savedViews)) {
+        sharedSavedViews.value = localData.savedViews;
       }
 
       if (localData?.customTags && Array.isArray(localData.customTags)) {
@@ -149,7 +157,7 @@ export function useTagData() {
     return s;
   }
 
-  async function saveTagMetadata(meta: ITagMetadata, savedViews: any[] = []) {
+  async function saveTagMetadata(meta: ITagMetadata, savedViews?: any[]) {
     metadataMap.value.set(meta.label, meta);
     await persistConfig(savedViews);
 
@@ -161,7 +169,7 @@ export function useTagData() {
     }
   }
 
-  async function saveTagGroups(groups: ITagGroup[], savedViews: any[] = []) {
+  async function saveTagGroups(groups: ITagGroup[], savedViews?: any[]) {
     tagGroups.value = groups;
     await persistConfig(savedViews);
   }
@@ -169,7 +177,7 @@ export function useTagData() {
   /**
    * 将新标签仅添加到侧面板标签资产库中（不修改当前文档）
    */
-  async function addCustomTag(rawLabel: string, savedViews: any[] = []): Promise<{ success: boolean; label: string; error?: string }> {
+  async function addCustomTag(rawLabel: string, savedViews?: any[]): Promise<{ success: boolean; label: string; error?: string }> {
     const validation = TagCreationService.validateTag(rawLabel);
     if (!validation.valid) {
       return { success: false, label: rawLabel, error: validation.error };
@@ -236,7 +244,7 @@ export function useTagData() {
         showMessage(`已成功删除标签 "${label}"`, 3000, 'info');
       }
 
-      await refreshTags();
+      // 数据刷新统一由调用层（App.refreshAllData）收口，避免同一操作触发两遍全量拉取
       return result.success;
     } catch (err: any) {
       showMessage(`删除标签失败: ${err.message || err}`, 4000, 'error');
@@ -249,7 +257,10 @@ export function useTagData() {
   async function handleConvertToDoc(label: string) {
     loading.value = true;
     try {
-      const blocks = await TagApiClient.queryMatchedBlocks({ includeTags: [label], limit: 30 });
+      const blocks = await TagFilterEngine.queryMatchedBlocks(
+        { includeTags: [label], limit: 30 },
+        (url: string, data: any) => TagApiClient.request(url, data),
+      );
       const res = await TagDocConverterService.createDocFromTag(label, blocks);
       if (res.success && res.docId) {
         showMessage(`已成功创建主题聚合文档《${label}》！`, 4000, 'info');
@@ -269,7 +280,7 @@ export function useTagData() {
     }
   }
 
-  async function saveCustomColorPreset(preset: IColorPreset, savedViews: any[] = []) {
+  async function saveCustomColorPreset(preset: IColorPreset, savedViews?: any[]) {
     const existingIndex = customColorPresets.value.findIndex(p => p.id === preset.id);
     if (existingIndex >= 0) {
       customColorPresets.value[existingIndex] = preset;
@@ -279,7 +290,7 @@ export function useTagData() {
     await persistConfig(savedViews);
   }
 
-  async function removeCustomColorPreset(presetId: string, savedViews: any[] = []) {
+  async function removeCustomColorPreset(presetId: string, savedViews?: any[]) {
     customColorPresets.value = customColorPresets.value.filter(p => p.id !== presetId);
     await persistConfig(savedViews);
   }
@@ -307,7 +318,7 @@ export function useTagData() {
         await TagApiClient.renameTag(kr.oldLabel, kr.newLabel);
       }
 
-      // 2. 迁移所有变动项的元数据与侧面板自定义标签
+      // 2. 迁移所有变动项的元数据、侧面板自定义标签与标签组（与 handleRenameTag 行为保持一致）
       for (const m of moves) {
         if (m.oldLabel === m.newLabel) continue;
         const oldMeta = metadataMap.value.get(m.oldLabel);
@@ -323,6 +334,22 @@ export function useTagData() {
         if (customIdx >= 0) {
           customTags.value[customIdx] = m.newLabel;
         }
+        const oldPrefix = `${m.oldLabel}/`;
+        tagGroups.value = tagGroups.value.map(g => {
+          let changed = false;
+          const nextTags = g.tags.map(t => {
+            if (t === m.oldLabel) {
+              changed = true;
+              return m.newLabel;
+            }
+            if (t.startsWith(oldPrefix)) {
+              changed = true;
+              return `${m.newLabel}/${t.slice(oldPrefix.length)}`;
+            }
+            return t;
+          });
+          return changed ? { ...g, tags: nextTags } : g;
+        });
       }
       await persistConfig();
       await refreshTags();
@@ -343,7 +370,7 @@ export function useTagData() {
   async function handleRenameTag(
     oldLabel: string,
     newLabel: string,
-    savedViews: any[] = [],
+    savedViews?: any[],
   ): Promise<{ success: boolean; error?: string }> {
     if (!oldLabel || !newLabel || oldLabel === newLabel) {
       return { success: false, error: '新旧标签名称相同或为空' };
@@ -419,7 +446,7 @@ export function useTagData() {
       }
 
       await persistConfig(savedViews);
-      await refreshTags();
+      // 数据刷新统一由调用层（App.refreshAllData）收口；失败路径保留刷新以回滚展示真实内核状态
 
       return { success: true };
     } catch (err: any) {
@@ -430,14 +457,14 @@ export function useTagData() {
     }
   }
 
-  async function saveCompanionConfig(config: ITagCompanionConfig, savedViews: any[] = []) {
+  async function saveCompanionConfig(config: ITagCompanionConfig, savedViews?: any[]) {
     companionConfig.value = { ...config };
     TagCompanionService.updateConfig(config);
     await persistConfig(savedViews);
     showMessage('伴生推荐设置已保存', 3000, 'info');
   }
 
-  async function saveTagDeleteConfig(config: ITagDeleteConfig, savedViews: any[] = []) {
+  async function saveTagDeleteConfig(config: ITagDeleteConfig, savedViews?: any[]) {
     tagDeleteConfig.value = { ...config };
     await persistConfig(savedViews);
   }

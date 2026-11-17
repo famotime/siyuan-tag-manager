@@ -105,6 +105,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import SyLineIcon from '../SiyuanTheme/SyLineIcon.vue';
+import { stripTagHash } from '../../utils/tagText';
 import type { ITagItem } from '../../types/tag';
 import type { ITagGroupModalState } from '../../types/ui';
 
@@ -125,14 +126,14 @@ function removeTagFromGroup(tag: string) {
 }
 
 function addTagToGroup(tag: string) {
-  const clean = tag.replace(/^#+|#+$/g, '').trim();
+  const clean = stripTagHash(tag);
   if (clean && !props.state.tags.includes(clean)) {
     props.state.tags.push(clean);
   }
 }
 
 function addTypedTag() {
-  const clean = searchTagText.value.replace(/^#+|#+$/g, '').trim();
+  const clean = stripTagHash(searchTagText.value);
   if (clean) {
     addTagToGroup(clean);
     searchTagText.value = '';

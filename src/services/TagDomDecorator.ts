@@ -1,3 +1,5 @@
+import { stripTagHash } from '../utils/tagText';
+
 /**
  * 正文文档标签 DOM 属性装饰器服务
  * 
@@ -19,7 +21,7 @@ export class TagDomDecorator {
     // 过滤零宽字符（\u200B-\u200F）、格式控制字符（\u202A-\u202E）、单词连接符（\u2060-\u206F，思源Protyle行内标签默认前缀U+2060）及BOM字符（\uFEFF）
     const cleaned = rawText.replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, '').trim();
     // 剥离首尾所有的 '#' 字符并修剪
-    return cleaned.replace(/^#+|#+$/g, '').trim();
+    return stripTagHash(cleaned);
   }
 
   /**

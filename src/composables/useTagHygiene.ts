@@ -31,6 +31,9 @@ export function useTagHygiene() {
         if (onSuccess) {
           onSuccess();
         }
+      } else {
+        // executeMergePlan 内部吞掉单项异常（返回 errors 数组），此处必须显式反馈部分失败
+        showMessage(`部分合并失败: ${res.errors.join('; ')}`, 5000, 'error');
       }
     } catch (err: any) {
       showMessage(`修复失败: ${err.message || err}`, 4000, 'error');
