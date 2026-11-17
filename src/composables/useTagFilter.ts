@@ -32,6 +32,9 @@ export function useTagFilter() {
       && activeFilter.value.optionalTags.length === 0
     ) {
       matchedBlocks.value = [];
+      // 空筛选同样生效为“最新一次查询”：直接复位加载态。
+      // 否则在途请求的 finally 因 seq 不匹配会跳过复位，queryLoading 将永久卡在 true
+      queryLoading.value = false;
       return;
     }
 
