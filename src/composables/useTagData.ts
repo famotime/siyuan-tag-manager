@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { showMessage } from 'siyuan';
 import type {
   ITagDeleteConfig,
@@ -24,15 +24,30 @@ import { savedViews as sharedSavedViews } from './useTagFilter';
 
 // 共享的标签资产与元数据状态
 const allTags = ref<ITagItem[]>([]);
-const loading = ref(false);
+// 引用计数式全局忙碌状态：多条异步流（刷新/删除/重命名/升格/层级调整/图谱加载）
+// 可重叠执行，单一布尔会被先结束者提前复位，计数器保证全部结束后才解除忙碌
+const loadingDepth = ref(0);
+const loading = computed(() => loadingDepth.value > 0);
 const metadataMap = ref<Map<string, ITagMetadata>>(new Map());
 const tagGroups = ref<ITagGroup[]>([]);
 const customTags = ref<string[]>([]);
 const customColorPresets = ref<IColorPreset[]>([]);
 const companionConfig = ref<ITagCompanionConfig>({ ...DEFAULT_COMPANION_CONFIG });
 const tagDeleteConfig = ref<ITagDeleteConfig>({ ...DEFAULT_TAG_DELETE_CONFIG });
+// 全库刷新竞态防护序号：仅最新一次刷新可写入共享状态
+let refreshSeq = 0;
 
 export function useTagData() {
+  /** 进入一段忙碌区间（配对调用；endLoading 需置于 finally） */
+  function beginLoading() {
+    loadingDepth.value++;
+  }
+
+  /** 退出一段忙碌区间 */
+  function endLoading() {
+    loadingDepth.value = Math.max(0, loadingDepth.value - 1);
+  }
+
   /**
    * 统一持久化插件配置
    * @param savedViewsList 显式传入的智能视图快照；未传入时回退共享 savedViews 状态，
@@ -54,11 +69,15 @@ export function useTagData() {
 
   /**
    * 刷新全库标签数据与本地元数据配置
+   * 竞态防护：仅最新一次刷新允许写入共享状态，先发后至的旧响应整体丢弃
    */
   async function refreshTags(onLoaded?: (tags: ITagItem[]) => void) {
-    loading.value = true;
+    const seq = ++refreshSeq;
+    beginLoading();
     try {
       const localData = await TagConfigStore.readConfig();
+      if (seq !== refreshSeq) return allTags.value;
+
       if (localData?.metadataList && Array.isArray(localData.metadataList)) {
         const map = new Map<string, ITagMetadata>();
         localData.metadataList.forEach((m: ITagMetadata) => map.set(m.label, m));
@@ -94,6 +113,8 @@ export function useTagData() {
       }
 
       const tags = await TagApiClient.fetchAllTags();
+      if (seq !== refreshSeq) return allTags.value;
+
       tags.forEach((t) => {
         t.metadata = metadataMap.value.get(t.label);
       });
@@ -123,10 +144,13 @@ export function useTagData() {
       }
       return tags;
     } catch (err: any) {
-      showMessage(`加载标签失败: ${err.message || err}`, 4000, 'error');
+      // 仅最新一次刷新提示错误，避免并发刷新重复弹 toast
+      if (seq === refreshSeq) {
+        showMessage(`加载标签失败: ${err.message || err}`, 4000, 'error');
+      }
       return [];
     } finally {
-      loading.value = false;
+      endLoading();
     }
   }
 
@@ -212,7 +236,7 @@ export function useTagData() {
 
   async function handleRemoveTag(label: string): Promise<boolean> {
     // 确认交互统一由调用层（App 的自绘确认模态）完成，此处专注执行删除
-    loading.value = true;
+    beginLoading();
     try {
       // 1. 若在 customTags 中，将其剔除
       if (customTags.value.some(t => t.toLowerCase() === label.toLowerCase())) {
@@ -247,12 +271,12 @@ export function useTagData() {
       showMessage(`删除标签失败: ${err.message || err}`, 4000, 'error');
       return false;
     } finally {
-      loading.value = false;
+      endLoading();
     }
   }
 
   async function handleConvertToDoc(label: string) {
-    loading.value = true;
+    beginLoading();
     try {
       const blocks = await TagFilterEngine.queryMatchedBlocks(
         { includeTags: [label], limit: 30 },
@@ -273,7 +297,7 @@ export function useTagData() {
     } catch (err: any) {
       showMessage(`升格文档异常: ${err.message || err}`, 4000, 'error');
     } finally {
-      loading.value = false;
+      endLoading();
     }
   }
 
@@ -324,7 +348,7 @@ export function useTagData() {
     moves: Array<{ oldLabel: string; newLabel: string }>,
   ): Promise<{ success: boolean; error?: string }> {
     if (!moves || moves.length === 0) return { success: true };
-    loading.value = true;
+    beginLoading();
     try {
       // 1. 过滤出需要调用内核 renameTag 的根变动节点（思源内核 renameTag 会自动级联处理下属所有子标签）
       const kernelRenames: Array<{ oldLabel: string; newLabel: string }> = [];
@@ -385,7 +409,7 @@ export function useTagData() {
       await refreshTags();
       return { success: false, error: err.message || String(err) };
     } finally {
-      loading.value = false;
+      endLoading();
     }
   }
 
@@ -490,7 +514,7 @@ export function useTagData() {
     if (!oldLabel || !newLabel || oldLabel === newLabel) {
       return { success: false, error: '新旧标签名称相同或为空' };
     }
-    loading.value = true;
+    beginLoading();
     try {
       // 1. 调用内核原生重命名接口（思源内核会自动级联处理全库中下属所有子标签）
       await TagApiClient.renameTag(oldLabel, newLabel);
@@ -509,7 +533,7 @@ export function useTagData() {
       await refreshTags();
       return { success: false, error: err.message || String(err) };
     } finally {
-      loading.value = false;
+      endLoading();
     }
   }
 
@@ -528,6 +552,8 @@ export function useTagData() {
   return {
     allTags,
     loading,
+    beginLoading,
+    endLoading,
     metadataMap,
     customTags,
     customColorPresets,

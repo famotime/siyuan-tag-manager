@@ -300,6 +300,8 @@ import { TagDeletionService } from './services/TagDeletionService';
 const {
   allTags,
   loading,
+  beginLoading,
+  endLoading,
   metadataMap,
   tagGroups,
   customColorPresets,
@@ -843,7 +845,7 @@ async function handleAutoNormalizeTag(label: string, target?: string) {
 
 // 5. 关联洞察与生命周期
 async function loadGraphData() {
-  loading.value = true;
+  beginLoading();
   try {
     const res = await TagCooccurrenceService.fetchCooccurrenceGraph(
       (url: string, data: any) => TagApiClient.request(url, data),
@@ -854,7 +856,7 @@ async function loadGraphData() {
   } catch (err: any) {
     showMessage(`加载共现关联失败: ${err.message || err}`, 4000, 'error');
   } finally {
-    loading.value = false;
+    endLoading();
   }
 }
 

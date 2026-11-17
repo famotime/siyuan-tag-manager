@@ -321,6 +321,57 @@ describe('UI Composables 与状态管理规范化测试', () => {
       expect(savedViews.value[0].includeTags).toEqual(['AI', 'AI/llm']);
     });
 
+    it('refreshTags 并发时仅最新一次生效，先发后至的旧响应整体丢弃', async () => {
+      const { usePlugin } = await import('../src/main');
+      const { TagApiClient } = await import('../src/services/TagApiClient');
+      const { TagConfigStore } = await import('../src/services/TagConfigStore');
+      const { useTagData } = await import('../src/composables/useTagData');
+
+      usePlugin({ loadData: async () => ({}), saveData: async () => {} } as any);
+
+      // 两路可独立放行的挂起响应
+      const configResolvers: Array<(v: any) => void> = [];
+      const readSpy = vi.spyOn(TagConfigStore, 'readConfig')
+        .mockImplementation(() => new Promise((resolve) => { configResolvers.push(resolve); }));
+      const fetchResolvers: Array<(v: any[]) => void> = [];
+      const fetchSpy = vi.spyOn(TagApiClient, 'fetchAllTags')
+        .mockImplementation(() => new Promise((resolve) => { fetchResolvers.push(resolve); }));
+
+      try {
+        const { allTags, loading, customTags, refreshTags } = useTagData();
+        customTags.value = []; // 清理前序用例残留的共享自定义标签
+        const first = refreshTags();
+        await Promise.resolve();
+        configResolvers[0]({ metadataList: [] });
+        await Promise.resolve(); // 先发刷新通过配置检查，进入 fetchAllTags 挂起
+        expect(fetchResolvers.length).toBe(1);
+
+        const second = refreshTags();
+        await Promise.resolve();
+        configResolvers[1]({ metadataList: [] });
+        await Promise.resolve();
+        expect(fetchResolvers.length).toBe(2);
+
+        // 引用计数忙碌态：两段刷新区间叠加时保持忙碌
+        expect(loading.value).toBe(true);
+
+        // 后发刷新先返回 -> 生效
+        fetchResolvers[1]([{ name: 'new', label: 'new', count: 2, depth: 0, blockCount: 2, docCount: 1 }]);
+        await second;
+        expect(loading.value).toBe(true); // 旧刷新仍在飞行，忙碌未解除
+
+        // 先发刷新迟到 -> 数据被丢弃
+        fetchResolvers[0]([{ name: 'old', label: 'old', count: 1, depth: 0, blockCount: 1, docCount: 1 }]);
+        await first;
+
+        expect(allTags.value.map(t => t.label)).toEqual(['new']);
+        expect(loading.value).toBe(false); // 全部结束后忙碌解除
+      } finally {
+        readSpy.mockRestore();
+        fetchSpy.mockRestore();
+      }
+    });
+
     it('handleRemoveTag 在删除确认后调用 TagDeletionService 并清理元数据与自定义标签', async () => {
       const { usePlugin } = await import('../src/main');
       const { TagDeletionService } = await import('../src/services/TagDeletionService');
