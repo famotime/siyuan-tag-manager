@@ -270,6 +270,7 @@ import { TagTimelineService } from './services/TagTimelineService';
 import type { ITagTimelineStats } from './services/TagTimelineService';
 import { toggleTagManagerDock } from './main';
 import { batchTagBridge } from './utils/batchTagBridge';
+import { TAG_DATA_CHANGED_EVENT } from './utils/batchTagModalManager';
 
 // 状态 Composables
 import { useTagData } from './composables/useTagData';
@@ -921,8 +922,14 @@ function closePanel() {
 
 let unsubBridge: (() => void) | null = null;
 
+// 独立批量弹窗（Dock 未打开时的全局实例）执行成功后的数据同步
+function handleTagDataChanged() {
+  refreshAllData();
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown);
+  window.addEventListener(TAG_DATA_CHANGED_EVENT, handleTagDataChanged);
   unsubBridge = batchTagBridge.on((docs) => {
     // 原地合并而非整体替换，保持 state 对象引用稳定，
     // 避免子组件捕获的 props.state 与内部 composable 的 watch 源失效
@@ -939,6 +946,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown);
+  window.removeEventListener(TAG_DATA_CHANGED_EVENT, handleTagDataChanged);
   if (unsubBridge) unsubBridge();
 });
 </script>

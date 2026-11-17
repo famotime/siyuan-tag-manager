@@ -8,6 +8,9 @@ import { parseIalTags, escapeSqlLiteral } from '../utils/tagText';
  * 批量打标与属性更新服务
  */
 export class TagBatchService {
+  /** 批量打标执行串行锁：bridge 重开弹窗等场景下防止并发二次执行 */
+  private static isExecutingTagging = false;
+
   /**
    * 解析文档 IAL tags 属性（逗号分隔）
    */
@@ -129,6 +132,13 @@ export class TagBatchService {
       return false;
     }
 
+    // 串行守卫：上一轮批量打标尚未结束时拒绝重入（如执行中经文档树右键再次唤起弹窗）
+    if (this.isExecutingTagging) {
+      showMessage('批量打标正在执行中，请等待当前任务完成', 3000, 'error');
+      return false;
+    }
+
+    this.isExecutingTagging = true;
     setExecuting(true);
     try {
       const res = await this.batchTagDocuments(docIds, tags);
@@ -143,6 +153,7 @@ export class TagBatchService {
       return false;
     } finally {
       setExecuting(false);
+      this.isExecutingTagging = false;
     }
   }
 

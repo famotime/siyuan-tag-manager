@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TagBatchService } from '../src/services/TagBatchService';
 
 describe('TagBatchService 批量打标与属性更新测试', () => {
@@ -139,6 +139,45 @@ describe('TagBatchService 批量打标与属性更新测试', () => {
       const mockRequest = async () => ([]);
       const resNotFound = await TagBatchService.getSubDocs(['not_exist_doc'], mockRequest);
       expect(resNotFound).toEqual([]);
+    });
+  });
+
+  describe('executeBatchTagging 统一执行链路', () => {
+    it('执行期间拒绝并发重入，完成后恢复可用', async () => {
+      let resolveBatch!: (v: { success: boolean; updatedCount: number; errors: string[] }) => void;
+      const batchSpy = vi.spyOn(TagBatchService, 'batchTagDocuments')
+        .mockImplementation(() => new Promise((resolve) => { resolveBatch = resolve; }));
+
+      const executingCalls: boolean[] = [];
+      try {
+        const first = TagBatchService.executeBatchTagging(['doc-1'], ['ai'], (executing) => {
+          executingCalls.push(executing);
+        });
+
+        // 首轮仍在飞行：等待进入挂起后发起的并发调用应被拒绝
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const second = await TagBatchService.executeBatchTagging(['doc-2'], ['ai'], () => {});
+        expect(second).toBe(false);
+        expect(batchSpy).toHaveBeenCalledTimes(1); // 第二次未进入 batchTagDocuments
+
+        resolveBatch({ success: true, updatedCount: 1, errors: [] });
+        expect(await first).toBe(true);
+        expect(executingCalls).toEqual([true, false]);
+
+        // 首轮结束后可再次执行
+        batchSpy.mockResolvedValue({ success: true, updatedCount: 1, errors: [] });
+        const third = await TagBatchService.executeBatchTagging(['doc-3'], ['ai'], () => {});
+        expect(third).toBe(true);
+      } finally {
+        batchSpy.mockRestore();
+      }
+    });
+
+    it('空文档列表或空标签直接拒绝且不进入串行锁', async () => {
+      const executingSpy = vi.fn();
+      const res = await TagBatchService.executeBatchTagging([], ['ai'], executingSpy);
+      expect(res).toBe(false);
+      expect(executingSpy).not.toHaveBeenCalled();
     });
   });
 });

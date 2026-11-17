@@ -12,6 +12,18 @@ let standaloneApp: VueApp | null = null;
 let standaloneContainer: HTMLElement | null = null;
 let keydownListener: ((e: KeyboardEvent) => void) | null = null;
 
+/**
+ * 独立批量弹窗执行成功后的全局状态同步事件：
+ * Dock 内工作台实例监听该事件执行 refreshAllData，消除双实例间的数据陈旧窗口
+ */
+export const TAG_DATA_CHANGED_EVENT = 'tm:tag-data-changed';
+
+export function notifyTagDataChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(TAG_DATA_CHANGED_EVENT));
+  }
+}
+
 export async function openStandaloneBatchModal(
   docs: IBatchBridgeDoc[],
   options?: {

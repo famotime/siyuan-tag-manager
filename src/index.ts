@@ -22,6 +22,7 @@ import { batchTagBridge } from '@/utils/batchTagBridge';
 import {
   openStandaloneBatchModal,
   closeStandaloneBatchModal,
+  notifyTagDataChanged,
 } from '@/utils/batchTagModalManager';
 import { TagDropService } from '@/services/TagDropService';
 import { TagCompanionService } from '@/services/TagCompanionService';
@@ -175,8 +176,11 @@ export default class TagManagerPlugin extends Plugin {
           // 严禁调用 toggleTagManagerDock，避免把已展开的侧栏折叠缩回
           const dispatched = batchTagBridge.trigger(docs);
           if (!dispatched) {
-            // 侧栏未挂载或未激活时，通过全局独立模态窗直接唤起，不强行展开侧栏干扰用户
-            openStandaloneBatchModal(docs);
+            // 侧栏未挂载或未激活时，通过全局独立模态窗直接唤起，不强行展开侧栏干扰用户；
+            // 执行成功后派发全局事件，让 Dock 内工作台（若已打开）刷新数据
+            openStandaloneBatchModal(docs, {
+              onSuccess: () => notifyTagDataChanged(),
+            });
           }
         },
       });
