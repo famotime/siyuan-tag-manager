@@ -163,7 +163,7 @@ describe('TagConfigStore 配置统一存储', () => {
           return savedData ? JSON.parse(JSON.stringify(savedData)) : {};
         },
         saveData: async (_file: string, data: any) => {
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          await new Promise(resolve => setTimeout(resolve, 20));
           savedData = data;
         },
       } as any;

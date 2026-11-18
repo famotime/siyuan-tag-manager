@@ -155,7 +155,7 @@ describe('TagBatchService 批量打标与属性更新测试', () => {
         });
 
         // 首轮仍在飞行：等待进入挂起后发起的并发调用应被拒绝
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
         const second = await TagBatchService.executeBatchTagging(['doc-2'], ['ai'], () => {});
         expect(second).toBe(false);
         expect(batchSpy).toHaveBeenCalledTimes(1); // 第二次未进入 batchTagDocuments

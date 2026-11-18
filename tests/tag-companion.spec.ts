@@ -335,7 +335,7 @@ describe('伴生标签智能推荐服务与算法测试', () => {
         const first = TagCompanionService.acceptCandidate(candidates[0], 0);
         const second = TagCompanionService.acceptCandidate(candidates[1], 1);
         // 等待首个采纳推进到挂起的 updateBlock，再放行以验证串行锁
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise(resolve => setTimeout(resolve, 0));
         resolveUpdate();
         await Promise.all([first, second]);
 
