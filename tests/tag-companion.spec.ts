@@ -321,7 +321,9 @@ describe('伴生标签智能推荐服务与算法测试', () => {
       let resolveUpdate!: () => void;
       TagApiClient.getBlockMarkdown = async () => '正文内容';
       TagApiClient.updateBlock = async () => {
-        await new Promise<void>((resolve) => { resolveUpdate = resolve; });
+        await new Promise<void>((resolve) => {
+          resolveUpdate = resolve;
+        });
       };
 
       try {
