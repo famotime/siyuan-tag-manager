@@ -70,36 +70,75 @@
 ## 三、修复计划跟踪表
 
 > 状态取值：`待修复` / `已修复` / `跳过（原因）`
+> 修复完成日期：2026-11-18；全部修复已通过 353 项单元测试（32 个用例文件）、`pnpm typecheck`、`pnpm build` 与 `npx eslint src tests` 全绿验证。
 
 | 编号 | 问题 | 修复方案 | 状态 | 提交 |
 |------|------|---------|------|------|
-| P0-1 | queryLoading 卡死 | 空筛选分支复用 seq 协议并复位 loading | 待修复 | — |
-| P0-2 | Escape 链缺树内对话框/输入框冒泡 | escapeClosers 支持外部注册 + executing 守卫 + 输入框 .stop | 待修复 | — |
-| P0-3 | 伴生索引失效闭环断裂 | triggerRecommendation 消费 dirty + 打标操作统一 markDirty + 构建序号防误清 | 待修复 | — |
-| P0-4 | 身份迁移协议分叉 | 提取 migrateTagReferences，normalize/merge/autoResolve 全部走同一入口 | 待修复 | — |
-| P1-1 | 假异步守卫 | onBatchReparent/onRenameTag 改为可 await 契约 | 待修复 | — |
-| P1-2 | 气泡复活竞态 | triggerRecommendation 加 seq 令牌 + await 后复验条件 | 待修复 | — |
-| P1-3 | 轮询链无取消 | centerBlockInView 加静态 seq 取消令牌；startTagDrag 加会话哨兵 | 待修复 | — |
-| P1-4 | 采纳静默失败 | 检查返回值/失败回滚 markAccepted/串行化 isAccepting | 待修复 | — |
-| P1-5 | 共享 loading | 改引用计数 busy + refreshTags 加 seq | 待修复 | — |
-| P1-6 | 批量防并发缺失 | executeBatchTagging 服务级串行守卫 + App 入口守卫 | 待修复 | — |
-| P1-7 | 独立弹窗状态同步 | onSuccess 派发全局事件，Dock 内 App 监听刷新 | 待修复 | — |
-| P1-8 | 扫描失败显示成功 | scanned 成功后才置位 | 待修复 | — |
-| P2-1 | Esc 打断执行中弹窗 | 并入 P0-2（canClose 守卫） | 待修复 | — |
-| P2-2 | 配置写入竞态 | updateConfig 串行化队列 | 待修复 | — |
-| P2-3 | resize 监听泄漏 | onUnmounted 清理 | 待修复 | — |
-| P2-4 | tooltip DOM 泄漏 | destroyTooltip() + onunload 调用 | 待修复 | — |
-| P2-5 | allCollapsed 失同步 | toggleNodeCollapse 后重算 | 待修复 | — |
-| P2-6 | 批量弹窗残留状态 | open-watch 清理搜索态 | 待修复 | — |
-| P2-7 | confirmDialog 回调残留 | @close 改用 closeConfirmDialog | 待修复 | — |
-| P2-8 | hoverTimer 串源 | cursor-idle 独立定时器 | 待修复 | — |
+| P0-1 | queryLoading 卡死 | 空筛选分支复用 seq 协议并复位 loading | 已修复 | `81a598f` |
+| P0-2 | Escape 链缺树内对话框/输入框冒泡 | escapeClosers 支持外部注册（registerEscapeCloser）+ 执行中弹窗 canClose 守卫 + 输入框 .stop | 已修复 | `007100d` |
+| P0-3 | 伴生索引失效闭环断裂 | triggerRecommendation 消费 dirty + 打标操作统一 markDirty + dirtyGeneration 防构建误清 | 已修复 | `5364a98` |
+| P0-4 | 身份迁移协议分叉 | 提取 migrateTagReferences，normalize/merge/autoResolve 全部走同一入口并持久化 | 已修复 | `0414046` |
+| P1-1 | 假异步守卫 | onBatchReparent/onRenameTag 改为可 await 契约；TagTreeView 注入 reparentExecutor/renameExecutor（Vue emit 不回传 Promise，已实测确认） | 已修复 | `ae2ecc8` |
+| P1-2 | 气泡复活竞态 | triggerRecommendation 加 triggerSeq 令牌 + await 后复验条件，hide() 作废在途触发 | 已修复 | `5364a98` |
+| P1-3 | 轮询链无取消 | centerBlockInView 加静态 jumpSeq 取消令牌；startTagDrag 加 dragSession 会话哨兵 | 已修复 | `e06fe00` |
+| P1-4 | 采纳静默失败 | 检查块级写入返回值/失败回滚 markAccepted 且不推进指针/isAccepting 串行化 | 已修复 | `5364a98` |
+| P1-5 | 共享 loading | 改 loadingDepth 引用计数 + computed；refreshTags 加 refreshSeq 竞态防护 | 已修复 | `114fdfe` |
+| P1-6 | 批量防并发缺失 | executeBatchTagging 服务级串行守卫 | 已修复 | `445fa88` |
+| P1-7 | 独立弹窗状态同步 | notifyTagDataChanged 全局事件，Dock 内 App 监听刷新 | 已修复 | `445fa88` |
+| P1-8 | 扫描失败显示成功 | scanned 成功后才置位 | 已修复 | `58e060b` |
+| P2-1 | Esc 打断执行中弹窗 | 并入 P0-2（canClose 守卫） | 已修复 | `007100d` |
+| P2-2 | 配置写入竞态 | updateConfig 串行化写入队列，队尾吸收失败 | 已修复 | `7d2c982` |
+| P2-3 | resize 监听泄漏 | 清理句柄 + onUnmounted 强制回收 | 已修复 | `7d2c982` |
+| P2-4 | tooltip DOM 泄漏 | destroyTooltip() + onunload 调用 | 已修复 | `7d2c982` |
+| P2-5 | allCollapsed 失同步 | toggleNodeCollapse 后按折叠集重算 | 已修复 | `7d2c982` |
+| P2-6 | 批量弹窗残留状态 | open-watch 清理搜索关键词/结果/完成标记 | 已修复 | `7d2c982` |
+| P2-7 | confirmDialog 回调残留 | @close 改用 closeConfirmDialog | 已修复 | `007100d` |
+| P2-8 | hoverTimer 串源 | 悬浮/光标停留定时器分离存储，mouseout/hide 统一回收 | 已修复 | `5364a98` |
 | P2-9 | 滚动位置内存态 | 跳过（现状行为可接受，避免无谓改动） | 跳过 | — |
+
+### 修复提交清单（时序）
+
+```
+81a598f fix(filter): 修复清空筛选打断在途查询时 queryLoading 永久卡死
+007100d fix(escape): 统一 Escape 关闭架构，树内对话框与执行中弹窗纳入关闭链
+5364a98 fix(companion): 打通共现索引失效闭环并修复推荐气泡竞态与采纳静默失败
+0414046 fix(migration): 统一标签身份迁移协议，规范化/合并/一键修复不再绕过
+ae2ecc8 fix(async): 拖拽重构与行内重命名假异步守卫改为真实 await
+114fdfe fix(async): 全局 loading 改引用计数并给 refreshTags 加竞态防护
+e06fe00 fix(nav): 块定位轮询链加取消令牌并消除拖拽幽灵态残留
+445fa88 fix(batch): 批量打标串行防重入并同步独立弹窗执行结果到 Dock 工作台
+58e060b fix(ref-promote): 扫描失败不再误显示为空成功态
+7d2c982 fix(hygiene): 清理配置写入竞态与生命周期残留
+9a22ecc / 5a08870 / b4b724d / d9796b7 style: lint 门禁基线对齐
+```
+
+### 新增测试覆盖（共 23 项新用例）
+
+- `tests/ui-tag-filter.spec.ts`（新增文件）：seq 竞态时序 5 项（含 loading 卡死回归、迟到结果丢弃、失败复位）。
+- `tests/ui-modal-orchestration.spec.ts`：动态注册项优先级/注销、canClose 吞事件、执行中弹窗保护、confirmDialog 取消语义。
+- `tests/tag-companion.spec.ts`：dirty 消费闭环、构建期脏标记保护、采纳失败回滚、并发串行化。
+- `tests/ui-composables.spec.ts`：迁移合并语义与去重级联、并发刷新丢弃与忙碌计数。
+- `tests/ui-tree-composables.spec.ts`：挂起期守卫/重复触发忽略/失败不展开祖先链、拖拽幽灵态不复活。
+- `tests/tag-navigation.spec.ts`：旧轮询链作废。
+- `tests/tag-batch.spec.ts`：并发重入拒绝、空参快速拒绝。
+- `tests/ui-ref-promote-panel.spec.ts`：扫描成功/失败状态。
+- `tests/tag-config-store.spec.ts`：并发写入串行化、失败不阻塞。
+- `tests/ui-doc-selection.spec.ts`：弹窗重开清理搜索态。
 
 ---
 
 ## 四、中期重构方向（本次不实施，记录备查）
 
-1. 引入 `useAsyncTask` 原语（seq + 引用计数 busy + error 枚举）统一替换散落的 try/finally 布尔模式。
-2. 弹窗编排升级为带 z 序的显式对话框仓库（11 个弹窗 + 2 个树内对话框共用）。
-3. App.vue 的「内核操作 → 本地状态迁移 → 持久化 → refreshAllData」链条下沉为 `TagWorkbenchOrchestrator`。
-4. 测试补强方向：异步竞态时序用例、身份迁移完整性快照、缓存失效闭环用例。
+1. 引入 `useAsyncTask` 原语（seq + 引用计数 busy + error 枚举）统一替换散落的 try/finally 布尔模式——本次修复已在 `useTagData`（loadingDepth）与 `runQuery`（seq）落地局部实现，可后续抽为通用原语。
+2. 弹窗编排升级为带 z 序的显式对话框仓库（11 个弹窗 + 2 个树内对话框共用）——本次 `registerEscapeCloser` 动态注册机制已是雏形。
+3. App.vue 的「内核操作 → 本地状态迁移 → 持久化 → refreshAllData」链条下沉为 `TagWorkbenchOrchestrator`——本次 `migrateTagReferences` 统一迁移函数是第一步。
+4. 测试补强方向：异步竞态时序用例、身份迁移完整性快照、缓存失效闭环用例——本次已补 23 项回归用例（见第三节清单）。
+
+---
+
+## 五、实施过程中的关键决策记录
+
+1. **Vue emit 不回传 Promise**（经实测 Vue 3.5.41 runtime-core 确认：`emit` 调用 handler 的返回值被丢弃），因此假异步守卫修复采用与 `getTagStyle` 一致的**函数 prop 注入执行器**模式（`reparentExecutor`/`renameExecutor`），emit 保留为未注入时的回退通道。
+2. **Escape 关闭链采用「动态注册项」而非完整对话框仓库重构**：`registerEscapeCloser` 让各 Tab 内部局部可关闭面（树内确认框、行内编辑态）以最小侵入挂入统一链条，为未来的对话框仓库留出接口。
+3. **伴生索引重建不设冷却期**：`markDirty` 后的下一次触发即重建。若大库场景出现频繁重建的性能问题，可在 `ensureIndexLoaded` 增加 `lastBuiltTime` 冷却窗口，属于单点增强。
+4. **`migrateTagReferences` 的合并语义**：目标元数据已存在时保留目标样式字段并合并别名集合（源字段仅在目标缺失时并入），标签组/自定义标签全程大小写不敏感去重，防止合并产生重复引用。
