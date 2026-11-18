@@ -19,6 +19,7 @@ import '@/index.scss';
 import { TagVisualService } from '@/services/TagVisualService';
 import { TagDomDecorator } from '@/services/TagDomDecorator';
 import { batchTagBridge } from '@/utils/batchTagBridge';
+import { destroyTooltip } from '@/utils/tooltip';
 import {
   openStandaloneBatchModal,
   closeStandaloneBatchModal,
@@ -208,6 +209,9 @@ export default class TagManagerPlugin extends Plugin {
     TagDomDecorator.stopObserving();
     TagDomDecorator.clearDecorations();
     TagVisualService.removeStyles();
+
+    // 回收全局 tooltip 气泡节点与挂起定时器
+    destroyTooltip();
   }
 
   async onDataChanged(_reason?: TPluginDataChangeReason): Promise<void> {

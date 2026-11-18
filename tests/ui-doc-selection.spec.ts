@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { reactive } from 'vue';
 import { useDocSelection } from '../src/composables/useDocSelection';
 import { TagBatchService } from '../src/services/TagBatchService';
 import type { IBatchModalState } from '../src/types/ui';
@@ -8,13 +9,14 @@ import type { IBatchModalState } from '../src/types/ui';
  * 覆盖：初始化回填、选取切换、子文档排除与合并去重、手动 ID 同步、执行上下文回传
  */
 function makeState(partial?: Partial<IBatchModalState>): IBatchModalState {
-  return {
+  // 与生产一致使用 reactive：watch 源依赖可见性与目标文档的响应式变化
+  return reactive({
     visible: false,
     docIdsText: '',
     tagsText: '',
     executing: false,
     ...partial,
-  } as IBatchModalState;
+  }) as IBatchModalState;
 }
 
 function setup(state: IBatchModalState) {
@@ -57,6 +59,27 @@ describe('useDocSelection 文档选取子域', () => {
       { id: 'doc-a', title: 'doc-a' },
       { id: 'doc-b', title: 'doc-b' },
     ]);
+  });
+
+  it('visible 开启时清理上次会话残留的搜索状态', async () => {
+    const { nextTick } = await import('vue');
+    const state = makeState({ visible: false, targetDocs: [{ id: 'doc-1', title: '文档一' }] });
+    const composable = setup(state);
+    const { docSearchKeyword, searchDocResults, searched } = composable;
+
+    // 模拟上次会话残留
+    docSearchKeyword.value = '旧关键词';
+    searchDocResults.value = [{ id: 'old', title: '旧结果', tags: [] }];
+    searched.value = true;
+
+    // 重新打开弹窗（watch 在调度器 flush 后触发）
+    state.visible = true;
+    await nextTick();
+    await nextTick();
+
+    expect(docSearchKeyword.value).toBe('');
+    expect(searchDocResults.value).toEqual([]);
+    expect(searched.value).toBe(false);
   });
 
   it('toggleDocSelection 选取与移除互逆，isDocSelected 状态同步', () => {

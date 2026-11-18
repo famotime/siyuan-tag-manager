@@ -14,6 +14,13 @@ export const TAG_MANAGER_CONFIG_STORAGE = 'tag-manager-config.json';
  */
 export class TagConfigStore {
   /**
+   * 写入串行队列：updateConfig 是“读-合并-写”三步，两个并发写入若交错执行
+   * 会各自基于同一份旧快照合并，后写者覆盖前写者造成丢失更新。
+   * 所有写入按到达顺序串行执行，每次都读取最新磁盘快照。
+   */
+  private static writeQueue: Promise<void> = Promise.resolve();
+
+  /**
    * 读取当前持久化的完整配置
    * 无文件、内容为空或损坏时返回空对象，不抛出
    */
@@ -29,10 +36,17 @@ export class TagConfigStore {
 
   /**
    * 读-合并-写：仅覆盖传入字段，保留配置文件中的其余字段
+   * （并发调用经内部队列串行化，保证每次合并都基于最新落盘数据）
    */
-  public static async updateConfig(partial: Record<string, any>): Promise<void> {
-    const plugin = usePlugin();
-    const current = await this.readConfig();
-    await plugin.saveData(TAG_MANAGER_CONFIG_STORAGE, { ...current, ...partial });
+  public static updateConfig(partial: Record<string, any>): Promise<void> {
+    const run = async () => {
+      const plugin = usePlugin();
+      const current = await this.readConfig();
+      await plugin.saveData(TAG_MANAGER_CONFIG_STORAGE, { ...current, ...partial });
+    };
+    const next = this.writeQueue.then(run, run);
+    // 队尾吸收失败，保证前序写入失败不会卡死后续写入
+    this.writeQueue = next.catch(() => {});
+    return next;
   }
 }

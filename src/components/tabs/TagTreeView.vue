@@ -904,6 +904,10 @@ function toggleNodeCollapse(label: string) {
   } else {
     collapsedSet.value.add(label);
   }
+  // 逐节点操作后同步「全部折叠/展开」按钮语义，避免与 allCollapsed 失同步
+  allCollapsed.value = virtualAllTags.value.every(
+    t => !hasSubTags(t.label) || collapsedSet.value.has(t.label),
+  );
 }
 
 function isNodeVisible(node: ITagItem): boolean {

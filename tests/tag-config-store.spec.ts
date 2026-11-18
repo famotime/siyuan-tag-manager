@@ -152,4 +152,56 @@ describe('TagConfigStore 配置统一存储', () => {
       expect(tagDeleteConfig.value.mode).toBe('remove_all');
     });
   });
+
+  describe('updateConfig · 并发写入串行化', () => {
+    it('并发 updateConfig 交错执行时不丢失对方字段（丢失更新回归）', async () => {
+      // 模拟磁盘延迟：saveData 等待两拍，制造两个并发写入交错的窗口
+      let savedData: any = null;
+      const mockPlugin = {
+        loadData: async (file: string) => {
+          if (file !== TAG_MANAGER_CONFIG_STORAGE) return null;
+          return savedData ? JSON.parse(JSON.stringify(savedData)) : {};
+        },
+        saveData: async (_file: string, data: any) => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      // 无串行化时：A/B 各自读到旧快照，后写者覆盖前写者字段
+      await Promise.all([
+        TagConfigStore.updateConfig({ fieldA: 'a' }),
+        TagConfigStore.updateConfig({ fieldB: 'b' }),
+      ]);
+
+      // 通过再次读取校验最终落盘同时包含两个字段
+      const final = await TagConfigStore.readConfig();
+      expect(final.fieldA).toBe('a');
+      expect(final.fieldB).toBe('b');
+    });
+
+    it('前序写入失败不阻塞后续写入', async () => {
+      let savedData: any = null;
+      let failNext = true;
+      const mockPlugin = {
+        loadData: async () => (savedData ? JSON.parse(JSON.stringify(savedData)) : {}),
+        saveData: async (_file: string, data: any) => {
+          if (failNext) {
+            failNext = false;
+            throw new Error('disk error');
+          }
+          savedData = data;
+        },
+      } as any;
+      usePlugin(mockPlugin);
+
+      const failing = TagConfigStore.updateConfig({ bad: 1 });
+      await expect(failing).rejects.toThrow('disk error');
+
+      // 前序失败后，后续写入仍正常执行
+      await TagConfigStore.updateConfig({ good: 1 });
+      expect(savedData).toEqual({ good: 1 });
+    });
+  });
 });

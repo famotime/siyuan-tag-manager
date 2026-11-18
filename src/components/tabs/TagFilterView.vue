@@ -281,7 +281,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import type { ITagItem, ITagMatchedBlock, ISmartTagView, TagFilterConditionMode } from '../../types/tag';
 import { TagPinyinAliasService } from '../../services/TagPinyinAliasService';
 import { TagFilterEngine } from '../../services/TagFilterEngine';
@@ -360,6 +360,16 @@ const filterBoxRef = ref<HTMLElement | null>(null);
 const quickTagsRef = ref<HTMLElement | null>(null);
 const isResizingFilterBox = ref(false);
 const expandQuickTags = ref(false);
+// 拖拽调宽的 window 级监听回收句柄（组件卸载时强制清理，防止泄漏）
+let activeResizeCleanup: (() => void) | null = null;
+
+onUnmounted(() => {
+  if (activeResizeCleanup) {
+    activeResizeCleanup();
+    activeResizeCleanup = null;
+    isResizingFilterBox.value = false;
+  }
+});
 
 const filterBoxHeight = ref<number | null>((() => {
   try {
@@ -438,6 +448,7 @@ function startFilterBoxResize(e: MouseEvent) {
     isResizingFilterBox.value = false;
     window.removeEventListener('mousemove', onMouseMove);
     window.removeEventListener('mouseup', onMouseUp);
+    activeResizeCleanup = null;
     if (filterBoxHeight.value) {
       try {
         localStorage.setItem('siyuan_tm_filter_box_height', String(filterBoxHeight.value));
@@ -447,6 +458,11 @@ function startFilterBoxResize(e: MouseEvent) {
 
   window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mouseup', onMouseUp);
+  // 记录清理句柄：组件在拖拽中途被卸载（切 Tab/关 Dock）时由 onUnmounted 强制回收
+  activeResizeCleanup = () => {
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
 }
 
 function resetFilterBoxHeight() {

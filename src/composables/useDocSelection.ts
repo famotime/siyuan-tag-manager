@@ -113,6 +113,11 @@ export function useDocSelection(options: {
     [() => options.getState().visible, () => options.getState().targetDocs],
     ([vis]) => {
       if (vis) {
+        // 清理上次会话残留的搜索状态，避免重开弹窗时显示陈旧结果
+        docSearchKeyword.value = '';
+        searchDocResults.value = [];
+        searched.value = false;
+
         const state = options.getState();
         includeSubDocs.value = Boolean(state.includeSubDocs);
         excludedSubDocIds.value = new Set();

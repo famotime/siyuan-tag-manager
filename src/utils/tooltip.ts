@@ -71,8 +71,7 @@ function hideTooltip() {
   currentTarget = null;
 }
 
-export const vTooltip: Directive<HTMLElement, string | undefined> = {
-  mounted(el, binding) {
+export const vTooltip: Directive<HTMLElement, string | undefined> = {  mounted(el, binding) {
     el.setAttribute('data-tm-tooltip', binding.value || '');
 
     const onMouseEnter = () => {
@@ -124,3 +123,22 @@ export const vTooltip: Directive<HTMLElement, string | undefined> = {
     }
   },
 };
+
+/**
+ * 插件卸载时回收全局 tooltip 资源：清理挂起定时器并移除 body 上的气泡节点
+ */
+export function destroyTooltip(): void {
+  if (showTimer) {
+    clearTimeout(showTimer);
+    showTimer = null;
+  }
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+  currentTarget = null;
+  if (tooltipEl) {
+    tooltipEl.remove();
+    tooltipEl = null;
+  }
+}
