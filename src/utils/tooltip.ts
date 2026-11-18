@@ -71,58 +71,55 @@ function hideTooltip() {
   currentTarget = null;
 }
 
-export const vTooltip: Directive<HTMLElement, string | undefined> = {  mounted(el, binding) {
-    el.setAttribute('data-tm-tooltip', binding.value || '');
+export const vTooltip: Directive<HTMLElement, string | undefined> = { mounted(el, binding) {
+  el.setAttribute('data-tm-tooltip', binding.value || '');
 
-    const onMouseEnter = () => {
-      const text = el.getAttribute('data-tm-tooltip');
-      if (!text) return;
-      clearTimeout(hideTimer);
-      clearTimeout(showTimer);
-      currentTarget = el;
-      // 150ms 延迟淡入，即时但避免鼠标快速掠过时误触发
-      showTimer = setTimeout(() => {
-        if (currentTarget === el) {
-          showTooltip(el, text);
-        }
-      }, 150);
-    };
-
-    const onMouseLeave = () => {
-      clearTimeout(showTimer);
-      clearTimeout(hideTimer);
+  const onMouseEnter = () => {
+    const text = el.getAttribute('data-tm-tooltip');
+    if (!text) return;
+    clearTimeout(hideTimer);
+    clearTimeout(showTimer);
+    currentTarget = el;
+    // 150ms 延迟淡入，即时但避免鼠标快速掠过时误触发
+    showTimer = setTimeout(() => {
       if (currentTarget === el) {
-        // 80ms 快速消失
-        hideTimer = setTimeout(() => {
-          hideTooltip();
-        }, 80);
+        showTooltip(el, text);
       }
-    };
+    }, 150);
+  };
 
-    (el as any)._tmTooltipEnter = onMouseEnter;
-    (el as any)._tmTooltipLeave = onMouseLeave;
-
-    el.addEventListener('mouseenter', onMouseEnter);
-    el.addEventListener('mouseleave', onMouseLeave);
-  },
-  updated(el, binding) {
-    el.setAttribute('data-tm-tooltip', binding.value || '');
-    if (currentTarget === el && tooltipEl && tooltipEl.style.opacity === '1') {
-      tooltipEl.textContent = binding.value || '';
-    }
-  },
-  unmounted(el) {
-    if ((el as any)._tmTooltipEnter) {
-      el.removeEventListener('mouseenter', (el as any)._tmTooltipEnter);
-    }
-    if ((el as any)._tmTooltipLeave) {
-      el.removeEventListener('mouseleave', (el as any)._tmTooltipLeave);
-    }
+  const onMouseLeave = () => {
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
     if (currentTarget === el) {
-      hideTooltip();
+      // 80ms 快速消失
+      hideTimer = setTimeout(() => {
+        hideTooltip();
+      }, 80);
     }
-  },
-};
+  };
+
+  (el as any)._tmTooltipEnter = onMouseEnter;
+  (el as any)._tmTooltipLeave = onMouseLeave;
+
+  el.addEventListener('mouseenter', onMouseEnter);
+  el.addEventListener('mouseleave', onMouseLeave);
+}, updated(el, binding) {
+  el.setAttribute('data-tm-tooltip', binding.value || '');
+  if (currentTarget === el && tooltipEl && tooltipEl.style.opacity === '1') {
+    tooltipEl.textContent = binding.value || '';
+  }
+}, unmounted(el) {
+  if ((el as any)._tmTooltipEnter) {
+    el.removeEventListener('mouseenter', (el as any)._tmTooltipEnter);
+  }
+  if ((el as any)._tmTooltipLeave) {
+    el.removeEventListener('mouseleave', (el as any)._tmTooltipLeave);
+  }
+  if (currentTarget === el) {
+    hideTooltip();
+  }
+} };
 
 /**
  * 插件卸载时回收全局 tooltip 资源：清理挂起定时器并移除 body 上的气泡节点

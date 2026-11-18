@@ -803,7 +803,7 @@ const {
 } = useTreeDragDrop({
   virtualAllTags,
   collapsedSet,
-  onBatchReparent: (moves) =>
+  onBatchReparent: moves =>
     props.reparentExecutor
       ? props.reparentExecutor(moves)
       : emit('batch-reparent', moves),
