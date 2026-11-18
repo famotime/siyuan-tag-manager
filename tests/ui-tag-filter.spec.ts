@@ -22,7 +22,7 @@ describe('useTagFilter 查询状态机', () => {
   });
 
   it('空筛选提前返回时复位 queryLoading', async () => {
-    const { activeFilter, runQuery, queryLoading } = useTagFilter();
+    const { runQuery, queryLoading } = useTagFilter();
 
     queryLoading.value = true;
     await runQuery();

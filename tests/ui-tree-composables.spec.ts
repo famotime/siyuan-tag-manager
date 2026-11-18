@@ -88,7 +88,9 @@ describe('useInlineRename 行内就地重命名', () => {
   it('提交期间 isSubmittingRename 保持为真阻止重复提交，完成后清理编辑态', async () => {
     let resolveRename!: () => void;
     const tags: ITagItem[] = [{ name: 'vue', label: 'vue', count: 1, depth: 0 }];
-    const onRenameTag = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveRename = resolve; }));
+    const onRenameTag = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      resolveRename = resolve;
+    }));
     const composable = useInlineRename({ allTags: () => tags, onRenameTag });
 
     composable.editingLabel.value = 'vue';
@@ -306,7 +308,9 @@ describe('useTreeDragDrop 拖拽层级重构', () => {
     let resolveReparent!: () => void;
     const virtualAllTags = ref<ITagItem[]>(mockTags);
     const collapsedSet = ref<Set<string>>(new Set());
-    const onBatchReparent = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveReparent = resolve; }));
+    const onBatchReparent = vi.fn().mockImplementation(() => new Promise<void>((resolve) => {
+      resolveReparent = resolve;
+    }));
     const composable = useTreeDragDrop({ virtualAllTags, collapsedSet, onBatchReparent });
 
     composable.reparentConfirmState.value = {
